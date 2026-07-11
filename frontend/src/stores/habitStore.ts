@@ -24,7 +24,7 @@ interface HabitState {
     addXPToCurrentUser: (xpAmount: number) => void
     fetchCurrentUser: () => Promise<void>
 
-    login: (username: string, password: string) => Promise<boolean>
+    login: (login: string, password: string) => Promise<boolean>
     logout: () => void
 }
 
@@ -205,16 +205,15 @@ export const useHabitStore = create<HabitState>((set, get) => {
             }
         },
 
-        login: async (username, password) => {
+        login: async (login, password) => {
             try {
                 const res = await fetch('http://localhost:5000/api/user/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password }),
+                    body: JSON.stringify({ login, password }),
                 })
 
                 if (!res.ok) {
-                    alert('登录失败，用户名或密码错误')
                     return false
                 }
 

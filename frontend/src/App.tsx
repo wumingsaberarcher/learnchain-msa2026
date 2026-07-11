@@ -5,11 +5,14 @@ import Dashboard from './pages/ChainDashboard'
 import Habits from './pages/Habits'
 import LoginModal from './components/LoginModal'
 import BackgroundAnimation from './components/BackgroundAnimation'
+import LanguageToggle from './components/LanguageToggle'
 import { useHabitStore } from './stores/habitStore'
+import { useTranslation } from './stores/languageStore'
 
 function App() {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
     const { isLoggedIn, currentUser, logout } = useHabitStore()
+    const { t } = useTranslation()
 
     return (
         <BrowserRouter>
@@ -32,7 +35,7 @@ function App() {
                                         to="/"
                                         className={({ isActive }) => (isActive ? 'active' : undefined)}
                                     >
-                                        仪表盘
+                                        {t('nav.dashboard')}
                                     </NavLink>
                                 </li>
                                 <li>
@@ -40,17 +43,19 @@ function App() {
                                         to="/habits"
                                         className={({ isActive }) => (isActive ? 'active' : undefined)}
                                     >
-                                        我的习惯
+                                        {t('nav.habits')}
                                     </NavLink>
                                 </li>
                             </ul>
+
+                            <LanguageToggle />
 
                             <div className="nav-auth">
                                 {isLoggedIn && currentUser ? (
                                     <>
                                         <span className="nav-username">{currentUser.username}</span>
                                         <button type="button" className="btn-nav-logout" onClick={logout}>
-                                            登出
+                                            {t('nav.logout')}
                                         </button>
                                     </>
                                 ) : (
@@ -59,7 +64,7 @@ function App() {
                                         className="btn btn-primary btn-nav-login"
                                         onClick={() => setIsLoginModalOpen(true)}
                                     >
-                                        登录
+                                        {t('nav.login')}
                                     </button>
                                 )}
                             </div>

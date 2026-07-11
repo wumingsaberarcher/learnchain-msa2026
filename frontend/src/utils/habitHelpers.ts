@@ -1,3 +1,5 @@
+import type { TranslationKey } from '../i18n/translations'
+
 export type HabitType = 'Daily' | 'EveryOtherDay' | 'Weekly' | 'OneTime'
 
 export interface HabitMilestone {
@@ -82,12 +84,35 @@ export function daysUntil(dateStr?: string): number | null {
     return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
 }
 
-export function formatCountdown(dateStr?: string): string {
+export function habitTypeKey(type: string): TranslationKey {
+    switch (type) {
+        case 'EveryOtherDay': return 'type.everyOther'
+        case 'Weekly': return 'type.weekly'
+        case 'OneTime': return 'type.oneTime'
+        default: return 'type.daily'
+    }
+}
+
+export function difficultyKey(difficulty: number): TranslationKey {
+    if (difficulty === 2) return 'diff.medium'
+    if (difficulty === 3) return 'diff.hard'
+    return 'diff.easy'
+}
+
+export function isDuplicateHabitName(name: string, existingNames: string[]): boolean {
+    const normalized = name.trim().toLowerCase()
+    return existingNames.some(n => n.trim().toLowerCase() === normalized)
+}
+
+export function formatCountdownI18n(
+    dateStr: string | undefined,
+    t: (key: TranslationKey, params?: Record<string, string | number>) => string
+): string {
     const days = daysUntil(dateStr)
     if (days === null) return ''
-    if (days < 0) return `已逾期 ${Math.abs(days)} 天`
-    if (days === 0) return '今天截止'
-    return `还剩 ${days} 天`
+    if (days < 0) return t('countdown.overdue', { days: Math.abs(days) })
+    if (days === 0) return t('countdown.today')
+    return t('countdown.remaining', { days })
 }
 
 export function getPendingMilestones(habit: Habit) {

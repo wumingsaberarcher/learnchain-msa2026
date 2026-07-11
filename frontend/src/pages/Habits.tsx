@@ -5,12 +5,14 @@ import { getAllHabits } from '../api/habitApi'
 import CreateHabitWizard from '../components/CreateHabitWizard'
 import type { CreateHabitPayload } from '../utils/habitHelpers'
 import {
-    formatCountdown,
-    getDifficultyLabel,
+    difficultyKey,
+    formatCountdownI18n,
     getDueMilestonesToday,
-    getHabitTypeLabel,
     getPendingMilestones,
+    habitTypeKey,
+    isDuplicateHabitName,
 } from '../utils/habitHelpers'
+import { useTranslation } from '../stores/languageStore'
 import {
     Flame,
     Plus,
@@ -51,6 +53,8 @@ export default function Habits() {
         fetchCurrentUser,
     } = useHabitStore()
 
+    const { t } = useTranslation()
+
     const [showForm, setShowForm] = useState(false)
     const [checkInLoading, setCheckInLoading] = useState<string | null>(null)
     const [successMessage, setSuccessMessage] = useState('')
@@ -89,17 +93,27 @@ export default function Habits() {
     }, [successMessage])
 
     const handleCreateHabit = async (payload: CreateHabitPayload) => {
-        await addHabit(payload)
-        setSuccessMessage('习惯创建成功！')
-        await fetchHabits()
+        try {
+            await addHabit(payload)
+            setSuccessMessage(t('habits.createSuccess'))
+            await fetchHabits()
+        } catch (err: any) {
+            alert(err?.message || t('habits.nameDuplicate'))
+            throw err
+        }
     }
 
     const handleUpdateHabit = async () => {
         if (!editingHabit || !editingHabit.name.trim()) return
+        const otherNames = habits.filter(h => h.id !== editingHabit.id).map(h => h.name)
+        if (isDuplicateHabitName(editingHabit.name, otherNames)) {
+            alert(t('habits.nameDuplicate'))
+            return
+        }
         try {
             await updateHabit(editingHabit.id, { name: editingHabit.name.trim() })
             setEditingHabit(null)
-            setSuccessMessage('习惯更新成功！')
+            setSuccessMessage(t('habits.updateSuccess'))
             await fetchHabits()
         } catch {
             alert('更新失败')
@@ -110,7 +124,7 @@ export default function Habits() {
         if (!confirm(`确定要删除「${name}」吗？\n\n注意：打卡历史会保留，你可以在下方的「历史痕迹」中查看过去贡献的经验值。`)) return
         try {
             await deleteHabit(id)
-            setSuccessMessage('习惯已删除，历史记录已保留')
+            setSuccessMessage(t('habits.deleteSuccess'))
         } catch {
             alert('删除失败')
         }
@@ -121,7 +135,7 @@ export default function Habits() {
         setCheckInLoading(key)
         try {
             const result = await createCheckIn({ habitId, milestoneId })
-            setSuccessMessage(`打卡成功！+${result.xpEarned} XP`)
+            setSuccessMessage(`${t('habits.checkinSuccess')} +${result.xpEarned} XP`)
             await fetchCurrentUser()
             await fetchHabits()
             markHabitCheckedToday(habitId)
@@ -175,10 +189,10 @@ export default function Habits() {
                     <div className="habits-empty-icon">
                         <Target className="w-8 h-8" />
                     </div>
-                    <h2>请先登录</h2>
-                    <p>登录后即可创建习惯、打卡积累 XP，开启你的成长链。</p>
-                    <button type="button" className="btn btn-primary" onClick={() => alert('请点击右上角「登录」按钮')}>
-                        去登录
+                    <h2>{t('habits.pleaseLogin')}</h2>
+                    <p>{t('habits.loginHint')}</p>
+                    <button type="button" className="btn btn-primary" onClick={() => alert(t('habits.loginAlert'))}>
+                        {t('habits.goLogin')}
                     </button>
                 </div>
             </div>
@@ -189,34 +203,34 @@ export default function Habits() {
         <div className="habits-page">
             <div className="habits-page-header">
                 <div>
-                    <h1 className="habits-page-title">我的习惯</h1>
-                    <p className="habits-page-subtitle">坚持打卡，积累连击与经验值</p>
+                    <h1 className="habits-page-title">{t('habits.title')}</h1>
+                    <p className="habits-page-subtitle">{t('habits.subtitle')}</p>
                 </div>
                 <button type="button" className="btn-habit-add" onClick={() => setShowForm(true)}>
-                    <Plus className="w-4 h-4" /> 新建习惯
+                    <Plus className="w-4 h-4" /> {t('habits.new')}
                 </button>
             </div>
 
             <div className="habits-stats-row">
                 <div className="habits-stat-chip">
                     <span className="habits-stat-value">{habits.length}</span>
-                    <span className="habits-stat-label">习惯总数</span>
+                    <span className="habits-stat-label">{t('habits.total')}</span>
                 </div>
                 <div className="habits-stat-chip">
                     <span className="habits-stat-value">{todayCheckedCount}</span>
-                    <span className="habits-stat-label">今日已打卡</span>
+                    <span className="habits-stat-label">{t('habits.checkedToday')}</span>
                 </div>
                 <div className="habits-stat-chip">
                     <span className="habits-stat-value">{pendingToday}</span>
-                    <span className="habits-stat-label">今日待打卡</span>
+                    <span className="habits-stat-label">{t('habits.pendingToday')}</span>
                 </div>
                 <div className="habits-stat-chip">
                     <span className="habits-stat-value">{totalStreak}</span>
-                    <span className="habits-stat-label">累计连击天数</span>
+                    <span className="habits-stat-label">{t('habits.totalStreak')}</span>
                 </div>
                 <div className="habits-stat-chip">
                     <span className="habits-stat-value">{currentUser?.totalXP || 0}</span>
-                    <span className="habits-stat-label">总经验值</span>
+                    <span className="habits-stat-label">{t('dash.totalXp')}</span>
                 </div>
             </div>
 
@@ -231,19 +245,20 @@ export default function Habits() {
                 <CreateHabitWizard
                     onClose={() => setShowForm(false)}
                     onSubmit={handleCreateHabit}
+                    existingNames={habits.map(h => h.name)}
                 />
             )}
 
             {isLoading ? (
-                <div className="habits-loading"><Loader2 className="w-6 h-6 animate-spin inline-block mr-2" />加载中...</div>
+                <div className="habits-loading"><Loader2 className="w-6 h-6 animate-spin inline-block mr-2" />{t('habits.loading')}</div>
             ) : error ? (
                 <div className="habits-error">{error}</div>
             ) : habits.length === 0 ? (
                 <div className="habits-empty">
                     <div className="habits-empty-icon"><Target className="w-8 h-8" /></div>
-                    <h2>还没有习惯</h2>
-                    <p>创建你的第一个习惯，支持每日、每周或一次性目标。</p>
-                    <button type="button" className="btn btn-primary" onClick={() => setShowForm(true)}>立即创建第一个习惯</button>
+                    <h2>{t('habits.empty')}</h2>
+                    <p>{t('habits.emptyHint')}</p>
+                    <button type="button" className="btn btn-primary" onClick={() => setShowForm(true)}>{t('habits.createFirst')}</button>
                 </div>
             ) : (
                 <div className="habits-list">
@@ -270,32 +285,32 @@ export default function Habits() {
                                                     onChange={e => setEditingHabit({ ...editingHabit, name: e.target.value })}
                                                     className="habit-edit-input"
                                                 />
-                                                <button type="button" className="btn-habit btn-habit-checkin" onClick={handleUpdateHabit}>保存</button>
-                                                <button type="button" className="btn-habit btn-habit-ghost" onClick={() => setEditingHabit(null)}>取消</button>
+                                                <button type="button" className="btn-habit btn-habit-checkin" onClick={handleUpdateHabit}>{t('habits.save')}</button>
+                                                <button type="button" className="btn-habit btn-habit-ghost" onClick={() => setEditingHabit(null)}>{t('auth.cancel')}</button>
                                             </div>
                                         ) : (
                                             <>
                                                 <div className="habit-card-name">{habit.name}</div>
                                                 <div className="habit-card-meta">
-                                                    <span className="habit-badge habit-badge-freq">{getHabitTypeLabel(habit.habitType || 'Daily')}</span>
-                                                    <span className="habit-badge habit-badge-difficulty">{getDifficultyLabel(habit.difficulty || 1)}</span>
+                                                    <span className="habit-badge habit-badge-freq">{t(habitTypeKey(habit.habitType || 'Daily'))}</span>
+                                                    <span className="habit-badge habit-badge-difficulty">{t(difficultyKey(habit.difficulty || 1))}</span>
                                                     <span className="habit-badge habit-badge-xp">+{habit.baseXP} XP</span>
                                                     {habit.habitType === 'OneTime' && (
-                                                        <span className="habit-badge habit-badge-onetime">一次性</span>
+                                                        <span className="habit-badge habit-badge-onetime">{t('habits.oneTime')}</span>
                                                     )}
                                                     {habit.currentStreak > 0 && (
                                                         <span className="habit-badge habit-badge-streak">
-                                                            <Flame className="w-3 h-3" /> {habit.currentStreak} 天连击
+                                                            <Flame className="w-3 h-3" /> {habit.currentStreak} {t('dash.streakDays')}
                                                         </span>
                                                     )}
                                                     {habit.isCompleted && (
-                                                        <span className="habit-badge habit-badge-xp"><Check className="w-3 h-3 inline" /> 已完成</span>
+                                                        <span className="habit-badge habit-badge-xp"><Check className="w-3 h-3 inline" /> {t('habits.completed')}</span>
                                                     )}
                                                 </div>
                                                 {habit.habitType === 'OneTime' && habit.dueDate && !habit.isCompleted && (
                                                     <div className="habit-countdown">
                                                         <Flag className="w-3.5 h-3.5 inline mr-1" />
-                                                        {formatCountdown(habit.dueDate)}
+                                                        {formatCountdownI18n(habit.dueDate, t)}
                                                     </div>
                                                 )}
                                                 {pendingMilestones.length > 0 && (
@@ -310,7 +325,7 @@ export default function Habits() {
                                                                         <div className="habit-milestone-item-title">{m.title}</div>
                                                                         <div className="habit-milestone-item-date">
                                                                             {m.dueDate} · +{m.xpValue} XP
-                                                                            {!isDue && ' · 未到日期'}
+                                                                            {!isDue && ` · ${t('habits.notDueYet')}`}
                                                                         </div>
                                                                     </div>
                                                                     {!m.isCompleted && (
@@ -320,7 +335,7 @@ export default function Habits() {
                                                                             className="btn-habit btn-habit-checkin btn-habit-milestone"
                                                                             onClick={() => handleCheckIn(habit.id, m.id)}
                                                                         >
-                                                                            {isMsChecking ? '打卡中' : '小目标打卡'}
+                                                                            {isMsChecking ? t('habits.checking') : t('habits.milestoneCheckin')}
                                                                         </button>
                                                                     )}
                                                                 </div>
@@ -343,30 +358,30 @@ export default function Habits() {
                                                 className={`btn-habit btn-habit-checkin${isChecking ? ' loading' : ''}`}
                                             >
                                                 {isChecking ? (
-                                                    <><Loader2 className="w-3.5 h-3.5 inline mr-1 animate-spin" />打卡中</>
-                                                ) : habit.habitType === 'OneTime' ? '最终打卡' : '打卡'}
+                                                    <><Loader2 className="w-3.5 h-3.5 inline mr-1 animate-spin" />{t('habits.checking')}</>
+                                                ) : habit.habitType === 'OneTime' ? t('habits.finalCheckin') : t('habits.checkin')}
                                             </button>
                                         )}
                                         {!showMainCheckIn && isChecked && !habit.isCompleted && habit.habitType !== 'OneTime' && (
                                             <button type="button" disabled className="btn-habit btn-habit-checkin done">
-                                                <Check className="w-3.5 h-3.5 inline mr-1" />今日已打卡
+                                                <Check className="w-3.5 h-3.5 inline mr-1" />{t('habits.checked')}
                                             </button>
                                         )}
                                         {!showMainCheckIn && !isChecked && !habit.isDueToday && !habit.isCompleted && dueMilestones.length === 0 && pendingMilestones.length === 0 && (
                                             <button type="button" disabled className="btn-habit btn-habit-ghost">
-                                                今日无需打卡
+                                                {t('habits.noNeedToday')}
                                             </button>
                                         )}
                                         {habit.isCompleted && (
                                             <button type="button" disabled className="btn-habit btn-habit-checkin done">
-                                                <Check className="w-3.5 h-3.5 inline mr-1" />任务完成
+                                                <Check className="w-3.5 h-3.5 inline mr-1" />{t('habits.completed')}
                                             </button>
                                         )}
                                         <button type="button" className="btn-habit btn-habit-ghost" onClick={() => setEditingHabit(habit)}>
-                                            <Pencil className="w-3.5 h-3.5 inline mr-1" />编辑
+                                            <Pencil className="w-3.5 h-3.5 inline mr-1" />{t('habits.edit')}
                                         </button>
                                         <button type="button" className="btn-habit btn-habit-danger" onClick={() => handleDeleteHabit(habit.id, habit.name)}>
-                                            <Trash2 className="w-3.5 h-3.5 inline mr-1" />删除
+                                            <Trash2 className="w-3.5 h-3.5 inline mr-1" />{t('habits.delete')}
                                         </button>
                                     </div>
                                 )}
@@ -379,30 +394,30 @@ export default function Habits() {
             <div className="habits-section-divider">
                 <button type="button" className="habits-history-toggle" onClick={toggleHistory}>
                     <History className="w-4 h-4" />
-                    {showHistory ? '隐藏' : '查看'} 我的打卡历史痕迹
-                    <span className="toggle-hint">保留所有记录，即使习惯已删除</span>
+                    {showHistory ? t('habits.historyHide') : t('habits.historyShow')} {t('habits.history')}
+                    <span className="toggle-hint">{t('habits.historyHint')}</span>
                 </button>
 
                 {showHistory && (
                     <div className="habits-history-panel">
                         <div className="habits-history-header">
                             <div>
-                                <div className="habits-history-title">打卡历史痕迹</div>
-                                <div className="habits-history-subtitle">这里记录了你所有过去的努力和经验值来源</div>
+                                <div className="habits-history-title">{t('habits.historyTitle')}</div>
+                                <div className="habits-history-subtitle">{t('habits.historySub')}</div>
                             </div>
                             <div className="habits-history-xp">
-                                <strong>{currentUser?.totalXP || 0} XP</strong><br />当前总经验值
+                                <strong>{currentUser?.totalXP || 0} XP</strong><br />{t('habits.currentXp')}
                             </div>
                         </div>
 
                         {historyLoading ? (
-                            <div className="habits-loading"><Loader2 className="w-5 h-5 animate-spin inline mr-2" />加载历史中...</div>
+                            <div className="habits-loading"><Loader2 className="w-5 h-5 animate-spin inline mr-2" />{t('habits.historyLoading')}</div>
                         ) : historyCheckIns.length === 0 ? (
-                            <div className="habits-loading">还没有任何打卡记录</div>
+                            <div className="habits-loading">{t('habits.noHistory')}</div>
                         ) : (
                             <div className="habits-history-list">
                                 {historyCheckIns.map(checkin => {
-                                    const habitName = historyHabitMap.get(checkin.habitId) || `已删除习惯 #${checkin.habitId}`
+                                    const habitName = historyHabitMap.get(checkin.habitId) || `${t('habits.deletedHabit')} #${checkin.habitId}`
                                     return (
                                         <div key={checkin.id} className="habits-history-item">
                                             <div>
@@ -420,7 +435,7 @@ export default function Habits() {
                                 })}
                             </div>
                         )}
-                        <p className="habits-history-footer">删除习惯不会丢失历史记录，你可以随时在这里回顾自己的坚持。</p>
+                        <p className="habits-history-footer">{t('habits.historyFooter')}</p>
                     </div>
                 )}
             </div>

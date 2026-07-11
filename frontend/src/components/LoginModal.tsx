@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { Mail, User, Lock, Sparkles, X } from 'lucide-react'
 import { useHabitStore } from '../stores/habitStore'
+import { useTranslation } from '../stores/languageStore'
 
 interface LoginModalProps {
     isOpen: boolean
@@ -7,120 +9,188 @@ interface LoginModalProps {
 }
 
 export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
+    const { t } = useTranslation()
     const [mode, setMode] = useState<'login' | 'register'>('login')
+    const [login, setLogin] = useState('')
     const [username, setUsername] = useState('')
+    const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [isLoading, setIsLoading] = useState(false)
+    const [error, setError] = useState('')
 
-    const { login } = useHabitStore()
+    const { login: doLogin } = useHabitStore()
 
     if (!isOpen) return null
 
+    const resetForm = () => {
+        setLogin('')
+        setUsername('')
+        setEmail('')
+        setPassword('')
+        setError('')
+    }
+
+    const handleClose = () => {
+        resetForm()
+        onClose()
+    }
+
+    const isValidEmail = (value: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)
+
     const handleSubmit = async () => {
-        if (!username || !password) {
-            alert('请输入用户名和密码')
+        setError('')
+
+        if (mode === 'login') {
+            if (!login || !password) {
+                setError(t('auth.fillRequired'))
+                return
+            }
+            setIsLoading(true)
+            const success = await doLogin(login, password)
+            if (success) {
+                handleClose()
+            } else {
+                setError(t('auth.loginFailed'))
+            }
+            setIsLoading(false)
+            return
+        }
+
+        if (!username || !email || !password) {
+            setError(t('auth.fillRequired'))
+            return
+        }
+        if (!isValidEmail(email)) {
+            setError(t('auth.invalidEmail'))
             return
         }
 
         setIsLoading(true)
+        try {
+            const res = await fetch('http://localhost:5000/api/user/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password }),
+            })
 
-        if (mode === 'login') {
-            // 登录
-            const success = await login(username, password)
-            if (success) {
-                onClose()
-                setUsername('')
+            if (!res.ok) {
+                const errText = await res.text()
+                setError(errText || t('auth.registerFailed'))
+            } else {
+                setMode('login')
+                setLogin(username)
                 setPassword('')
+                setUsername('')
+                setEmail('')
+                setError('')
+                alert(t('auth.registerSuccess'))
             }
-        } else {
-            // 注册
-            try {
-                const res = await fetch('http://localhost:5000/api/user/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password }),
-                })
-
-                if (!res.ok) {
-                    const error = await res.text()
-                    alert(error || '注册失败，用户名可能已存在')
-                } else {
-                    alert('注册成功！请使用新账号登录')
-                    setMode('login')
-                    setPassword('')
-                }
-            } catch (err) {
-                alert('注册出错，请稍后重试')
-            }
+        } catch {
+            setError(t('auth.registerFailed'))
         }
-
         setIsLoading(false)
     }
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-8 w-full max-w-md">
-                <h2 className="text-2xl font-bold mb-6 text-center">
-                    {mode === 'login' ? '登录' : '注册'}
-                </h2>
+        <div className="auth-modal-overlay" onClick={handleClose}>
+            <div className="auth-modal" onClick={e => e.stopPropagation()}>
+                <button type="button" className="auth-modal-close" onClick={handleClose}>
+                    <X className="w-4 h-4" />
+                </button>
 
-                <div className="space-y-4">
-                    <input
-                        type="text"
-                        placeholder="用户名"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                    <input
-                        type="password"
-                        placeholder="密码"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-                    />
+                <div className="auth-modal-icon">
+                    <Sparkles className="w-7 h-7" />
                 </div>
 
-                <div className="flex gap-3 mt-6">
+                <h2 className="auth-modal-title">
+                    {mode === 'login' ? t('auth.welcomeBack') : t('auth.createAccount')}
+                </h2>
+                <p className="auth-modal-subtitle">
+                    {mode === 'login' ? t('auth.loginSubtitle') : t('auth.registerSubtitle')}
+                </p>
+
+                <div className="auth-mode-tabs">
                     <button
-                        onClick={onClose}
-                        className="flex-1 py-3 border border-gray-300 rounded-xl hover:bg-gray-50"
+                        type="button"
+                        className={`auth-mode-tab${mode === 'login' ? ' active' : ''}`}
+                        onClick={() => { setMode('login'); setError('') }}
                     >
-                        取消
+                        {t('auth.login')}
                     </button>
                     <button
+                        type="button"
+                        className={`auth-mode-tab${mode === 'register' ? ' active' : ''}`}
+                        onClick={() => { setMode('register'); setError('') }}
+                    >
+                        {t('auth.register')}
+                    </button>
+                </div>
+
+                <div className="auth-form">
+                    {mode === 'login' ? (
+                        <div className="auth-field">
+                            <User className="auth-field-icon" />
+                            <input
+                                type="text"
+                                placeholder={t('auth.usernameOrEmail')}
+                                value={login}
+                                onChange={e => setLogin(e.target.value)}
+                                className="auth-input"
+                                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                            />
+                        </div>
+                    ) : (
+                        <>
+                            <div className="auth-field">
+                                <User className="auth-field-icon" />
+                                <input
+                                    type="text"
+                                    placeholder={t('auth.username')}
+                                    value={username}
+                                    onChange={e => setUsername(e.target.value)}
+                                    className="auth-input"
+                                />
+                            </div>
+                            <div className="auth-field">
+                                <Mail className="auth-field-icon" />
+                                <input
+                                    type="email"
+                                    placeholder={t('auth.email')}
+                                    value={email}
+                                    onChange={e => setEmail(e.target.value)}
+                                    className="auth-input"
+                                />
+                            </div>
+                        </>
+                    )}
+
+                    <div className="auth-field">
+                        <Lock className="auth-field-icon" />
+                        <input
+                            type="password"
+                            placeholder={t('auth.password')}
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            className="auth-input"
+                            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                        />
+                    </div>
+                </div>
+
+                {error && <div className="auth-error">{error}</div>}
+
+                <div className="auth-actions">
+                    <button type="button" className="btn-habit btn-habit-ghost" onClick={handleClose}>
+                        {t('auth.cancel')}
+                    </button>
+                    <button
+                        type="button"
+                        className="btn-habit btn-habit-checkin"
                         onClick={handleSubmit}
                         disabled={isLoading}
-                        className="flex-1 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50"
                     >
-                        {isLoading ? '处理中...' : mode === 'login' ? '登录' : '注册'}
+                        {isLoading ? t('auth.processing') : mode === 'login' ? t('auth.login') : t('auth.register')}
                     </button>
-                </div>
-
-                {/* 切换登录/注册 */}
-                <div className="text-center mt-4 text-sm">
-                    {mode === 'login' ? (
-                        <span>
-                            还没有账号？{' '}
-                            <button
-                                onClick={() => setMode('register')}
-                                className="text-indigo-600 hover:underline"
-                            >
-                                去注册
-                            </button>
-                        </span>
-                    ) : (
-                        <span>
-                            已有账号？{' '}
-                            <button
-                                onClick={() => setMode('login')}
-                                className="text-indigo-600 hover:underline"
-                            >
-                                去登录
-                            </button>
-                        </span>
-                    )}
                 </div>
             </div>
         </div>

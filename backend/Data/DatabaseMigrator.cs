@@ -19,6 +19,7 @@ public static class DatabaseMigrator
             EnsureColumn(connection, "Habits", "DueDate", "TEXT NULL");
             EnsureColumn(connection, "Habits", "IsCompleted", "INTEGER NOT NULL DEFAULT 0");
             EnsureColumn(connection, "CheckIns", "MilestoneId", "INTEGER NULL");
+            EnsureColumn(connection, "Users", "Email", "TEXT NOT NULL DEFAULT ''");
 
             using var cmd = connection.CreateCommand();
             cmd.CommandText = """

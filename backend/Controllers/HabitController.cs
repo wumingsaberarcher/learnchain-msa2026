@@ -114,13 +114,22 @@ public class HabitController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest("习惯名称不能为空");
 
+        var trimmedName = request.Name.Trim();
+        bool nameExists = await _context.Habits.AnyAsync(h =>
+            h.UserId == currentUserId &&
+            h.IsActive &&
+            h.Name.ToLower() == trimmedName.ToLower());
+
+        if (nameExists)
+            return BadRequest("已存在同名的活跃习惯，请使用不同的名称");
+
         var habitType = string.IsNullOrWhiteSpace(request.HabitType) ? "Daily" : request.HabitType;
         var difficulty = request.Difficulty is >= 1 and <= 3 ? request.Difficulty : 1;
 
         var habit = new Habit
         {
             UserId = currentUserId,
-            Name = request.Name.Trim(),
+            Name = trimmedName,
             HabitType = habitType,
             Frequency = HabitXpService.GetFrequencyLabel(habitType),
             Difficulty = difficulty,
@@ -171,7 +180,19 @@ public class HabitController : ControllerBase
             return NotFound("习惯不存在或无权限");
 
         if (!string.IsNullOrWhiteSpace(habit.Name))
-            existingHabit.Name = habit.Name.Trim();
+        {
+            var trimmedName = habit.Name.Trim();
+            bool nameExists = await _context.Habits.AnyAsync(h =>
+                h.UserId == currentUserId &&
+                h.IsActive &&
+                h.Id != id &&
+                h.Name.ToLower() == trimmedName.ToLower());
+
+            if (nameExists)
+                return BadRequest("已存在同名的活跃习惯，请使用不同的名称");
+
+            existingHabit.Name = trimmedName;
+        }
 
         await _context.SaveChangesAsync();
         return NoContent();
