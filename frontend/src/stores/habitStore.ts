@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Habit } from '../api/habitApi'
+import type { Habit, CreateHabitPayload } from '../api/habitApi'
 import { getHabits, createHabit } from '../api/habitApi'
 
 interface HabitState {
@@ -16,7 +16,7 @@ interface HabitState {
     } | null
 
     fetchHabits: () => Promise<void>
-    addHabit: (habit: Omit<Habit, 'id' | 'createdAt'>) => Promise<void>
+    addHabit: (habit: CreateHabitPayload) => Promise<Habit>
     updateHabit: (id: number, updatedHabit: Partial<Habit>) => Promise<void>
     deleteHabit: (id: number) => Promise<void>
     fetchTodayCheckedHabits: () => Promise<void>
@@ -131,8 +131,19 @@ export const useHabitStore = create<HabitState>((set, get) => {
 
         fetchTodayCheckedHabits: async () => {
             try {
-                const res = await fetch('http://localhost:5000/api/checkin/today')
+                const token = localStorage.getItem('token')
+
+                const headers: HeadersInit = {}
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`
+                }
+
+                const res = await fetch('http://localhost:5000/api/checkin/today', {
+                    headers,
+                })
+
                 if (!res.ok) throw new Error('Failed to fetch today check-ins')
+
                 const habitIds: number[] = await res.json()
                 set({ todayCheckedHabitIds: habitIds })
             } catch (err) {

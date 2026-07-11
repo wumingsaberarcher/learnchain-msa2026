@@ -10,6 +10,7 @@ public class AppDbContext : DbContext
     }
 
     public DbSet<Habit> Habits { get; set; }
-    public DbSet<CheckIn> CheckIns { get; set; }   // 新增这一行
+    public DbSet<CheckIn> CheckIns { get; set; }
+    public DbSet<HabitMilestone> HabitMilestones { get; set; }
     public DbSet<User> Users { get; set; }
 }

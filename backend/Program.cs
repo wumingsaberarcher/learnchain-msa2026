@@ -58,13 +58,10 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // ====================== 数据库初始化（重要！） ======================
-if (app.Environment.IsDevelopment())
+using (var scope = app.Services.CreateScope())
 {
-    using (var scope = app.Services.CreateScope())
-    {
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        dbContext.Database.EnsureCreated();   // 自动创建所有表（包括 Users）
-    }
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    DatabaseMigrator.ApplyMigrations(dbContext);
 }
 
 // ====================== 中间件配置 ======================

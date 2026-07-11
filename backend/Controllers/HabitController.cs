@@ -1,7 +1,10 @@
 using backend.Data;
 using backend.Models;
+using backend.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace backend.Controllers;
 
@@ -16,36 +19,53 @@ public class HabitController : ControllerBase
         _context = context;
     }
 
-    // GET: api/habit
-    [HttpGet]
-    public async Task<ActionResult<IEnumerable<Habit>>> GetHabits()
+    private int GetCurrentUserId()
     {
-        var today = DateTime.UtcNow.Date;
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
+            throw new UnauthorizedAccessException("未登录或 Token 无效");
 
-        var habits = await _context.Habits.ToListAsync();
+        return int.Parse(userIdClaim.Value);
+    }
 
-        // 查询今天已打卡的 HabitId
+    private async Task EnrichHabitsAsync(List<Habit> habits, int currentUserId, DateTime today)
+    {
+        if (habits.Count == 0) return;
+
+        var habitIds = habits.Select(h => h.Id).ToList();
+
         var todayCheckedIds = await _context.CheckIns
-            .Where(c => c.CompletedAt.Date == today)
+            .Where(c => c.UserId == currentUserId && c.CompletedAt.Date == today)
             .Select(c => c.HabitId)
             .Distinct()
             .ToListAsync();
 
+        var allCheckIns = await _context.CheckIns
+            .Where(c => c.UserId == currentUserId && habitIds.Contains(c.HabitId))
+            .Select(c => new { c.HabitId, c.CompletedAt })
+            .ToListAsync();
+
+        var milestones = await _context.HabitMilestones
+            .Where(m => habitIds.Contains(m.HabitId))
+            .OrderBy(m => m.SortOrder)
+            .ToListAsync();
+
         foreach (var habit in habits)
         {
+            if (string.IsNullOrWhiteSpace(habit.HabitType))
+                habit.HabitType = "Daily";
+
             habit.IsCheckedToday = todayCheckedIds.Contains(habit.Id);
 
-            // 计算当前连击天数
-            var checkInDates = await _context.CheckIns
+            var checkInDates = allCheckIns
                 .Where(c => c.HabitId == habit.Id)
                 .Select(c => c.CompletedAt.Date)
                 .Distinct()
                 .OrderByDescending(d => d)
-                .ToListAsync();
+                .ToList();
 
             int streak = 0;
             var currentDate = today;
-
             foreach (var date in checkInDates)
             {
                 if (date == currentDate)
@@ -60,93 +80,116 @@ public class HabitController : ControllerBase
             }
 
             habit.CurrentStreak = streak;
+
+            var habitMilestones = milestones.Where(m => m.HabitId == habit.Id).ToList();
+            habit.Milestones = habitMilestones;
+            habit.IsDueToday = HabitDueService.IsDueToday(habit, checkInDates, habitMilestones, today);
         }
+    }
+
+    [HttpGet]
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<Habit>>> GetHabits([FromQuery] bool includeInactive = false)
+    {
+        int currentUserId = GetCurrentUserId();
+        var today = DateTime.UtcNow.Date;
+
+        var query = _context.Habits.Where(h => h.UserId == currentUserId);
+
+        if (!includeInactive)
+            query = query.Where(h => h.IsActive);
+
+        var habits = await query.ToListAsync();
+        await EnrichHabitsAsync(habits, currentUserId, today);
 
         return habits;
     }
 
-    // GET: api/habit/5
-    [HttpGet("{id}")]
-    public async Task<ActionResult<Habit>> GetHabit(int id)
-    {
-        var habit = await _context.Habits.FindAsync(id);
-        if (habit == null)
-        {
-            return NotFound();
-        }
-
-        // 单个习惯也计算连击（可选，但建议加上）
-        var today = DateTime.UtcNow.Date;
-        habit.IsCheckedToday = await _context.CheckIns
-            .AnyAsync(c => c.HabitId == id && c.CompletedAt.Date == today);
-
-        var checkInDates = await _context.CheckIns
-            .Where(c => c.HabitId == id)
-            .Select(c => c.CompletedAt.Date)
-            .Distinct()
-            .OrderByDescending(d => d)
-            .ToListAsync();
-
-        int streak = 0;
-        var currentDate = today;
-        foreach (var date in checkInDates)
-        {
-            if (date == currentDate)
-            {
-                streak++;
-                currentDate = currentDate.AddDays(-1);
-            }
-            else if (date < currentDate)
-            {
-                break;
-            }
-        }
-        habit.CurrentStreak = streak;
-
-        return habit;
-    }
-
-    // POST: api/habit
     [HttpPost]
-    public async Task<ActionResult<Habit>> CreateHabit(Habit habit)
+    [Authorize]
+    public async Task<ActionResult<Habit>> CreateHabit(CreateHabitRequest request)
     {
+        int currentUserId = GetCurrentUserId();
+
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return BadRequest("习惯名称不能为空");
+
+        var habitType = string.IsNullOrWhiteSpace(request.HabitType) ? "Daily" : request.HabitType;
+        var difficulty = request.Difficulty is >= 1 and <= 3 ? request.Difficulty : 1;
+
+        var habit = new Habit
+        {
+            UserId = currentUserId,
+            Name = request.Name.Trim(),
+            HabitType = habitType,
+            Frequency = HabitXpService.GetFrequencyLabel(habitType),
+            Difficulty = difficulty,
+            BaseXP = HabitXpService.GetBaseXP(difficulty),
+            DueDate = request.DueDate?.Date,
+            CompletionType = habitType == "OneTime" ? 1 : 0,
+            IsActive = true,
+            IsCompleted = false,
+            CreatedAt = DateTime.UtcNow
+        };
+
         _context.Habits.Add(habit);
         await _context.SaveChangesAsync();
-        return CreatedAtAction(nameof(GetHabit), new { id = habit.Id }, habit);
+
+        if (habitType == "OneTime" && request.Milestones != null && request.Milestones.Count > 0)
+        {
+            var milestones = request.Milestones
+                .Select((m, index) => new HabitMilestone
+                {
+                    HabitId = habit.Id,
+                    Title = string.IsNullOrWhiteSpace(m.Title) ? $"小目标 {index + 1}" : m.Title.Trim(),
+                    DueDate = m.DueDate.Date,
+                    XPValue = m.XPValue > 0 ? m.XPValue : HabitXpService.GetDefaultMilestoneXP(difficulty),
+                    SortOrder = m.SortOrder > 0 ? m.SortOrder : index,
+                    IsCompleted = false
+                })
+                .OrderBy(m => m.DueDate)
+                .ToList();
+
+            _context.HabitMilestones.AddRange(milestones);
+            await _context.SaveChangesAsync();
+        }
+
+        await EnrichHabitsAsync(new List<Habit> { habit }, currentUserId, DateTime.UtcNow.Date);
+        return CreatedAtAction(nameof(GetHabits), new { id = habit.Id }, habit);
     }
 
-    // PUT: api/habit/5
     [HttpPut("{id}")]
-    [Microsoft.AspNetCore.Authorization.Authorize]
+    [Authorize]
     public async Task<IActionResult> UpdateHabit(int id, [FromBody] Habit habit)
     {
-        var existingHabit = await _context.Habits.FindAsync(id);
+        int currentUserId = GetCurrentUserId();
+
+        var existingHabit = await _context.Habits
+            .FirstOrDefaultAsync(h => h.Id == id && h.UserId == currentUserId);
+
         if (existingHabit == null)
-        {
-            return NotFound();
-        }
+            return NotFound("习惯不存在或无权限");
 
         if (!string.IsNullOrWhiteSpace(habit.Name))
-        {
             existingHabit.Name = habit.Name.Trim();
-        }
 
         await _context.SaveChangesAsync();
         return NoContent();
     }
 
-    // DELETE: api/habit/5
     [HttpDelete("{id}")]
-    [Microsoft.AspNetCore.Authorization.Authorize]
+    [Authorize]
     public async Task<IActionResult> DeleteHabit(int id)
     {
-        var habit = await _context.Habits.FindAsync(id);
-        if (habit == null)
-        {
-            return NotFound();
-        }
+        int currentUserId = GetCurrentUserId();
 
-        _context.Habits.Remove(habit);
+        var habit = await _context.Habits
+            .FirstOrDefaultAsync(h => h.Id == id && h.UserId == currentUserId);
+
+        if (habit == null)
+            return NotFound("习惯不存在或无权限");
+
+        habit.IsActive = false;
         await _context.SaveChangesAsync();
         return NoContent();
     }

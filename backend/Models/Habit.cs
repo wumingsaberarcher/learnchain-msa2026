@@ -9,17 +9,25 @@ public class Habit
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string Frequency { get; set; } = string.Empty;
+    public string HabitType { get; set; } = "Daily";
+    public int Difficulty { get; set; } = 1;
+    public DateTime? DueDate { get; set; }
+    public bool IsCompleted { get; set; }
     public int CompletionType { get; set; }
     public int? TargetValue { get; set; }
     public int BaseXP { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
 
-    // 当前连击天数（不映射到数据库）
     [NotMapped]
     public int CurrentStreak { get; set; }
 
-    // 是否今日已打卡（不映射到数据库）
     [NotMapped]
     public bool IsCheckedToday { get; set; }
+
+    [NotMapped]
+    public bool IsDueToday { get; set; }
+
+    [NotMapped]
+    public List<HabitMilestone> Milestones { get; set; } = new();
 }

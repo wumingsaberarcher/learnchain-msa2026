@@ -14,5 +14,7 @@ public class CheckIn
 
     public string? Notes { get; set; }                  // 备注
 
-    public int XPEarned { get; set; }                   // 本次打卡获得的 XP
+    public int XPEarned { get; set; }
+
+    public int? MilestoneId { get; set; }
 }

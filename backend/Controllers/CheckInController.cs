@@ -1,9 +1,19 @@
 using backend.Data;
 using backend.Models;
+using backend.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
+
 namespace backend.Controllers;
+
+public class CreateCheckInRequest
+{
+    public int HabitId { get; set; }
+    public int? MilestoneId { get; set; }
+    public string? Notes { get; set; }
+}
 
 [ApiController]
 [Route("api/[controller]")]
@@ -16,28 +26,23 @@ public class CheckInController : ControllerBase
         _context = context;
     }
 
-    // GET: api/checkin?habitId=1
-    [HttpGet]
-    public async Task<ActionResult<IEnumerable<CheckIn>>> GetCheckIns(int? habitId)
+    private int GetCurrentUserId()
     {
-        var query = _context.CheckIns.AsQueryable();
-
-        if (habitId.HasValue)
-        {
-            query = query.Where(c => c.HabitId == habitId.Value);
-        }
-
-        return await query.OrderByDescending(c => c.CompletedAt).ToListAsync();
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+        if (userIdClaim == null)
+            throw new UnauthorizedAccessException("未登录或 Token 无效");
+        return int.Parse(userIdClaim.Value);
     }
 
-    // GET: api/checkin/today
     [HttpGet("today")]
+    [Authorize]
     public async Task<ActionResult<IEnumerable<int>>> GetTodayCheckedHabitIds()
     {
+        int currentUserId = GetCurrentUserId();
         var today = DateTime.UtcNow.Date;
 
         var habitIds = await _context.CheckIns
-            .Where(c => c.CompletedAt.Date == today)
+            .Where(c => c.UserId == currentUserId && c.CompletedAt.Date == today)
             .Select(c => c.HabitId)
             .Distinct()
             .ToListAsync();
@@ -45,72 +50,140 @@ public class CheckInController : ControllerBase
         return Ok(habitIds);
     }
 
-    // POST: api/checkin
-    [HttpPost]
-    [Microsoft.AspNetCore.Authorization.Authorize]   // 需要登录才能打卡
-    public async Task<ActionResult<CheckIn>> CreateCheckIn(CheckIn checkIn)
+    [HttpGet]
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<CheckIn>>> GetCheckIns(int? habitId)
     {
-        // 1. 获取当前登录用户的 ID（从 JWT Token 中解析）
-        var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
-        if (userIdClaim == null)
-        {
-            return Unauthorized("未登录或 Token 无效");
-        }
+        int currentUserId = GetCurrentUserId();
+        var query = _context.CheckIns
+            .Where(c => c.UserId == currentUserId)
+            .AsQueryable();
 
-        int currentUserId = int.Parse(userIdClaim.Value);
+        if (habitId.HasValue)
+            query = query.Where(c => c.HabitId == habitId.Value);
 
-        // 2. 检查 Habit 是否存在
-        var habit = await _context.Habits.FindAsync(checkIn.HabitId);
-        if (habit == null)
-        {
-            return BadRequest("Habit not found");
-        }
+        return await query.OrderByDescending(c => c.CompletedAt).ToListAsync();
+    }
 
-        // 3. 防止同一天重复打卡
+    [HttpPost]
+    [Authorize]
+    public async Task<ActionResult<CheckIn>> CreateCheckIn(CreateCheckInRequest request)
+    {
+        int currentUserId = GetCurrentUserId();
         var today = DateTime.UtcNow.Date;
-        bool alreadyCheckedToday = await _context.CheckIns
-            .AnyAsync(c => c.HabitId == checkIn.HabitId && c.CompletedAt.Date == today);
 
-        if (alreadyCheckedToday)
+        var habit = await _context.Habits
+            .FirstOrDefaultAsync(h => h.Id == request.HabitId && h.UserId == currentUserId && h.IsActive);
+
+        if (habit == null)
+            return BadRequest("习惯不存在或无权限");
+
+        if (habit.IsCompleted)
+            return BadRequest("该一次性任务已完成");
+
+        var checkInDates = await _context.CheckIns
+            .Where(c => c.HabitId == habit.Id && c.UserId == currentUserId)
+            .Select(c => c.CompletedAt.Date)
+            .Distinct()
+            .ToListAsync();
+
+        var milestones = await _context.HabitMilestones
+            .Where(m => m.HabitId == habit.Id)
+            .OrderBy(m => m.SortOrder)
+            .ToListAsync();
+
+        int xpEarned;
+        int? milestoneId = null;
+        string? notes = request.Notes;
+
+        if (request.MilestoneId.HasValue)
         {
-            return BadRequest("今天已经打卡过了，不能重复打卡");
+            var milestone = milestones.FirstOrDefault(m => m.Id == request.MilestoneId.Value);
+            if (milestone == null)
+                return BadRequest("里程碑不存在");
+
+            if (milestone.IsCompleted)
+                return BadRequest("该小目标已完成");
+
+            if (milestone.DueDate.Date > today)
+                return BadRequest("该小目标尚未到打卡日期");
+
+            bool milestoneCheckedToday = await _context.CheckIns
+                .AnyAsync(c => c.UserId == currentUserId && c.MilestoneId == milestone.Id && c.CompletedAt.Date == today);
+
+            if (milestoneCheckedToday)
+                return BadRequest("今天已经打卡过该小目标");
+
+            xpEarned = milestone.XPValue;
+            milestoneId = milestone.Id;
+            milestone.IsCompleted = true;
+            notes = string.IsNullOrWhiteSpace(notes) ? $"完成小目标：{milestone.Title}" : notes;
+        }
+        else if (habit.HabitType == "OneTime")
+        {
+            if (milestones.Count > 0)
+            {
+                var pending = milestones.Where(m => !m.IsCompleted).ToList();
+                if (pending.Count > 0)
+                    return BadRequest("请先完成所有小目标后再进行最终打卡");
+
+                bool finalCheckedToday = await _context.CheckIns
+                    .AnyAsync(c => c.UserId == currentUserId && c.HabitId == habit.Id && c.MilestoneId == null && c.CompletedAt.Date == today);
+
+                if (finalCheckedToday)
+                    return BadRequest("今天已经完成最终打卡");
+
+                xpEarned = HabitXpService.GetBaseXP(habit.Difficulty);
+                habit.IsCompleted = true;
+            }
+            else
+            {
+                if (habit.DueDate.HasValue && habit.DueDate.Value.Date < today)
+                    return BadRequest("该任务已超过截止日期");
+
+                bool alreadyChecked = await _context.CheckIns
+                    .AnyAsync(c => c.HabitId == habit.Id && c.UserId == currentUserId);
+
+                if (alreadyChecked)
+                    return BadRequest("该一次性任务已打卡");
+
+                xpEarned = HabitXpService.GetBaseXP(habit.Difficulty);
+                habit.IsCompleted = true;
+            }
+        }
+        else
+        {
+            if (!HabitDueService.IsDueToday(habit, checkInDates, milestones, today))
+                return BadRequest("今天不是该习惯的打卡日");
+
+            bool alreadyCheckedToday = checkInDates.Contains(today);
+            if (alreadyCheckedToday)
+                return BadRequest("今天已经打卡过了，不能重复打卡");
+
+            xpEarned = HabitXpService.GetBaseXP(habit.Difficulty);
         }
 
-        // 4. 设置打卡信息
-        checkIn.UserId = currentUserId;           // 强制使用当前登录用户
-        checkIn.XPEarned = habit.BaseXP;
-        checkIn.CompletedAt = DateTime.UtcNow;
+        var checkIn = new CheckIn
+        {
+            HabitId = habit.Id,
+            UserId = currentUserId,
+            MilestoneId = milestoneId,
+            XPEarned = xpEarned,
+            Notes = notes,
+            CompletedAt = DateTime.UtcNow
+        };
 
         _context.CheckIns.Add(checkIn);
 
-        // 5. 把 XP 累加到用户身上（核心！）
         var user = await _context.Users.FindAsync(currentUserId);
         if (user != null)
         {
-            user.TotalXP += checkIn.XPEarned;
-
-            // 简单计算等级（每 100 XP 升 1 级，可后续优化）
+            user.TotalXP += xpEarned;
             user.Level = (user.TotalXP / 100) + 1;
         }
 
         await _context.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetCheckIns), new { habitId = checkIn.HabitId }, checkIn);
-    }
-
-    // DELETE: api/checkin/5
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteCheckIn(int id)
-    {
-        var checkIn = await _context.CheckIns.FindAsync(id);
-        if (checkIn == null)
-        {
-            return NotFound();
-        }
-
-        _context.CheckIns.Remove(checkIn);
-        await _context.SaveChangesAsync();
-
-        return NoContent();
     }
 }

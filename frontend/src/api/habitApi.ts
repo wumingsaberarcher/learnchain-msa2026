@@ -1,42 +1,46 @@
+import type { CreateHabitPayload, Habit } from '../utils/habitHelpers'
+
 const API_BASE = 'http://localhost:5000/api'
 
-export interface Habit {
-    id: number
-    userId: number
-    name: string
-    description?: string
-    frequency: string
-    completionType: number
-    targetValue?: number
-    baseXP: number
-    isActive: boolean
-    createdAt: string
-    isCheckedToday: boolean     // ← 新增这个字段
+function authHeaders(json = false): HeadersInit {
+    const token = localStorage.getItem('token')
+    const headers: HeadersInit = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    if (json) headers['Content-Type'] = 'application/json'
+    return headers
 }
 
-// 获取所有习惯
+export type { Habit, CreateHabitPayload } from '../utils/habitHelpers'
+
 export async function getHabits(): Promise<Habit[]> {
-    const res = await fetch(`${API_BASE}/habit`)
+    const res = await fetch(`${API_BASE}/habit`, {
+        method: 'GET',
+        headers: authHeaders(),
+    })
+
+    if (!res.ok) {
+        const errorText = await res.text()
+        throw new Error(errorText || 'Failed to fetch habits')
+    }
+
+    return res.json()
+}
+
+export async function getAllHabits(includeInactive = false): Promise<Habit[]> {
+    const url = includeInactive
+        ? `${API_BASE}/habit?includeInactive=true`
+        : `${API_BASE}/habit`
+
+    const res = await fetch(url, { headers: authHeaders() })
     if (!res.ok) throw new Error('Failed to fetch habits')
     return res.json()
 }
 
-// 创建习惯
-export async function createHabit(habit: Omit<Habit, 'id' | 'createdAt'>): Promise<Habit> {
-    const token = localStorage.getItem('token')
-
-    const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-    }
-
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-    }
-
+export async function createHabit(payload: CreateHabitPayload): Promise<Habit> {
     const res = await fetch(`${API_BASE}/habit`, {
         method: 'POST',
-        headers,
-        body: JSON.stringify(habit),
+        headers: authHeaders(true),
+        body: JSON.stringify(payload),
     })
 
     if (!res.ok) {
@@ -45,4 +49,21 @@ export async function createHabit(habit: Omit<Habit, 'id' | 'createdAt'>): Promi
     }
 
     return res.json()
+}
+
+export async function updateHabit(id: number, data: Partial<Habit>): Promise<void> {
+    const res = await fetch(`${API_BASE}/habit/${id}`, {
+        method: 'PUT',
+        headers: authHeaders(true),
+        body: JSON.stringify(data),
+    })
+    if (!res.ok) throw new Error('更新失败')
+}
+
+export async function deleteHabit(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/habit/${id}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+    })
+    if (!res.ok) throw new Error('删除失败')
 }
