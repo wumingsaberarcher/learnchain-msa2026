@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "build": "vite build",
     "preview": "vite preview",
-    "dev:all": "concurrently \"cd ../backend && dotnet run\" \"npm run dev\""
+
+    "backend": "cd ../backend && dotnet run",
+    "frontend": "vite",
+
+    "dev:all": "npx concurrently -n backend,frontend -c green,blue \"npm run backend\" \"npm run frontend\""
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.2",
