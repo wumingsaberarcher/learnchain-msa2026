@@ -1,6 +1,6 @@
 import type { CreateHabitPayload, Habit } from '../utils/habitHelpers'
 
-const API_BASE = 'http://localhost:5000/api'
+import { API_BASE } from '../config/api'
 
 function authHeaders(json = false): HeadersInit {
     const token = localStorage.getItem('token')

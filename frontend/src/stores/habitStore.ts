@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Habit, CreateHabitPayload } from '../api/habitApi'
 import { getHabits, createHabit } from '../api/habitApi'
+import { API_BASE } from '../config/api'
 
 interface HabitState {
     habits: Habit[]
@@ -58,6 +59,8 @@ export const useHabitStore = create<HabitState>((set, get) => {
 
     return {
         habits: initialHabits,
+        isLoading: false,
+        error: null,
         todayCheckedHabitIds: initialTodayChecked,
         isLoggedIn: initialIsLoggedIn,
         currentUser: initialCurrentUser,
@@ -88,7 +91,7 @@ export const useHabitStore = create<HabitState>((set, get) => {
         updateHabit: async (id, updatedHabit) => {
             try {
                 const token = localStorage.getItem('token')
-                const res = await fetch(`http://localhost:5000/api/habit/${id}`, {
+                const res = await fetch(`${API_BASE}/habit/${id}`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
@@ -112,7 +115,7 @@ export const useHabitStore = create<HabitState>((set, get) => {
         deleteHabit: async (id) => {
             try {
                 const token = localStorage.getItem('token')
-                const res = await fetch(`http://localhost:5000/api/habit/${id}`, {
+                const res = await fetch(`${API_BASE}/habit/${id}`, {
                     method: 'DELETE',
                     headers: {
                         ...(token && { Authorization: `Bearer ${token}` }),
@@ -138,7 +141,7 @@ export const useHabitStore = create<HabitState>((set, get) => {
                     headers['Authorization'] = `Bearer ${token}`
                 }
 
-                const res = await fetch('http://localhost:5000/api/checkin/today', {
+                const res = await fetch(`${API_BASE}/checkin/today`, {
                     headers,
                 })
 
@@ -180,7 +183,7 @@ export const useHabitStore = create<HabitState>((set, get) => {
                 const token = localStorage.getItem('token')
                 if (!token) return
 
-                const res = await fetch('http://localhost:5000/api/user/me', {
+                const res = await fetch(`${API_BASE}/user/me`, {
                     headers: {
                         Authorization: `Bearer ${token}`
                     }
@@ -207,7 +210,7 @@ export const useHabitStore = create<HabitState>((set, get) => {
 
         login: async (login, password) => {
             try {
-                const res = await fetch('http://localhost:5000/api/user/login', {
+                const res = await fetch(`${API_BASE}/user/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ login, password }),

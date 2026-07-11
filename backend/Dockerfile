@@ -1,14 +1,27 @@
-# 使用 .NET 10 SDK 构建
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
-COPY . .
+COPY backend.csproj .
 RUN dotnet restore
-RUN dotnet publish -c Release -o /app
+COPY . .
+RUN dotnet publish -c Release -o /app/publish
 
-# 使用轻量运行时
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
-COPY --from=build /app .
-EXPOSE 5000
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /app/data
+
+COPY --from=build /app/publish .
+
 ENV ASPNETCORE_URLS=http://+:5000
+ENV ConnectionStrings__DefaultConnection=Data Source=/app/data/learnchain.db
+
+EXPOSE 5000
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=5 \
+    CMD curl -f http://localhost:5000/health || exit 1
+
 ENTRYPOINT ["dotnet", "backend.dll"]

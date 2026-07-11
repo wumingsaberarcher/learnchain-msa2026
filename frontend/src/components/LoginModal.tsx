@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Mail, User, Lock, Sparkles, X } from 'lucide-react'
 import { useHabitStore } from '../stores/habitStore'
-import { useTranslation } from '../stores/languageStore'
+import { useTranslation } from '../stores/settingsStore'
+import { API_BASE } from '../config/api'
 
 interface LoginModalProps {
     isOpen: boolean
@@ -67,7 +68,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
 
         setIsLoading(true)
         try {
-            const res = await fetch('http://localhost:5000/api/user/register', {
+            const res = await fetch(`${API_BASE}/user/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, email, password }),

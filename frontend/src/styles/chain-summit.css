@@ -52,12 +52,157 @@ p a:hover {
 	height: 100%;
 	pointer-events: none;
 	z-index: 0;
+	transition: background 0.8s ease;
+}
+
+.bg-animation.theme-night {
 	background: linear-gradient(45deg, var(--dark) 0%, var(--darker) 50%, var(--dark) 100%);
+}
+
+.bg-animation.theme-day {
+	background: linear-gradient(180deg,
+		#6EC6F5 0%,
+		#A8D8F0 25%,
+		#D4ECFA 50%,
+		#E8F5D6 75%,
+		#C5DCA0 100%);
+}
+
+/* Day theme — sun */
+.day-sun-container {
+	position: absolute;
+	top: 8%;
+	right: 12%;
+	width: 120px;
+	height: 120px;
+}
+
+.day-sun-core {
+	position: absolute;
+	inset: 30%;
+	border-radius: 50%;
+	background: radial-gradient(circle, #FFF9C4 0%, #FFE082 50%, #FFB300 100%);
+	box-shadow: 0 0 60px rgba(255, 193, 7, 0.6), 0 0 120px rgba(255, 193, 7, 0.3);
+	animation: sunPulse 6s ease-in-out infinite;
+}
+
+.day-sun-rays {
+	position: absolute;
+	inset: 0;
+	border-radius: 50%;
+	background: conic-gradient(from 0deg,
+		transparent 0deg, rgba(255, 220, 100, 0.15) 10deg, transparent 20deg,
+		transparent 40deg, rgba(255, 220, 100, 0.12) 50deg, transparent 60deg,
+		transparent 80deg, rgba(255, 220, 100, 0.15) 90deg, transparent 100deg,
+		transparent 120deg, rgba(255, 220, 100, 0.1) 130deg, transparent 140deg,
+		transparent 160deg, rgba(255, 220, 100, 0.14) 170deg, transparent 180deg,
+		transparent 200deg, rgba(255, 220, 100, 0.12) 210deg, transparent 220deg,
+		transparent 240deg, rgba(255, 220, 100, 0.15) 250deg, transparent 260deg,
+		transparent 280deg, rgba(255, 220, 100, 0.1) 290deg, transparent 300deg,
+		transparent 320deg, rgba(255, 220, 100, 0.13) 330deg, transparent 340deg);
+	animation: sunRaysSpin 30s linear infinite;
+}
+
+@keyframes sunPulse {
+	0%, 100% { transform: scale(1); filter: brightness(1); }
+	50% { transform: scale(1.05); filter: brightness(1.1); }
+}
+
+@keyframes sunRaysSpin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+/* Day golden particles */
+.day-particles {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+}
+
+.day-particle {
+	position: absolute;
+	width: 4px;
+	height: 4px;
+	background: radial-gradient(circle, #FFE082, #FFB300);
+	border-radius: 50%;
+	opacity: 0;
+	animation: dayFloat 14s infinite;
+	box-shadow: 0 0 6px rgba(255, 193, 7, 0.5);
+}
+
+@keyframes dayFloat {
+	0%, 100% {
+		transform: translateY(100vh) translateX(0) scale(0.5);
+		opacity: 0;
+	}
+	8% { opacity: 0.7; }
+	50% {
+		transform: translateY(40vh) translateX(30px) scale(1);
+		opacity: 0.5;
+	}
+	92% { opacity: 0.3; }
+	100% {
+		transform: translateY(-10vh) translateX(60px) scale(0.3);
+		opacity: 0;
+	}
+}
+
+.day-light-overlay {
+	position: absolute;
+	inset: 0;
+	background: radial-gradient(ellipse at 85% 15%, rgba(255, 236, 150, 0.25), transparent 50%);
+}
+
+/* Growing tree */
+.growing-tree-wrap {
+	position: absolute;
+	bottom: 0;
+	left: 50%;
+	transform: translateX(-50%);
+	width: min(280px, 40vw);
+	height: min(55vh, 420px);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-end;
+}
+
+.growing-tree-svg {
+	width: 100%;
+	height: 100%;
+	filter: drop-shadow(0 4px 12px rgba(60, 100, 50, 0.2));
+	transition: filter 1s ease;
+}
+
+.tree-growth-hint {
+	position: absolute;
+	bottom: 8px;
+	right: -8px;
+	font-size: 0.65rem;
+	color: rgba(60, 100, 50, 0.5);
+	font-weight: 600;
+	letter-spacing: 0.05em;
 }
 
 .app-shell {
 	position: relative;
 	isolation: isolate;
+	transition: color 0.5s ease;
+}
+
+.app-shell.theme-night {
+	color: var(--light);
+}
+
+.app-shell.theme-day {
+	color: #1a2e1a;
+	--day-text: #1a2e1a;
+	--day-text-muted: #4a6741;
+	--day-primary: #2E7D32;
+	--day-accent: #F9A825;
+	--day-surface: rgba(255, 255, 255, 0.55);
+	--day-border: rgba(76, 120, 68, 0.2);
 }
 
 .app-main {
@@ -1210,64 +1355,104 @@ nav {
 	color: var(--primary);
 }
 
-/* Language Toggle */
-.lang-toggle {
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
-	background: rgba(255, 255, 255, 0.04);
-	border: 1px solid rgba(255, 255, 255, 0.12);
-	border-radius: 50px;
-	padding: 0.35rem 0.6rem;
+/* Theme + Locale 4-corner toggle */
+.theme-locale-toggle {
+	position: relative;
+	width: 72px;
+	height: 72px;
+	background: rgba(255, 255, 255, 0.06);
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	border-radius: 14px;
 	cursor: pointer;
-	transition: all 0.3s ease;
-	font-family: inherit;
+	flex-shrink: 0;
+	transition: border-color 0.3s ease, box-shadow 0.3s ease;
+	overflow: hidden;
 }
 
-.lang-toggle:hover {
-	border-color: rgba(0, 255, 255, 0.3);
-	background: rgba(0, 255, 255, 0.06);
+.theme-locale-toggle:hover {
+	border-color: rgba(0, 255, 255, 0.35);
+	box-shadow: 0 4px 16px rgba(0, 255, 255, 0.12);
 }
 
-.lang-toggle-label {
-	font-size: 0.75rem;
-	font-weight: 600;
-	color: var(--gray);
+.app-shell.theme-day .theme-locale-toggle {
+	background: rgba(255, 255, 255, 0.65);
+	border-color: rgba(76, 120, 68, 0.25);
+}
+
+.app-shell.theme-day .theme-locale-toggle:hover {
+	border-color: rgba(46, 125, 50, 0.45);
+	box-shadow: 0 4px 16px rgba(249, 168, 37, 0.15);
+}
+
+.corner-grid-lines {
+	position: absolute;
+	inset: 0;
+	background:
+		linear-gradient(to right, transparent 49%, rgba(255,255,255,0.08) 49%, rgba(255,255,255,0.08) 51%, transparent 51%),
+		linear-gradient(to bottom, transparent 49%, rgba(255,255,255,0.08) 49%, rgba(255,255,255,0.08) 51%, transparent 51%);
+	pointer-events: none;
+}
+
+.app-shell.theme-day .corner-grid-lines {
+	background:
+		linear-gradient(to right, transparent 49%, rgba(76,120,68,0.12) 49%, rgba(76,120,68,0.12) 51%, transparent 51%),
+		linear-gradient(to bottom, transparent 49%, rgba(76,120,68,0.12) 49%, rgba(76,120,68,0.12) 51%, transparent 51%);
+}
+
+.corner-label {
+	position: absolute;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 1px;
+	font-size: 0.55rem;
+	font-weight: 700;
+	color: rgba(255, 255, 255, 0.35);
 	transition: color 0.3s ease;
-	min-width: 1.2rem;
-	text-align: center;
+	pointer-events: none;
+	line-height: 1;
 }
 
-.lang-toggle-label.active {
+.corner-label.active {
 	color: var(--primary);
 }
 
-.lang-toggle-track {
-	width: 36px;
-	height: 20px;
-	background: rgba(255, 255, 255, 0.1);
-	border-radius: 20px;
-	position: relative;
-	border: 1px solid rgba(255, 255, 255, 0.15);
+.app-shell.theme-day .corner-label {
+	color: rgba(60, 90, 50, 0.4);
 }
 
-.lang-toggle-thumb {
+.app-shell.theme-day .corner-label.active {
+	color: var(--day-primary, #2E7D32);
+}
+
+.corner-icon {
+	width: 10px;
+	height: 10px;
+	opacity: 0.7;
+}
+
+.corner-tl { top: 5px; left: 6px; }
+.corner-tr { top: 5px; right: 6px; }
+.corner-bl { bottom: 5px; left: 6px; }
+.corner-br { bottom: 5px; right: 6px; }
+
+.corner-thumb {
 	position: absolute;
-	top: 2px;
-	left: 2px;
-	width: 14px;
-	height: 14px;
-	border-radius: 50%;
+	width: 22px;
+	height: 22px;
+	border-radius: 8px;
 	background: linear-gradient(135deg, var(--primary), var(--accent));
-	transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-	box-shadow: 0 2px 8px rgba(0, 255, 255, 0.4);
+	box-shadow: 0 2px 10px rgba(0, 255, 255, 0.4);
+	transition: top 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+	            left 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+	pointer-events: none;
 }
 
-.lang-toggle-thumb.en {
-	transform: translateX(16px);
+.app-shell.theme-day .corner-thumb {
+	background: linear-gradient(135deg, #F9A825, #FFE082);
+	box-shadow: 0 2px 10px rgba(249, 168, 37, 0.45);
 }
 
-/* Auth Modal */
 .auth-modal-overlay {
 	position: fixed;
 	inset: 0;
@@ -2975,4 +3160,161 @@ footer p a:hover {
 	.sponsor-description {
 		font-size: 0.8rem;
 	}
+}
+
+/* ===== Day theme UI overrides ===== */
+.app-shell.theme-day header {
+	background: rgba(255, 255, 255, 0.75);
+	backdrop-filter: blur(20px);
+	border-bottom: 1px solid rgba(76, 120, 68, 0.15);
+}
+
+.app-shell.theme-day .logo-text {
+	background: linear-gradient(45deg, #2E7D32, #F9A825);
+	-webkit-background-clip: text;
+	background-clip: text;
+}
+
+.app-shell.theme-day .logo-icon {
+	background: rgba(249, 168, 37, 0.15);
+	border-color: rgba(249, 168, 37, 0.3);
+}
+
+.app-shell.theme-day .nav-links a {
+	color: rgba(30, 60, 30, 0.75);
+}
+
+.app-shell.theme-day .nav-links a:hover {
+	color: #1a2e1a;
+	background: rgba(76, 120, 68, 0.08);
+}
+
+.app-shell.theme-day .nav-links a.active {
+	color: #fff;
+	background: linear-gradient(45deg, #2E7D32, #F9A825);
+}
+
+.app-shell.theme-day .nav-username {
+	color: #2E5E2E;
+}
+
+.app-shell.theme-day .btn-nav-logout {
+	color: #2E5E2E;
+	background: rgba(76, 120, 68, 0.08);
+	border-color: rgba(76, 120, 68, 0.2);
+}
+
+.app-shell.theme-day .btn-nav-logout:hover {
+	color: #2E7D32;
+	border-color: rgba(46, 125, 50, 0.4);
+}
+
+.app-shell.theme-day .hero h1 {
+	background: linear-gradient(45deg, #2E7D32, #F9A825, #558B2F);
+	-webkit-background-clip: text;
+	background-clip: text;
+}
+
+.app-shell.theme-day .hero p,
+.app-shell.theme-day .stat-label {
+	color: #4a6741;
+}
+
+.app-shell.theme-day .stat-number {
+	color: #2E7D32;
+}
+
+.app-shell.theme-day .section h2,
+.app-shell.theme-day .habits-page-title,
+.app-shell.theme-day .register-title,
+.app-shell.theme-day .habits-history-title {
+	background: linear-gradient(45deg, #2E7D32, #F9A825);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+}
+
+.app-shell.theme-day .habits-page-subtitle,
+.app-shell.theme-day .about-text p,
+.app-shell.theme-day .speaker-bio,
+.app-shell.theme-day .register-subtitle {
+	color: #4a6741;
+}
+
+.app-shell.theme-day .habits-stat-chip,
+.app-shell.theme-day .habit-card,
+.app-shell.theme-day .today-checkin-panel,
+.app-shell.theme-day .today-checkin-stat,
+.app-shell.theme-day .today-checkin-item,
+.app-shell.theme-day .speaker-card,
+.app-shell.theme-day .habits-empty,
+.app-shell.theme-day .habits-login-prompt {
+	background: rgba(255, 255, 255, 0.55);
+	border-color: rgba(76, 120, 68, 0.18);
+	backdrop-filter: blur(12px);
+}
+
+.app-shell.theme-day .habits-stat-value,
+.app-shell.theme-day .habit-badge-xp,
+.app-shell.theme-day .today-checkin-number.done {
+	color: #2E7D32;
+}
+
+.app-shell.theme-day .btn-primary,
+.app-shell.theme-day .btn-habit-checkin,
+.app-shell.theme-day .btn-habit-add {
+	background: linear-gradient(45deg, #43A047, #F9A825) !important;
+	color: #fff !important;
+	box-shadow: 0 6px 20px rgba(76, 175, 80, 0.25);
+}
+
+.app-shell.theme-day .btn-secondary {
+	color: #2E7D32;
+	border-color: #2E7D32;
+}
+
+.app-shell.theme-day .btn-secondary:hover {
+	background: #2E7D32;
+	color: #fff;
+}
+
+.app-shell.theme-day .habit-card:hover {
+	border-color: rgba(46, 125, 50, 0.4);
+	box-shadow: 0 16px 40px rgba(76, 175, 80, 0.12);
+}
+
+.app-shell.theme-day .habit-card-avatar {
+	background: linear-gradient(135deg, #66BB6A, #F9A825);
+}
+
+.app-shell.theme-day .habit-card-name,
+.app-shell.theme-day .speaker-name,
+.app-shell.theme-day .today-checkin-item-name {
+	color: #1a2e1a;
+}
+
+.app-shell.theme-day .habits-modal,
+.app-shell.theme-day .auth-modal {
+	background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(232, 245, 214, 0.95));
+	border-color: rgba(76, 120, 68, 0.25);
+}
+
+.app-shell.theme-day .habits-modal-title,
+.app-shell.theme-day .auth-modal-title {
+	background: linear-gradient(45deg, #2E7D32, #F9A825);
+	-webkit-background-clip: text;
+	background-clip: text;
+}
+
+.app-shell.theme-day .habit-edit-input,
+.app-shell.theme-day .auth-input {
+	background: rgba(255, 255, 255, 0.7);
+	border-color: rgba(76, 120, 68, 0.2);
+	color: #1a2e1a;
+}
+
+.app-shell.theme-day .habit-edit-input:focus,
+.app-shell.theme-day .auth-input:focus {
+	border-color: #2E7D32;
+	box-shadow: 0 0 16px rgba(76, 175, 80, 0.15);
 }

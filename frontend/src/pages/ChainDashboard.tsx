@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useHabitStore } from '../stores/habitStore'
 import { useTranslation } from '../stores/languageStore'
 import { Target, ArrowRight, CheckCircle2, Clock, Sparkles } from 'lucide-react'
-import { difficultyKey, habitTypeKey, getDueMilestonesToday } from '../utils/habitHelpers'
+import { difficultyKey, habitTypeKey } from '../utils/habitHelpers'
 
 export default function ChainDashboard() {
     const { t } = useTranslation()
@@ -43,7 +43,7 @@ export default function ChainDashboard() {
     const totalStreak = habits.reduce((sum, h) => sum + (h.currentStreak || 0), 0)
 
     return (
-        <div className="min-h-screen text-white">
+        <div className="min-h-screen">
             <section id="home" className="hero">
                 <div className="hero-content">
                     <h1>LearnChain</h1>
@@ -147,9 +147,7 @@ export default function ChainDashboard() {
                                     {t('dash.pendingList')}
                                 </div>
                                 <div className="today-checkin-list">
-                                    {uncheckedHabits.map(habit => {
-                                        const dueMilestones = getDueMilestonesToday(habit)
-                                        return (
+                                    {uncheckedHabits.map(habit => (
                                             <div key={habit.id} className="today-checkin-item">
                                                 <div>
                                                     <div className="today-checkin-item-name">{habit.name}</div>
@@ -163,8 +161,7 @@ export default function ChainDashboard() {
                                                     {t('dash.goCheckin')}
                                                 </a>
                                             </div>
-                                        )
-                                    })}
+                                        ))}
                                 </div>
                             </>
                         ) : dueTodayHabits.length === 0 ? (

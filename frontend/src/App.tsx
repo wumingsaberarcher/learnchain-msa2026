@@ -5,18 +5,18 @@ import Dashboard from './pages/ChainDashboard'
 import Habits from './pages/Habits'
 import LoginModal from './components/LoginModal'
 import BackgroundAnimation from './components/BackgroundAnimation'
-import LanguageToggle from './components/LanguageToggle'
+import ThemeLocaleToggle from './components/ThemeLocaleToggle'
 import { useHabitStore } from './stores/habitStore'
-import { useTranslation } from './stores/languageStore'
+import { useTranslation } from './stores/settingsStore'
 
 function App() {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
     const { isLoggedIn, currentUser, logout } = useHabitStore()
-    const { t } = useTranslation()
+    const { t, theme } = useTranslation()
 
     return (
         <BrowserRouter>
-            <div className="app-shell min-h-screen">
+            <div className={`app-shell min-h-screen theme-${theme}`}>
                 <BackgroundAnimation />
 
                 <header>
@@ -48,7 +48,7 @@ function App() {
                                 </li>
                             </ul>
 
-                            <LanguageToggle />
+                            <ThemeLocaleToggle />
 
                             <div className="nav-auth">
                                 {isLoggedIn && currentUser ? (

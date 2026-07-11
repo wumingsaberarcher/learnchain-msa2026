@@ -153,12 +153,12 @@ public class CheckInController : ControllerBase
         }
         else
         {
-            if (!HabitDueService.IsDueToday(habit, checkInDates, milestones, today))
-                return BadRequest("今天不是该习惯的打卡日");
-
             bool alreadyCheckedToday = checkInDates.Contains(today);
             if (alreadyCheckedToday)
                 return BadRequest("今天已经打卡过了，不能重复打卡");
+
+            if (!HabitDueService.IsDueToday(habit, checkInDates, milestones, today))
+                return BadRequest("今天不是该习惯的打卡日");
 
             xpEarned = HabitXpService.GetBaseXP(habit.Difficulty);
         }
