@@ -1,4 +1,4 @@
-import { BADGE_MAP, type BadgeDefinition } from '../badges/badgeDefinitions'
+import type { BadgeDefinition } from '../badges/badgeDefinitions'
 import { useTranslation } from '../stores/settingsStore'
 
 interface BadgeCardProps {
@@ -34,9 +34,4 @@ export default function BadgeCard({ badge, unlocked, size = 'md', onClick }: Bad
             )}
         </div>
     )
-}
-
-export function getBadgeTitle(badgeId: string, t: (k: keyof typeof import('../i18n/translations').zh) => string) {
-    const badge = BADGE_MAP[badgeId]
-    return badge ? t(badge.titleKey) : badgeId
 }

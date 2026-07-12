@@ -10,7 +10,7 @@
         "projectUniqueName": "D:\\learnchain-msa2026\\backend\\backend.csproj",
         "projectName": "backend",
         "projectPath": "D:\\learnchain-msa2026\\backend\\backend.csproj",
-        "packagesPath": "C:\\Users\\LiTiancheng\\AppData\\Local\\Temp\\cursor-sandbox-cache\\9e0adaf9de2cb94b6505e603b044ad6d\\nuget",
+        "packagesPath": "C:\\Users\\LiTiancheng\\.nuget\\packages\\",
         "outputPath": "D:\\learnchain-msa2026\\backend\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
