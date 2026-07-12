@@ -1,11 +1,13 @@
+# Build context must be the repository root (Render default).
+# docker-compose also uses repo root — see docker-compose.yml.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY backend.csproj ./
-RUN dotnet restore
+COPY backend/backend.csproj ./backend/
+RUN dotnet restore ./backend/backend.csproj
 
-COPY . ./
-RUN dotnet publish backend.csproj -c Release -o /app/publish
+COPY backend/ ./backend/
+RUN dotnet publish ./backend/backend.csproj -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
