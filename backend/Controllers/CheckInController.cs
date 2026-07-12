@@ -20,10 +20,12 @@ public class CreateCheckInRequest
 public class CheckInController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly AchievementService _achievements;
 
-    public CheckInController(AppDbContext context)
+    public CheckInController(AppDbContext context, AchievementService achievements)
     {
         _context = context;
+        _achievements = achievements;
     }
 
     private int GetCurrentUserId()
@@ -184,6 +186,18 @@ public class CheckInController : ControllerBase
 
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetCheckIns), new { habitId = checkIn.HabitId }, checkIn);
+        var newlyUnlocked = await _achievements.EvaluateAndUnlockAsync(currentUserId);
+
+        return CreatedAtAction(nameof(GetCheckIns), new { habitId = checkIn.HabitId }, new
+        {
+            checkIn.Id,
+            checkIn.HabitId,
+            checkIn.UserId,
+            checkIn.CompletedAt,
+            checkIn.XPEarned,
+            checkIn.Notes,
+            checkIn.MilestoneId,
+            newlyUnlocked
+        });
     }
 }

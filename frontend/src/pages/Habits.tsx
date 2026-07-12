@@ -136,6 +136,10 @@ export default function Habits() {
         try {
             const result = await createCheckIn({ habitId, milestoneId })
             setSuccessMessage(`${t('habits.checkinSuccess')} +${result.xpEarned} XP`)
+            if (result.newlyUnlocked?.length) {
+                const { useAchievementStore } = await import('../stores/achievementStore')
+                useAchievementStore.getState().handleNewUnlocks(result.newlyUnlocked)
+            }
             await fetchCurrentUser()
             await fetchHabits()
             markHabitCheckedToday(habitId)

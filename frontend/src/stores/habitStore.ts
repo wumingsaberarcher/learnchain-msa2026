@@ -77,10 +77,14 @@ export const useHabitStore = create<HabitState>((set, get) => {
 
         addHabit: async (habit) => {
             try {
-                const newHabit = await createHabit(habit)
+                const { habit: newHabit, newlyUnlocked } = await createHabit(habit)
                 set((state) => ({
                     habits: [...state.habits, newHabit]
                 }))
+                if (newlyUnlocked?.length) {
+                    const { useAchievementStore } = await import('./achievementStore')
+                    useAchievementStore.getState().handleNewUnlocks(newlyUnlocked)
+                }
                 return newHabit
             } catch (err) {
                 set({ error: '创建习惯失败' })
@@ -236,6 +240,13 @@ export const useHabitStore = create<HabitState>((set, get) => {
                     currentUser: userInfo,
                 })
 
+                const { useAchievementStore } = await import('./achievementStore')
+                const achStore = useAchievementStore.getState()
+                await achStore.fetchProfile()
+                if (data.newlyUnlocked?.length) {
+                    achStore.handleNewUnlocks(data.newlyUnlocked)
+                }
+
                 await get().fetchHabits()
                 await get().fetchTodayCheckedHabits()
 
@@ -249,6 +260,9 @@ export const useHabitStore = create<HabitState>((set, get) => {
         logout: () => {
             localStorage.removeItem('token')
             localStorage.removeItem('currentUser')
+            import('./achievementStore').then(({ useAchievementStore }) => {
+                useAchievementStore.getState().clear()
+            })
             set({
                 isLoggedIn: false,
                 currentUser: null,

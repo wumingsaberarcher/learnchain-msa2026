@@ -1,18 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import { Target } from 'lucide-react'
 import Dashboard from './pages/ChainDashboard'
 import Habits from './pages/Habits'
+import Profile from './pages/Profile'
+import Achievements from './pages/Achievements'
 import LoginModal from './components/LoginModal'
 import BackgroundAnimation from './components/BackgroundAnimation'
 import ThemeLocaleToggle from './components/ThemeLocaleToggle'
+import UserProfileMenu from './components/UserProfileMenu'
+import BadgeUnlockModal from './components/BadgeUnlockModal'
 import { useHabitStore } from './stores/habitStore'
+import { useAchievementStore } from './stores/achievementStore'
 import { useTranslation } from './stores/settingsStore'
 
 function App() {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
-    const { isLoggedIn, currentUser, logout } = useHabitStore()
+    const { isLoggedIn, currentUser } = useHabitStore()
+    const { fetchProfile, syncAchievements } = useAchievementStore()
     const { t, theme } = useTranslation()
+
+    useEffect(() => {
+        if (isLoggedIn) {
+            fetchProfile().then(() => syncAchievements())
+        }
+    }, [isLoggedIn, fetchProfile, syncAchievements])
 
     return (
         <BrowserRouter>
@@ -52,12 +64,7 @@ function App() {
 
                             <div className="nav-auth">
                                 {isLoggedIn && currentUser ? (
-                                    <>
-                                        <span className="nav-username">{currentUser.username}</span>
-                                        <button type="button" className="btn-nav-logout" onClick={logout}>
-                                            {t('nav.logout')}
-                                        </button>
-                                    </>
+                                    <UserProfileMenu />
                                 ) : (
                                     <button
                                         type="button"
@@ -76,8 +83,12 @@ function App() {
                     <Routes>
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/habits" element={<Habits />} />
+                        <Route path="/profile" element={<Profile />} />
+                        <Route path="/achievements" element={<Achievements />} />
                     </Routes>
                 </main>
+
+                <BadgeUnlockModal />
 
                 <LoginModal
                     isOpen={isLoginModalOpen}

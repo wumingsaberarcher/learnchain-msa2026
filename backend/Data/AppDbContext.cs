@@ -13,4 +13,5 @@ public class AppDbContext : DbContext
     public DbSet<CheckIn> CheckIns { get; set; }
     public DbSet<HabitMilestone> HabitMilestones { get; set; }
     public DbSet<User> Users { get; set; }
+    public DbSet<UserAchievement> UserAchievements { get; set; }
 }

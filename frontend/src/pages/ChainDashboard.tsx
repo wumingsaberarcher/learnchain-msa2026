@@ -3,6 +3,7 @@ import { useHabitStore } from '../stores/habitStore'
 import { useTranslation } from '../stores/languageStore'
 import { Target, ArrowRight, CheckCircle2, Clock, Sparkles } from 'lucide-react'
 import { difficultyKey, habitTypeKey } from '../utils/habitHelpers'
+import MotivationTicker from '../components/MotivationTicker'
 
 export default function ChainDashboard() {
     const { t } = useTranslation()
@@ -202,7 +203,7 @@ export default function ChainDashboard() {
                 <div className="register-section">
                     <div className="register-content">
                         <h2 className="register-title">{t('dash.persist')}</h2>
-                        <p className="register-subtitle">{t('dash.persistSub')}</p>
+                        <MotivationTicker fallback={t('dash.persistSub')} />
                         <a href="/habits" className="btn btn-primary inline-block mt-4">
                             {t('dash.goCheckin')} <ArrowRight className="inline w-5 h-5 ml-2" />
                         </a>

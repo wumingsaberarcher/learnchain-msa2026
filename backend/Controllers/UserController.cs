@@ -1,5 +1,6 @@
 using backend.Data;
 using backend.Models;
+using backend.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -16,11 +17,13 @@ public class UserController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly IConfiguration _configuration;
+    private readonly AchievementService _achievements;
 
-    public UserController(AppDbContext context, IConfiguration configuration)
+    public UserController(AppDbContext context, IConfiguration configuration, AchievementService achievements)
     {
         _context = context;
         _configuration = configuration;
+        _achievements = achievements;
     }
 
     [HttpPost("register")]
@@ -73,6 +76,7 @@ public class UserController : ControllerBase
             return Unauthorized("用户名/邮箱或密码错误");
 
         var token = GenerateJwtToken(user);
+        var newlyUnlocked = await _achievements.EvaluateAndUnlockAsync(user.Id);
 
         return Ok(new
         {
@@ -83,8 +87,11 @@ public class UserController : ControllerBase
                 user.Username,
                 user.Email,
                 user.TotalXP,
-                user.Level
-            }
+                user.Level,
+                user.Bio,
+                user.CreatedAt
+            },
+            newlyUnlocked
         });
     }
 
@@ -108,8 +115,58 @@ public class UserController : ControllerBase
             user.Username,
             user.Email,
             user.TotalXP,
-            user.Level
+            user.Level,
+            user.Bio,
+            user.CreatedAt,
+            achievements = await _achievements.GetAchievementStatusAsync(userId)
         });
+    }
+
+    [HttpPut("profile")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto dto)
+    {
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null) return NotFound("用户不存在");
+
+        if (dto.Bio != null)
+            user.Bio = dto.Bio.Trim();
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "资料已更新", user.Bio });
+    }
+
+    [HttpPost("change-password")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.OldPassword) || string.IsNullOrWhiteSpace(dto.NewPassword))
+            return BadRequest("请填写当前密码和新密码");
+
+        if (dto.NewPassword.Length < 6)
+            return BadRequest("新密码至少 6 位");
+
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null) return NotFound("用户不存在");
+
+        if (!BCrypt.Net.BCrypt.Verify(dto.OldPassword, user.PasswordHash))
+            return BadRequest("当前密码不正确");
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "密码已更新" });
+    }
+
+    [HttpPost("achievements/sync")]
+    [Microsoft.AspNetCore.Authorization.Authorize]
+    public async Task<IActionResult> SyncAchievements()
+    {
+        var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var newlyUnlocked = await _achievements.EvaluateAndUnlockAsync(userId);
+        var achievements = await _achievements.GetAchievementStatusAsync(userId);
+        return Ok(new { newlyUnlocked, achievements });
     }
 
     private static bool IsValidEmail(string email)
@@ -155,4 +212,15 @@ public class LoginDto
 {
     public string Login { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
+}
+
+public class UpdateProfileDto
+{
+    public string? Bio { get; set; }
+}
+
+public class ChangePasswordDto
+{
+    public string OldPassword { get; set; } = string.Empty;
+    public string NewPassword { get; set; } = string.Empty;
 }

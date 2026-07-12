@@ -21,6 +21,20 @@ public static class DatabaseMigrator
             EnsureColumn(connection, "CheckIns", "MilestoneId", "INTEGER NULL");
             EnsureColumn(connection, "Users", "Email", "TEXT NOT NULL DEFAULT ''");
 
+            using var achievementCmd = connection.CreateCommand();
+            achievementCmd.CommandText = """
+                CREATE TABLE IF NOT EXISTS UserAchievements (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    UserId INTEGER NOT NULL,
+                    BadgeId TEXT NOT NULL,
+                    UnlockedAt TEXT NOT NULL,
+                    UNIQUE(UserId, BadgeId)
+                );
+                """;
+            achievementCmd.ExecuteNonQuery();
+
+            EnsureColumn(connection, "Users", "Bio", "TEXT NOT NULL DEFAULT ''");
+
             using var cmd = connection.CreateCommand();
             cmd.CommandText = """
                 CREATE TABLE IF NOT EXISTS HabitMilestones (

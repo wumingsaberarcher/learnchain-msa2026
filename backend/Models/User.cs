@@ -9,4 +9,6 @@ public class User
     public int TotalXP { get; set; } = 0;
     public int Level { get; set; } = 1;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    /// <summary>Personal bio / self-motivation notes (newline-separated).</summary>
+    public string Bio { get; set; } = string.Empty;
 }

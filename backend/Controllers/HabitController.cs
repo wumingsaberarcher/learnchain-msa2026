@@ -13,10 +13,12 @@ namespace backend.Controllers;
 public class HabitController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly AchievementService _achievements;
 
-    public HabitController(AppDbContext context)
+    public HabitController(AppDbContext context, AchievementService achievements)
     {
         _context = context;
+        _achievements = achievements;
     }
 
     private int GetCurrentUserId()
@@ -164,7 +166,8 @@ public class HabitController : ControllerBase
         }
 
         await EnrichHabitsAsync(new List<Habit> { habit }, currentUserId, DateTime.UtcNow.Date);
-        return CreatedAtAction(nameof(GetHabits), new { id = habit.Id }, habit);
+        var newlyUnlocked = await _achievements.EvaluateAndUnlockAsync(currentUserId);
+        return CreatedAtAction(nameof(GetHabits), new { id = habit.Id }, new { habit, newlyUnlocked });
     }
 
     [HttpPut("{id}")]

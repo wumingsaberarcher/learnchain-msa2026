@@ -36,7 +36,7 @@ export async function getAllHabits(includeInactive = false): Promise<Habit[]> {
     return res.json()
 }
 
-export async function createHabit(payload: CreateHabitPayload): Promise<Habit> {
+export async function createHabit(payload: CreateHabitPayload): Promise<{ habit: Habit; newlyUnlocked?: string[] }> {
     const res = await fetch(`${API_BASE}/habit`, {
         method: 'POST',
         headers: authHeaders(true),
@@ -48,7 +48,8 @@ export async function createHabit(payload: CreateHabitPayload): Promise<Habit> {
         throw new Error(errorText || 'Failed to create habit')
     }
 
-    return res.json()
+    const data = await res.json()
+    return { habit: data.habit ?? data, newlyUnlocked: data.newlyUnlocked }
 }
 
 export async function updateHabit(id: number, data: Partial<Habit>): Promise<void> {
