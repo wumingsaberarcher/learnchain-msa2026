@@ -21,7 +21,7 @@ RUN mkdir -p /app/data
 COPY --from=build /app/publish .
 
 ENV ASPNETCORE_URLS=http://+:5000
-ENV ConnectionStrings__DefaultConnection=Data Source=/app/data/learnchain.db
+ENV ConnectionStrings__DefaultConnection=DataSource=/app/data/learnchain.db
 
 EXPOSE 5000
 

@@ -20,9 +20,9 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 // 配置 EF Core + SQLite
+var connectionString = ResolveSqliteConnectionString(builder.Configuration);
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? "Data Source=learnchain.db"));
+    options.UseSqlite(connectionString));
 
 // ====================== JWT 配置 ======================
 
@@ -104,5 +104,25 @@ app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "learnchain-backend" }));
 
 app.Run();
+
+static string ResolveSqliteConnectionString(IConfiguration configuration)
+{
+    var raw = configuration.GetConnectionString("DefaultConnection")?.Trim().Trim('"', '\'');
+    if (string.IsNullOrWhiteSpace(raw))
+        return "Data Source=learnchain.db";
+
+    // Render/Docker env vars sometimes break on the space in "Data Source=".
+    if (raw.Equals("Data", StringComparison.OrdinalIgnoreCase))
+        return "DataSource=/app/data/learnchain.db";
+
+    // User pasted only a file path in the dashboard.
+    if (!raw.Contains('=') &&
+        (raw.StartsWith('/') || raw.StartsWith("./") || raw.EndsWith(".db", StringComparison.OrdinalIgnoreCase)))
+    {
+        return $"Data Source={raw}";
+    }
+
+    return raw;
+}
 
 public partial class Program { }

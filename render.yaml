@@ -8,7 +8,7 @@ services:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
       - key: ConnectionStrings__DefaultConnection
-        value: Data Source=/app/data/learnchain.db
+        value: DataSource=/app/data/learnchain.db
       - key: JWT_KEY
         generateValue: true
       - key: Cors__AllowedOrigins
