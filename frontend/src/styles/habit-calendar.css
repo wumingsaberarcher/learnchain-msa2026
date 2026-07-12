@@ -1,0 +1,355 @@
+/* Habit calendar — dashboard */
+.habit-calendar-section {
+	max-width: 1100px;
+}
+
+.habit-calendar-section-desc {
+	text-align: center;
+	color: var(--gray);
+	margin: -1.5rem auto 2rem;
+	max-width: 560px;
+}
+
+.habit-calendar-wrap {
+	display: grid;
+	grid-template-columns: 1fr min(320px, 100%);
+	gap: 1.5rem;
+	align-items: start;
+}
+
+.habit-calendar-panel {
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid rgba(0, 255, 255, 0.15);
+	border-radius: 28px;
+	padding: 1.5rem;
+	backdrop-filter: blur(14px);
+}
+
+.habit-calendar-empty {
+	text-align: center;
+	color: var(--gray);
+	padding: 3rem 1rem;
+}
+
+.habit-calendar-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 1.25rem;
+}
+
+.habit-calendar-month {
+	font-size: 1.35rem;
+	font-weight: 700;
+	background: linear-gradient(45deg, var(--primary), var(--accent));
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+}
+
+.habit-calendar-nav {
+	width: 40px;
+	height: 40px;
+	border-radius: 12px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	background: rgba(255, 255, 255, 0.05);
+	color: var(--light);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.25s ease;
+}
+
+.habit-calendar-nav:hover {
+	border-color: var(--primary);
+	color: var(--primary);
+}
+
+.habit-calendar-weekdays {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: 0.35rem;
+	margin-bottom: 0.5rem;
+}
+
+.habit-calendar-weekday {
+	text-align: center;
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: var(--gray);
+	padding: 0.35rem;
+}
+
+.habit-calendar-grid {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: 0.35rem;
+}
+
+.habit-calendar-cell {
+	min-height: 100px;
+	padding: 0.45rem;
+	border-radius: 14px;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: rgba(255, 255, 255, 0.03);
+	text-align: left;
+	cursor: pointer;
+	transition: all 0.25s ease;
+	font-family: inherit;
+	color: inherit;
+	display: flex;
+	flex-direction: column;
+	position: relative;
+}
+
+.habit-calendar-cell.empty {
+	background: transparent;
+	border: none;
+	cursor: default;
+	min-height: auto;
+}
+
+.habit-calendar-cell:hover:not(.empty) {
+	border-color: rgba(0, 255, 255, 0.35);
+	background: rgba(0, 255, 255, 0.06);
+}
+
+.habit-calendar-cell.today {
+	border-color: rgba(0, 255, 255, 0.5);
+	box-shadow: 0 0 16px rgba(0, 255, 255, 0.12);
+}
+
+.habit-calendar-cell.selected {
+	border-color: var(--primary);
+	background: rgba(0, 255, 255, 0.1);
+}
+
+.habit-calendar-cell.has-items {
+	min-height: 110px;
+}
+
+.habit-calendar-day-num {
+	font-size: 0.85rem;
+	font-weight: 700;
+	color: rgba(255, 255, 255, 0.9);
+	margin-bottom: 0.25rem;
+}
+
+.habit-calendar-cell.today .habit-calendar-day-num {
+	color: var(--primary);
+}
+
+.habit-calendar-cell-items {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+	flex: 1;
+	overflow: hidden;
+}
+
+.habit-calendar-chip {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.2rem;
+	padding: 0.15rem 0.35rem;
+	border-radius: 6px;
+	background: rgba(0, 255, 255, 0.1);
+	border: 1px solid rgba(0, 255, 255, 0.15);
+	font-size: 0.62rem;
+	line-height: 1.2;
+	max-width: 100%;
+	transition: all 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.habit-calendar-chip.done {
+	background: rgba(0, 255, 136, 0.12);
+	border-color: rgba(0, 255, 136, 0.25);
+	opacity: 0.75;
+	transform: translateX(4px);
+}
+
+.habit-calendar-chip-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	flex: 1;
+	transition: all 0.45s ease;
+}
+
+.habit-calendar-chip.done .habit-calendar-chip-text {
+	text-decoration: line-through;
+	text-decoration-color: var(--success);
+	text-decoration-thickness: 2px;
+	color: var(--success);
+}
+
+.habit-calendar-chip-check {
+	color: var(--success);
+	flex-shrink: 0;
+}
+
+.habit-calendar-more {
+	font-size: 0.6rem;
+	color: var(--gray);
+	padding-left: 0.2rem;
+}
+
+.habit-calendar-cell-stats {
+	position: absolute;
+	bottom: 4px;
+	right: 6px;
+	display: flex;
+	gap: 0.25rem;
+	font-size: 0.6rem;
+	font-weight: 700;
+}
+
+.stat-done { color: var(--success); }
+.stat-pending { color: #fbbf24; }
+
+/* Detail panel */
+.habit-calendar-detail {
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid rgba(255, 0, 255, 0.15);
+	border-radius: 24px;
+	padding: 1.25rem;
+	backdrop-filter: blur(12px);
+	position: sticky;
+	top: 5.5rem;
+}
+
+.habit-calendar-detail-title {
+	font-size: 1rem;
+	font-weight: 600;
+	margin-bottom: 1rem;
+	color: rgba(255, 255, 255, 0.9);
+}
+
+.habit-calendar-detail-empty {
+	color: var(--gray);
+	font-size: 0.9rem;
+}
+
+.habit-calendar-detail-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.6rem;
+}
+
+.habit-calendar-detail-item {
+	display: grid;
+	grid-template-columns: 1fr auto auto;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.75rem 1rem;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 14px;
+	transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.habit-calendar-detail-item.done {
+	background: rgba(0, 255, 136, 0.08);
+	border-color: rgba(0, 255, 136, 0.25);
+	transform: translateX(8px);
+	opacity: 0.85;
+	animation: calItemDone 0.6s ease;
+}
+
+@keyframes calItemDone {
+	0% { transform: translateX(0); opacity: 1; }
+	40% { transform: translateX(12px); opacity: 0.6; }
+	100% { transform: translateX(8px); opacity: 0.85; }
+}
+
+.habit-calendar-detail-name {
+	font-weight: 500;
+	font-size: 0.9rem;
+	transition: all 0.45s ease;
+}
+
+.habit-calendar-detail-item.done .habit-calendar-detail-name {
+	text-decoration: line-through;
+	text-decoration-color: var(--success);
+	text-decoration-thickness: 2px;
+	color: var(--success);
+}
+
+.habit-calendar-detail-xp {
+	font-size: 0.78rem;
+	color: var(--primary);
+	font-weight: 600;
+}
+
+.habit-calendar-detail-check {
+	color: var(--success);
+}
+
+.habit-calendar-cta {
+	display: block;
+	text-align: center;
+	margin-top: 1rem;
+	text-decoration: none;
+}
+
+.app-shell.theme-day .habit-calendar-panel,
+.app-shell.theme-day .habit-calendar-detail {
+	background: rgba(255, 255, 255, 0.55);
+	border-color: rgba(76, 120, 68, 0.2);
+}
+
+.app-shell.theme-day .habit-calendar-cell {
+	background: rgba(255, 255, 255, 0.5);
+	border-color: rgba(76, 120, 68, 0.15);
+}
+
+.app-shell.theme-day .habit-calendar-day-num,
+.app-shell.theme-day .habit-calendar-detail-title {
+	color: #1a2e1a;
+}
+
+.app-shell.theme-day .habit-calendar-chip {
+	background: rgba(76, 175, 80, 0.12);
+	border-color: rgba(76, 120, 68, 0.2);
+}
+
+@media (max-width: 900px) {
+	.habit-calendar-wrap {
+		grid-template-columns: 1fr;
+	}
+
+	.habit-calendar-detail {
+		position: static;
+	}
+
+	.habit-calendar-cell {
+		min-height: 72px;
+	}
+
+	.habit-calendar-cell.has-items {
+		min-height: 88px;
+	}
+}
+
+@media (max-width: 600px) {
+	.habit-calendar-chip-text {
+		display: none;
+	}
+
+	.habit-calendar-cell.has-items .habit-calendar-chip {
+		width: 8px;
+		height: 8px;
+		padding: 0;
+		border-radius: 50%;
+		min-height: 8px;
+	}
+
+	.habit-calendar-chip.done {
+		background: var(--success);
+	}
+}

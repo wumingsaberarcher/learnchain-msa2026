@@ -243,6 +243,17 @@ const zh = {
     'badge.total_365.desc': '累计打卡 365 次',
     'badge.total_1000.title': '千次传说',
     'badge.total_1000.desc': '累计打卡 1000 次',
+
+    // Calendar
+    'cal.sectionDesc': '在日历上查看每日打卡任务，完成后条目会划掉并亮起成就感特效',
+    'cal.sun': '日',
+    'cal.mon': '一',
+    'cal.tue': '二',
+    'cal.wed': '三',
+    'cal.thu': '四',
+    'cal.fri': '五',
+    'cal.sat': '六',
+    'cal.noItems': '这一天没有需要打卡的任务',
 } as const
 
 const en: Record<keyof typeof zh, string> = {
@@ -479,6 +490,16 @@ const en: Record<keyof typeof zh, string> = {
     'badge.total_365.desc': '365 total check-ins',
     'badge.total_1000.title': 'Thousand Legend',
     'badge.total_1000.desc': '1000 total check-ins',
+
+    'cal.sectionDesc': 'See daily check-in tasks on the calendar — completed items strike through with a satisfying effect',
+    'cal.sun': 'Sun',
+    'cal.mon': 'Mon',
+    'cal.tue': 'Tue',
+    'cal.wed': 'Wed',
+    'cal.thu': 'Thu',
+    'cal.fri': 'Fri',
+    'cal.sat': 'Sat',
+    'cal.noItems': 'No check-ins scheduled for this day',
 }
 
 export type TranslationKey = keyof typeof zh

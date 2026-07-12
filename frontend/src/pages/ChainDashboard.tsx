@@ -1,9 +1,12 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useHabitStore } from '../stores/habitStore'
 import { useTranslation } from '../stores/languageStore'
-import { Target, ArrowRight, CheckCircle2, Clock, Sparkles } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Clock, Sparkles } from 'lucide-react'
 import { difficultyKey, habitTypeKey } from '../utils/habitHelpers'
 import MotivationTicker from '../components/MotivationTicker'
+import HabitCalendar from '../components/HabitCalendar'
+import { getAllCheckIns } from '../api/checkInApi'
+import type { CalendarCheckIn } from '../utils/habitCalendarHelpers'
 
 export default function ChainDashboard() {
     const { t } = useTranslation()
@@ -15,13 +18,19 @@ export default function ChainDashboard() {
         isLoggedIn,
         todayCheckedHabitIds,
     } = useHabitStore()
+    const [checkIns, setCheckIns] = useState<CalendarCheckIn[]>([])
 
     useEffect(() => {
         if (isLoggedIn) {
             fetchHabits()
             fetchTodayCheckedHabits()
+            getAllCheckIns()
+                .then(data => setCheckIns(data))
+                .catch(() => setCheckIns([]))
+        } else {
+            setCheckIns([])
         }
-    }, [fetchHabits, fetchTodayCheckedHabits, isLoggedIn])
+    }, [fetchHabits, fetchTodayCheckedHabits, isLoggedIn, todayCheckedHabitIds.join(',')])
 
     const dueTodayHabits = useMemo(
         () => habits.filter(h => h.isDueToday && !h.isCompleted),
@@ -95,31 +104,10 @@ export default function ChainDashboard() {
                 </div>
             </section>
 
-            <section id="habits" className="section">
+            <section id="habits" className="section habit-calendar-section">
                 <h2>{t('dash.habitSection')}</h2>
-                <div className="speakers-grid">
-                    {habits.length > 0 ? (
-                        habits.slice(0, 6).map((habit) => (
-                            <div key={habit.id} className="speaker-card">
-                                <div className="speaker-avatar">
-                                    <Target className="w-10 h-10" />
-                                </div>
-                                <h3 className="speaker-name">{habit.name}</h3>
-                                <div className="speaker-title">
-                                    +{habit.baseXP} XP · {t(habitTypeKey(habit.habitType || 'Daily'))}
-                                </div>
-                                <p className="speaker-bio">
-                                    {t(difficultyKey(habit.difficulty || 1))} {t('dash.difficulty')}
-                                    {habit.currentStreak > 0 && ` · ${habit.currentStreak} ${t('dash.streakDays')}`}
-                                </p>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="col-span-full text-center py-12 text-zinc-400">
-                            {t('dash.noHabits')}
-                        </div>
-                    )}
-                </div>
+                <p className="habit-calendar-section-desc">{t('cal.sectionDesc')}</p>
+                <HabitCalendar habits={habits} checkIns={checkIns} isLoggedIn={isLoggedIn} />
             </section>
 
             <section id="checkin" className="section">

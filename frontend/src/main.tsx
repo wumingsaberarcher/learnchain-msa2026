@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.tsx'
 import './styles/chain-summit.css'
 import './styles/profile-achievements.css'
+import './styles/habit-calendar.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
