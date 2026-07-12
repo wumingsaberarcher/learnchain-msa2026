@@ -1,9 +1,12 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
-COPY backend.csproj .
-RUN dotnet restore
+
+# 复制整个 backend 目录的内容
 COPY . .
-RUN dotnet publish -c Release -o /app/publish
+
+# 明确指定项目文件进行还原和发布
+RUN dotnet restore "backend.csproj"
+RUN dotnet publish "backend.csproj" -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
