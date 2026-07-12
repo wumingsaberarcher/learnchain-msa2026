@@ -1651,6 +1651,11 @@ nav {
 	border: 1px solid rgba(0, 255, 255, 0.2);
 }
 
+.logo-icon svg {
+	color: var(--primary);
+	transition: color 0.3s ease;
+}
+
 .logo {
 	display: flex;
 	align-items: center;
@@ -1661,11 +1666,6 @@ nav {
 
 .logo:hover {
 	transform: translateY(-2px);
-}
-
-.logo-icon {
-	width: 40px;
-	height: 40px;
 }
 
 .logo-text {
@@ -3317,4 +3317,103 @@ footer p a:hover {
 .app-shell.theme-day .auth-input:focus {
 	border-color: #2E7D32;
 	box-shadow: 0 0 16px rgba(76, 175, 80, 0.15);
+}
+
+/* Auth modal — day theme */
+.app-shell.theme-day .auth-modal-overlay {
+	background: rgba(0, 0, 0, 0.35);
+}
+
+.app-shell.theme-day .auth-modal-icon {
+	background: linear-gradient(135deg, #66BB6A, #F9A825);
+	color: #fff;
+	box-shadow: 0 10px 30px rgba(76, 175, 80, 0.25);
+}
+
+.app-shell.theme-day .auth-modal-subtitle {
+	color: #4a6741;
+}
+
+.app-shell.theme-day .auth-modal-close {
+	color: #1a2e1a;
+	border-color: rgba(76, 120, 68, 0.25);
+	background: rgba(255, 255, 255, 0.6);
+}
+
+.app-shell.theme-day .auth-modal-close:hover {
+	border-color: rgba(46, 125, 50, 0.45);
+	color: #2E7D32;
+	background: rgba(76, 120, 68, 0.08);
+}
+
+.app-shell.theme-day .auth-mode-tabs {
+	background: rgba(76, 120, 68, 0.06);
+	border-color: rgba(76, 120, 68, 0.15);
+}
+
+.app-shell.theme-day .auth-mode-tab {
+	color: #1a2e1a;
+}
+
+.app-shell.theme-day .auth-mode-tab.active {
+	background: linear-gradient(45deg, #43A047, #F9A825);
+	color: #fff;
+}
+
+.app-shell.theme-day .auth-field-icon {
+	color: #1a2e1a;
+}
+
+.app-shell.theme-day .auth-input::placeholder {
+	color: rgba(26, 46, 26, 0.55);
+}
+
+.app-shell.theme-day .auth-actions .btn-habit-ghost {
+	background: rgba(76, 120, 68, 0.08);
+	color: #1a2e1a !important;
+	border-color: rgba(76, 120, 68, 0.25);
+}
+
+.app-shell.theme-day .auth-actions .btn-habit-ghost:hover {
+	background: rgba(76, 120, 68, 0.15);
+	border-color: rgba(46, 125, 50, 0.4);
+	color: #2E7D32 !important;
+}
+
+.app-shell.theme-day .auth-actions .btn-habit-checkin {
+	background: linear-gradient(45deg, #43A047, #F9A825) !important;
+	color: #fff !important;
+	box-shadow: 0 6px 20px rgba(76, 175, 80, 0.25);
+}
+
+.app-shell.theme-day .logo-icon svg {
+	color: #2E7D32;
+}
+
+.app-shell.theme-day .habits-empty-icon {
+	background: linear-gradient(135deg, #66BB6A, #F9A825);
+	color: #fff;
+}
+
+.app-shell.theme-day .habits-modal-close {
+	color: #1a2e1a;
+	border-color: rgba(76, 120, 68, 0.25);
+	background: rgba(255, 255, 255, 0.6);
+}
+
+.app-shell.theme-day .habits-modal-close:hover {
+	border-color: rgba(46, 125, 50, 0.45);
+	color: #2E7D32;
+}
+
+.app-shell.theme-day .btn-habit-ghost {
+	background: rgba(76, 120, 68, 0.08);
+	color: #1a2e1a;
+	border-color: rgba(76, 120, 68, 0.25);
+}
+
+.app-shell.theme-day .btn-habit-ghost:hover {
+	background: rgba(76, 120, 68, 0.15);
+	border-color: rgba(46, 125, 50, 0.4);
+	color: #2E7D32;
 }

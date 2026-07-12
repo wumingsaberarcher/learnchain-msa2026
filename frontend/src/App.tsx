@@ -23,7 +23,7 @@ function App() {
                     <nav>
                         <NavLink to="/" className="logo">
                             <div className="logo-icon">
-                                <Target className="w-6 h-6 text-cyan-400" />
+                                <Target className="w-6 h-6" />
                             </div>
                             <span className="logo-text">LearnChain</span>
                         </NavLink>

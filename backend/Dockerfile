@@ -1,10 +1,11 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY . .
+COPY backend.csproj ./
+RUN dotnet restore
 
-RUN dotnet restore "./backend/backend.csproj"
-RUN dotnet publish "./backend/backend.csproj" -c Release -o /app/publish
+COPY . ./
+RUN dotnet publish backend.csproj -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
@@ -23,6 +24,6 @@ ENV ConnectionStrings__DefaultConnection=Data Source=/app/data/learnchain.db
 EXPOSE 5000
 
 HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=5 \
-    CMD curl -f http://localhost:5000/health || exit 1
+    CMD sh -c 'curl -f http://localhost:${PORT:-5000}/health || exit 1'
 
 ENTRYPOINT ["dotnet", "backend.dll"]

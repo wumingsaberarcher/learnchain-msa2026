@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: learnchain-backend
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ConnectionStrings__DefaultConnection
+        value: Data Source=/app/data/learnchain.db
+      - key: JWT_KEY
+        generateValue: true
+      - key: Cors__AllowedOrigins
+        sync: false
