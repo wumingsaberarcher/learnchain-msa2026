@@ -42,6 +42,47 @@ VITE_API_BASE=https://learnchain-msa2026.onrender.com/api
 
 ---
 
+## Advanced Features (Phase 2)
+
+This project implements **three** advanced features for MSA 2026 Phase 2 assessment:
+
+| # | Feature | Status | Where to verify |
+|---|---------|--------|-----------------|
+| 1 | **Scalar API Reference** (not Swagger UI) | ✅ Done | `backend/Program.cs` — `AddOpenApi()` + `MapScalarApiReference()`; local UI at `/scalar/v1` |
+| 2 | **Gamification & Achievement System** | ✅ Done | 26 badges, XP/levels/streaks — `backend/Services/AchievementService.cs`, `/achievements` page |
+| 3 | **Cloud Deployment (Docker + Render + Vercel)** | ✅ Done | `backend/Dockerfile`, `render.yaml`, `frontend/vercel.json`; live URLs above |
+
+### 1. Scalar API Reference
+
+- Package: `Scalar.AspNetCore` in `backend/backend.csproj`
+- Registration in `Program.cs`:
+
+```csharp
+builder.Services.AddOpenApi();
+// ...
+app.MapOpenApi();
+app.MapScalarApiReference();
+```
+
+- **Local access** (Development only): run `dotnet run` in `backend/`, then open [http://localhost:5000/scalar/v1](http://localhost:5000/scalar/v1)
+- OpenAPI JSON: [http://localhost:5000/openapi/v1.json](http://localhost:5000/openapi/v1.json)
+
+> Scalar is enabled in Development environment only (not exposed on production Render).
+
+### 2. Gamification & Achievement System
+
+- Server-side badge unlock logic with 26 achievements (streak, level, total check-ins, milestones)
+- Unlock popups, profile page, achievement gallery with locked/unlocked visual states
+- Motivational quote ticker on dashboard from user bio
+
+### 3. Cloud Deployment
+
+- **Backend**: Docker image on Render (`learnchain-msa2026.onrender.com`)
+- **Frontend**: Static SPA on Vercel with `VITE_API_BASE` pointing to Render API
+- **Local**: `docker compose up --build` for full-stack testing
+
+---
+
 ## Quick Start (Docker)
 
 Prerequisites: [Docker Desktop](https://www.docker.com/products/docker-desktop/)
