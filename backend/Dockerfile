@@ -23,6 +23,12 @@ COPY --from=build /app/publish .
 ENV ASPNETCORE_URLS=http://+:5000
 ENV ConnectionStrings__DefaultConnection=DataSource=/app/data/learnchain.db
 
+# Render's shared hosts often exhaust the per-user inotify instance limit (128),
+# which crashes FileSystemWatcher at startup. Use polling instead of inotify
+# and disable appsettings.json hot-reload (not needed in production).
+ENV DOTNET_USE_POLLING_FILE_WATCHER=true
+ENV DOTNET_hostBuilder__reloadConfigOnChange=false
+
 EXPOSE 5000
 
 HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=5 \
