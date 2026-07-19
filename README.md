@@ -29,6 +29,7 @@ VITE_API_BASE=https://learnchain-msa2026.onrender.com/api
 | `ConnectionStrings__DefaultConnection` | `DataSource=/app/data/learnchain.db` |
 | `JWT_KEY` | (random secret) |
 | `Cors__AllowedOrigins` | `https://learnchain-msa2026.vercel.app` |
+| `Smtp__Host` / `Smtp__Port` / `Smtp__User` / `Smtp__Password` / `Smtp__From` | (optional — enables reminder + daily digest email) |
 
 ---
 
@@ -39,6 +40,26 @@ VITE_API_BASE=https://learnchain-msa2026.onrender.com/api
 - **Dashboard calendar** — Large month view showing due check-ins per day; completed items strike through
 - **Profile & motivation** — Personal bio quotes scroll on the dashboard
 - **Themes** — Day / night mode + Chinese / English (4-corner toggle)
+- **AI Assistant** — Floating chat (text + voice) that can read account/habits, guide create/rename/delete habits, and email today’s reminder (user’s own OpenAI-compatible API key)
+
+---
+
+## AI Assistant & Email
+
+1. **Profile → AI Assistant Settings** — paste your API key (defaults: OpenAI `https://api.openai.com/v1` + `gpt-4o-mini`). Key is stored in the browser only and sent with each chat request; the server does not persist it.
+2. Open the floating bot (bottom-right) after login to chat. Habit write tools: create / rename / soft-delete. Read tools cover account info and today’s due/check-in status.
+3. **Daily digest** — toggle on Profile; requires SMTP on the backend:
+
+| Variable | Example |
+|----------|---------|
+| `Smtp__Host` | `smtp.gmail.com` |
+| `Smtp__Port` | `587` |
+| `Smtp__User` | your SMTP username |
+| `Smtp__Password` | app password |
+| `Smtp__From` | `LearnChain <noreply@example.com>` |
+| `Digest__HourUtc` | `8` (default) |
+
+Chat / mail endpoints: `POST /api/chat`, `POST /api/chat/reminder`, `GET|PUT /api/chat/preferences`.
 
 ---
 

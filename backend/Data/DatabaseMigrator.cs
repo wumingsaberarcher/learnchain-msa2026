@@ -34,6 +34,7 @@ public static class DatabaseMigrator
             achievementCmd.ExecuteNonQuery();
 
             EnsureColumn(connection, "Users", "Bio", "TEXT NOT NULL DEFAULT ''");
+            EnsureColumn(connection, "Users", "DailyDigestEnabled", "INTEGER NOT NULL DEFAULT 0");
 
             using var cmd = connection.CreateCommand();
             cmd.CommandText = """

@@ -57,6 +57,14 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 builder.Services.AddScoped<AchievementService>();
+builder.Services.AddScoped<HabitContextBuilder>();
+builder.Services.AddScoped<AiAssistantService>();
+builder.Services.AddSingleton<EmailService>();
+builder.Services.AddHttpClient("OpenAiCompatible", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(90);
+});
+builder.Services.AddHostedService<DailyDigestHostedService>();
 
 // CORS — set Cors__AllowedOrigins on Render (comma-separated Vercel URLs)
 var corsOrigins = builder.Configuration["Cors:AllowedOrigins"];

@@ -10,6 +10,7 @@ import BackgroundAnimation from './components/BackgroundAnimation'
 import ThemeLocaleToggle from './components/ThemeLocaleToggle'
 import UserProfileMenu from './components/UserProfileMenu'
 import BadgeUnlockModal from './components/BadgeUnlockModal'
+import AiAssistant from './components/ai/AiAssistant'
 import { useHabitStore } from './stores/habitStore'
 import { useAchievementStore } from './stores/achievementStore'
 import { useTranslation } from './stores/settingsStore'
@@ -89,6 +90,7 @@ function App() {
                 </main>
 
                 <BadgeUnlockModal />
+                <AiAssistant />
 
                 <LoginModal
                     isOpen={isLoginModalOpen}

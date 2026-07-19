@@ -11,4 +11,7 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     /// <summary>Personal bio / self-motivation notes (newline-separated).</summary>
     public string Bio { get; set; } = string.Empty;
+
+    /// <summary>When true, DailyDigestHostedService emails a today-task summary.</summary>
+    public bool DailyDigestEnabled { get; set; }
 }
