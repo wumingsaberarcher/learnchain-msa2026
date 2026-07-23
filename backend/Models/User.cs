@@ -14,4 +14,9 @@ public class User
 
     /// <summary>When true, DailyDigestHostedService emails a today-task summary.</summary>
     public bool DailyDigestEnabled { get; set; }
+
+    /// <summary>SHA-256 hex of the 6-digit password-reset code.</summary>
+    public string? PasswordResetTokenHash { get; set; }
+
+    public DateTime? PasswordResetExpiresAt { get; set; }
 }

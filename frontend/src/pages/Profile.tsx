@@ -3,6 +3,7 @@ import { useAchievementStore } from '../stores/achievementStore'
 import { useAiSettingsStore } from '../stores/aiSettingsStore'
 import { useTranslation } from '../stores/settingsStore'
 import { getChatPreferences, updateChatPreferences } from '../api/chatApi'
+import { isValidPassword } from '../utils/authValidation'
 import { Save, Lock } from 'lucide-react'
 
 export default function ProfilePage() {
@@ -36,6 +37,10 @@ export default function ProfilePage() {
 
     const handleChangePassword = async () => {
         setErr('')
+        if (!isValidPassword(newPwd)) {
+            setErr(t('auth.invalidPassword'))
+            return
+        }
         const error = await changePassword(oldPwd, newPwd)
         if (error) { setErr(error); return }
         setOldPwd('')

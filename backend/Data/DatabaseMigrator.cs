@@ -35,6 +35,8 @@ public static class DatabaseMigrator
 
             EnsureColumn(connection, "Users", "Bio", "TEXT NOT NULL DEFAULT ''");
             EnsureColumn(connection, "Users", "DailyDigestEnabled", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn(connection, "Users", "PasswordResetTokenHash", "TEXT NULL");
+            EnsureColumn(connection, "Users", "PasswordResetExpiresAt", "TEXT NULL");
 
             using var cmd = connection.CreateCommand();
             cmd.CommandText = """

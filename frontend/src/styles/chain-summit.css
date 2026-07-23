@@ -1619,6 +1619,47 @@ nav {
 	text-align: center;
 }
 
+.auth-info {
+	padding: 0.75rem 1rem;
+	margin-bottom: 1rem;
+	border-radius: 12px;
+	background: rgba(0, 200, 120, 0.1);
+	border: 1px solid rgba(0, 200, 120, 0.25);
+	color: #7dffb3;
+	font-size: 0.85rem;
+	text-align: center;
+}
+
+.auth-hint {
+	margin: -0.35rem 0 0.75rem;
+	padding: 0 0.25rem;
+	font-size: 0.75rem;
+	opacity: 0.65;
+	line-height: 1.4;
+}
+
+.auth-footer-links {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 0.75rem 1.25rem;
+	margin-top: 1rem;
+}
+
+.auth-text-link {
+	background: none;
+	border: none;
+	color: var(--primary);
+	font-size: 0.85rem;
+	cursor: pointer;
+	text-decoration: underline;
+	opacity: 0.9;
+}
+
+.auth-text-link:hover {
+	opacity: 1;
+}
+
 .auth-actions {
 	display: flex;
 	gap: 0.75rem;
@@ -3332,6 +3373,17 @@ footer p a:hover {
 
 .app-shell.theme-day .auth-modal-subtitle {
 	color: #4a6741;
+}
+
+.app-shell.theme-day .auth-hint {
+	color: #4a6741;
+	opacity: 0.85;
+}
+
+.app-shell.theme-day .auth-info {
+	background: rgba(16, 185, 129, 0.1);
+	border-color: rgba(16, 185, 129, 0.3);
+	color: #047857;
 }
 
 .app-shell.theme-day .auth-modal-close {
