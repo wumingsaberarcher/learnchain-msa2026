@@ -29,7 +29,8 @@ VITE_API_BASE=https://learnchain-msa2026.onrender.com/api
 | `ConnectionStrings__DefaultConnection` | `DataSource=/app/data/learnchain.db` |
 | `JWT_KEY` | (random secret) |
 | `Cors__AllowedOrigins` | `https://learnchain-msa2026.vercel.app` |
-| `Smtp__Host` / `Smtp__Port` / `Smtp__User` / `Smtp__Password` / `Smtp__From` | (optional — enables reminder + daily digest email) |
+| `Smtp__Host` / `Smtp__Port` / `Smtp__User` / `Smtp__Password` / `Smtp__From` | (optional local SMTP — **blocked on Render free**) |
+| `Brevo__ApiKey` / `Brevo__FromEmail` / `Brevo__FromName` | **Recommended for Render** — HTTPS email to any registered user |
 
 ---
 
@@ -48,18 +49,38 @@ VITE_API_BASE=https://learnchain-msa2026.onrender.com/api
 
 1. **Profile → AI Assistant Settings** — paste your API key (defaults: OpenAI `https://api.openai.com/v1` + `gpt-4o-mini`). Key is stored in the browser only and sent with each chat request; the server does not persist it.
 2. Open the floating bot (bottom-right) after login to chat. Habit write tools: create / rename / soft-delete. Read tools cover account info and today’s due/check-in status.
-3. **Daily digest** — toggle on Profile; requires SMTP on the backend:
+3. **Password reset / daily digest email** — requires email on the backend.
+
+> **Important:** Render **free** web services [block outbound SMTP](https://render.com/changelog/free-web-services-will-no-longer-allow-outbound-traffic-to-smtp-ports) (`25` / `465` / `587`). Plain Gmail SMTP will **not** work. Use **Brevo HTTPS API** instead (free ≈ 300/day; verify one sender email, then send to **any** registered user address).
+
+### Brevo setup (Render — required for production recovery)
+
+1. Sign up at [brevo.com](https://www.brevo.com) → **SMTP & API** → create an **API key**.
+2. **Senders** → add & verify your email (e.g. Gmail) as a single sender.
+3. Render → Environment → set:
+
+| Variable | Example |
+|----------|---------|
+| `Brevo__ApiKey` | `xkeysib-...` |
+| `Brevo__FromEmail` | your **verified** sender email |
+| `Brevo__FromName` | `LearnChain` |
+| `Digest__HourUtc` | `8` (optional) |
+
+4. Save (service restarts) → **Forgot password** with any existing account email → that inbox gets username + 6-digit code.
+
+### SMTP (local / paid Render only)
 
 | Variable | Example |
 |----------|---------|
 | `Smtp__Host` | `smtp.gmail.com` |
 | `Smtp__Port` | `587` |
-| `Smtp__User` | your SMTP username |
-| `Smtp__Password` | app password |
-| `Smtp__From` | `LearnChain <noreply@example.com>` |
-| `Digest__HourUtc` | `8` (default) |
+| `Smtp__User` | your Gmail |
+| `Smtp__Password` | [App Password](https://myaccount.google.com/apppasswords) |
+| `Smtp__From` | `LearnChain <your@gmail.com>` |
 
-Chat / mail endpoints: `POST /api/chat`, `POST /api/chat/reminder`, `GET|PUT /api/chat/preferences`.
+> **Local Development:** if neither Brevo nor SMTP is set and `ASPNETCORE_ENVIRONMENT=Development`, forgot-password shows the code in the UI (no email).
+
+Chat / mail endpoints: `POST /api/chat`, `POST /api/chat/reminder`, `GET|PUT /api/chat/preferences`, `POST /api/user/forgot-password`.
 
 ---
 

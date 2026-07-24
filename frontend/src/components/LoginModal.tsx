@@ -142,11 +142,28 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: email.trim(), language }),
                 })
-                const body = await readErrorBody(res)
+                const bodyText = await res.text()
+                let parsed: { message?: string; username?: string; devCode?: string } = {}
+                try {
+                    parsed = JSON.parse(bodyText)
+                } catch {
+                    /* plain text */
+                }
+                const fallback = bodyText || t('auth.forgotFailed')
+                const message = parsed.message || fallback
+
                 if (!res.ok) {
-                    setError(body || t('auth.forgotFailed'))
+                    setError(message)
                 } else {
-                    setInfo(body || t('auth.forgotSent'))
+                    if (parsed.devCode) {
+                        setResetCode(parsed.devCode)
+                        setInfo(t('auth.forgotDevCode', {
+                            username: parsed.username || '—',
+                            code: parsed.devCode,
+                        }))
+                    } else {
+                        setInfo(message || t('auth.forgotSent'))
+                    }
                     setMode('reset')
                 }
             } catch {

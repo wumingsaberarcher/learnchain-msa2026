@@ -18,17 +18,23 @@ public class UserController : ControllerBase
     private readonly IConfiguration _configuration;
     private readonly AchievementService _achievements;
     private readonly EmailService _email;
+    private readonly IHostEnvironment _env;
+    private readonly ILogger<UserController> _logger;
 
     public UserController(
         AppDbContext context,
         IConfiguration configuration,
         AchievementService achievements,
-        EmailService email)
+        EmailService email,
+        IHostEnvironment env,
+        ILogger<UserController> logger)
     {
         _context = context;
         _configuration = configuration;
         _achievements = achievements;
         _email = email;
+        _env = env;
+        _logger = logger;
     }
 
     [HttpPost("register")]
@@ -116,11 +122,20 @@ public class UserController : ControllerBase
         if (string.IsNullOrWhiteSpace(dto.Email) || !AuthValidation.IsValidEmail(dto.Email))
             return BadRequest("请提供有效的邮箱地址");
 
-        if (!_email.IsConfigured())
-            return BadRequest("服务器未配置邮件服务，暂时无法找回密码。请联系管理员。");
+        var smtpReady = _email.IsConfigured();
+        // Local/dev: allow reset without SMTP by returning the code in the API response.
+        // Production: SMTP is required so codes only go out by email.
+        if (!smtpReady && !_env.IsDevelopment())
+        {
+            return BadRequest(
+                "服务器未配置邮件服务。Render 免费版会封锁 SMTP 端口，请设置 Brevo__ApiKey 与 Brevo__FromEmail（HTTPS 发信，可发给任意已注册邮箱）。");
+        }
 
         var email = dto.Email.Trim().ToLowerInvariant();
         var language = string.IsNullOrWhiteSpace(dto.Language) ? "zh" : dto.Language.Trim();
+
+        string? issuedCode = null;
+        string? issuedUsername = null;
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email, ct);
         if (user != null)
@@ -130,22 +145,47 @@ public class UserController : ControllerBase
             user.PasswordResetExpiresAt = DateTime.UtcNow.AddMinutes(30);
             await _context.SaveChangesAsync(ct);
 
-            try
+            if (smtpReady)
             {
-                await _email.SendPasswordResetAsync(user.Email, user.Username, code, language, ct);
+                try
+                {
+                    await _email.SendPasswordResetAsync(user.Email, user.Username, code, language, ct);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to send password-reset email to {Email}", user.Email);
+                    user.PasswordResetTokenHash = null;
+                    user.PasswordResetExpiresAt = null;
+                    await _context.SaveChangesAsync(ct);
+                    return StatusCode(502, "邮件发送失败，请稍后重试或检查 SMTP 配置");
+                }
             }
-            catch (Exception)
+            else
             {
-                user.PasswordResetTokenHash = null;
-                user.PasswordResetExpiresAt = null;
-                await _context.SaveChangesAsync(ct);
-                return StatusCode(502, "邮件发送失败，请稍后重试");
+                // Development fallback — code is not emailed; return it so the UI can show it.
+                issuedCode = code;
+                issuedUsername = user.Username;
+                _logger.LogWarning(
+                    "SMTP not configured; password reset code for {Email} is {Code} (Development only)",
+                    user.Email, code);
             }
+        }
+
+        if (issuedCode != null)
+        {
+            return Ok(new
+            {
+                message = $"开发模式（未配置 SMTP）：你的用户名是 {issuedUsername}，验证码是 {issuedCode}（30 分钟内有效）。正式环境请配置 Smtp__Host 等变量以发邮件。",
+                username = issuedUsername,
+                devCode = issuedCode,
+                emailed = false
+            });
         }
 
         return Ok(new
         {
-            message = "如果该邮箱已注册，我们已发送包含用户名和验证码的邮件。请查收收件箱（含垃圾邮件）。"
+            message = "如果该邮箱已注册，我们已发送包含用户名和验证码的邮件。请查收收件箱（含垃圾邮件）。",
+            emailed = smtpReady
         });
     }
 

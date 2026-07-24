@@ -64,6 +64,10 @@ builder.Services.AddHttpClient("OpenAiCompatible", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(90);
 });
+builder.Services.AddHttpClient("Brevo", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 builder.Services.AddHostedService<DailyDigestHostedService>();
 
 // CORS — set Cors__AllowedOrigins on Render (comma-separated Vercel URLs)

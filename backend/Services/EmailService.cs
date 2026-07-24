@@ -1,31 +1,105 @@
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
 
 namespace backend.Services;
 
+/// <summary>
+/// Sends email via Brevo HTTPS API (recommended on Render free tier — SMTP ports are blocked)
+/// or classic SMTP (fine for local / paid hosts).
+/// </summary>
 public class EmailService
 {
     private readonly IConfiguration _configuration;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<EmailService> _logger;
 
-    public EmailService(IConfiguration configuration, ILogger<EmailService> logger)
+    public EmailService(
+        IConfiguration configuration,
+        IHttpClientFactory httpClientFactory,
+        ILogger<EmailService> logger)
     {
         _configuration = configuration;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
 
-    public bool IsConfigured()
-    {
-        var host = _configuration["Smtp:Host"];
-        return !string.IsNullOrWhiteSpace(host);
-    }
+    public bool IsConfigured() =>
+        HasBrevo() || HasSmtp();
+
+    private bool HasBrevo() =>
+        !string.IsNullOrWhiteSpace(_configuration["Brevo:ApiKey"]);
+
+    private bool HasSmtp() =>
+        !string.IsNullOrWhiteSpace(_configuration["Smtp:Host"]);
 
     public async Task SendAsync(string toEmail, string subject, string htmlBody, CancellationToken ct = default)
     {
         if (!IsConfigured())
-            throw new InvalidOperationException("SMTP is not configured. Set Smtp:Host (and related) environment variables.");
+        {
+            throw new InvalidOperationException(
+                "Email is not configured. On Render free tier set Brevo__ApiKey + Brevo__FromEmail (HTTPS). " +
+                "Locally you can use Smtp__Host instead.");
+        }
 
+        // Prefer Brevo on cloud hosts — SMTP ports 25/465/587 are blocked on Render free.
+        if (HasBrevo())
+        {
+            await SendViaBrevoAsync(toEmail, subject, htmlBody, ct);
+            return;
+        }
+
+        await SendViaSmtpAsync(toEmail, subject, htmlBody, ct);
+    }
+
+    private async Task SendViaBrevoAsync(string toEmail, string subject, string htmlBody, CancellationToken ct)
+    {
+        var apiKey = _configuration["Brevo:ApiKey"]!.Trim();
+        var fromEmail = (_configuration["Brevo:FromEmail"] ?? _configuration["Smtp:From"] ?? "").Trim();
+        var fromName = (_configuration["Brevo:FromName"] ?? "LearnChain").Trim();
+
+        if (string.IsNullOrWhiteSpace(fromEmail))
+            throw new InvalidOperationException("Brevo__FromEmail is required (must be a sender verified in Brevo).");
+
+        // Allow "Name <email@x.com>" or bare email
+        if (fromEmail.Contains('<') && fromEmail.Contains('>'))
+        {
+            var start = fromEmail.IndexOf('<') + 1;
+            var end = fromEmail.IndexOf('>');
+            fromName = fromEmail[..(start - 1)].Trim().Trim('"');
+            fromEmail = fromEmail[start..end].Trim();
+        }
+
+        var payload = new
+        {
+            sender = new { name = fromName, email = fromEmail },
+            to = new[] { new { email = toEmail } },
+            subject,
+            htmlContent = htmlBody
+        };
+
+        var client = _httpClientFactory.CreateClient("Brevo");
+        using var req = new HttpRequestMessage(HttpMethod.Post, "https://api.brevo.com/v3/smtp/email");
+        req.Headers.TryAddWithoutValidation("api-key", apiKey);
+        req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        req.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+
+        using var res = await client.SendAsync(req, ct);
+        var body = await res.Content.ReadAsStringAsync(ct);
+        if (!res.IsSuccessStatusCode)
+        {
+            _logger.LogWarning("Brevo send failed {Status}: {Body}", (int)res.StatusCode, body);
+            throw new InvalidOperationException($"Brevo API error ({(int)res.StatusCode}): {Truncate(body, 300)}");
+        }
+
+        _logger.LogInformation("Email sent via Brevo to {Email}: {Subject}", toEmail, subject);
+    }
+
+    private async Task SendViaSmtpAsync(string toEmail, string subject, string htmlBody, CancellationToken ct)
+    {
         var host = _configuration["Smtp:Host"]!;
         var port = int.TryParse(_configuration["Smtp:Port"], out var p) ? p : 587;
         var user = _configuration["Smtp:User"];
@@ -52,7 +126,7 @@ public class EmailService
         await client.SendAsync(message, ct);
         await client.DisconnectAsync(true, ct);
 
-        _logger.LogInformation("Email sent to {Email}: {Subject}", toEmail, subject);
+        _logger.LogInformation("Email sent via SMTP to {Email}: {Subject}", toEmail, subject);
     }
 
     public async Task SendTodayDigestAsync(
@@ -126,4 +200,7 @@ public class EmailService
 
         await SendAsync(toEmail, subject, html, ct);
     }
+
+    private static string Truncate(string s, int max) =>
+        s.Length <= max ? s : s[..max] + "…";
 }

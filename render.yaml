@@ -13,3 +13,23 @@ services:
         generateValue: true
       - key: Cors__AllowedOrigins
         sync: false
+      # Render free blocks SMTP ports — use Brevo HTTPS API (recommended)
+      - key: Brevo__ApiKey
+        sync: false
+      - key: Brevo__FromEmail
+        sync: false
+      - key: Brevo__FromName
+        value: LearnChain
+      # Optional local/paid SMTP (will NOT work on Render free tier)
+      - key: Smtp__Host
+        sync: false
+      - key: Smtp__Port
+        value: "587"
+      - key: Smtp__User
+        sync: false
+      - key: Smtp__Password
+        sync: false
+      - key: Smtp__From
+        sync: false
+      - key: Smtp__UseSsl
+        value: "true"
