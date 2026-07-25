@@ -323,6 +323,37 @@
           }
         }
       },
+      "Npgsql/10.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net10.0/Npgsql.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/Npgsql.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "Npgsql.EntityFrameworkCore.PostgreSQL/10.0.0": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.EntityFrameworkCore": "[10.0.0, 11.0.0)",
+          "Microsoft.EntityFrameworkCore.Relational": "[10.0.0, 11.0.0)",
+          "Npgsql": "10.0.0"
+        },
+        "compile": {
+          "lib/net10.0/Npgsql.EntityFrameworkCore.PostgreSQL.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net10.0/Npgsql.EntityFrameworkCore.PostgreSQL.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "Scalar.AspNetCore/2.16.10": {
         "type": "package",
         "compile": {
@@ -966,6 +997,40 @@
         "mimekit.nuspec"
       ]
     },
+    "Npgsql/10.0.0": {
+      "sha512": "xZAYhPOU2rUIFpV48xsqhCx9vXs6Y+0jX2LCoSEfDFYMw9jtAOUk3iQsCnDLrFIv9NT3JGMihn7nnuZsPKqJmA==",
+      "type": "package",
+      "path": "npgsql/10.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net10.0/Npgsql.dll",
+        "lib/net10.0/Npgsql.xml",
+        "lib/net8.0/Npgsql.dll",
+        "lib/net8.0/Npgsql.xml",
+        "lib/net9.0/Npgsql.dll",
+        "lib/net9.0/Npgsql.xml",
+        "npgsql.10.0.0.nupkg.sha512",
+        "npgsql.nuspec",
+        "postgresql.png"
+      ]
+    },
+    "Npgsql.EntityFrameworkCore.PostgreSQL/10.0.0": {
+      "sha512": "E2+uSWxSB8LdsUVwPaqRWOcGOP92biry2JEwc0KJMdLJF+aZdczeIdEXVwEyv4nSVMQJH0o8tLhyAMiR6VF0lw==",
+      "type": "package",
+      "path": "npgsql.entityframeworkcore.postgresql/10.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "README.md",
+        "lib/net10.0/Npgsql.EntityFrameworkCore.PostgreSQL.dll",
+        "lib/net10.0/Npgsql.EntityFrameworkCore.PostgreSQL.xml",
+        "npgsql.entityframeworkcore.postgresql.10.0.0.nupkg.sha512",
+        "npgsql.entityframeworkcore.postgresql.nuspec",
+        "postgresql.png"
+      ]
+    },
     "Scalar.AspNetCore/2.16.10": {
       "sha512": "dJsam1uxJ+h6YzaqDGjja1y3miyBd4VDumMwwow03yJapiRp3OtV5lMaOUvp8w5b16gAflYyvfj7HDL+0X2Rqw==",
       "type": "package",
@@ -1149,11 +1214,12 @@
       "Microsoft.EntityFrameworkCore >= 10.0.9",
       "Microsoft.EntityFrameworkCore.Sqlite >= 10.0.9",
       "Microsoft.OpenApi >= 2.0.1",
+      "Npgsql.EntityFrameworkCore.PostgreSQL >= 10.0.0",
       "Scalar.AspNetCore >= 2.16.10"
     ]
   },
   "packageFolders": {
-    "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\e4804d26276312fc1a09078b2e50ac7c\\nuget": {},
+    "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\0ed4a52971e923677688d387951b9c4d\\nuget": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
@@ -1162,7 +1228,7 @@
       "projectUniqueName": "D:\\learnchain-msa2026\\backend\\backend.csproj",
       "projectName": "backend",
       "projectPath": "D:\\learnchain-msa2026\\backend\\backend.csproj",
-      "packagesPath": "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\e4804d26276312fc1a09078b2e50ac7c\\nuget",
+      "packagesPath": "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\0ed4a52971e923677688d387951b9c4d\\nuget",
       "outputPath": "D:\\learnchain-msa2026\\backend\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
@@ -1231,6 +1297,10 @@
           "Microsoft.OpenApi": {
             "target": "Package",
             "version": "[2.0.1, )"
+          },
+          "Npgsql.EntityFrameworkCore.PostgreSQL": {
+            "target": "Package",
+            "version": "[10.0.0, )"
           },
           "Scalar.AspNetCore": {
             "target": "Package",

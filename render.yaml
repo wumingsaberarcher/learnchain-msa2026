@@ -1,14 +1,25 @@
+databases:
+  - name: learnchain-db
+    plan: free
+    databaseName: learnchain
+    user: learnchain
+    region: oregon
+
 services:
   - type: web
     name: learnchain-backend
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     healthCheckPath: /health
+    region: oregon
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
+      # Prefer Internal Database URL from the linked Postgres (survives redeploys)
       - key: ConnectionStrings__DefaultConnection
-        value: DataSource=/app/data/learnchain.db
+        fromDatabase:
+          name: learnchain-db
+          property: connectionString
       - key: JWT_KEY
         generateValue: true
       - key: Cors__AllowedOrigins

@@ -26,11 +26,39 @@ VITE_API_BASE=https://learnchain-msa2026.onrender.com/api
 
 | Variable | Value |
 |----------|-------|
-| `ConnectionStrings__DefaultConnection` | `DataSource=/app/data/learnchain.db` |
+| `ConnectionStrings__DefaultConnection` | **Internal Database URL** from Render Postgres (not SQLite path) |
 | `JWT_KEY` | (random secret) |
 | `Cors__AllowedOrigins` | `https://learnchain-msa2026.vercel.app` |
-| `Smtp__Host` / `Smtp__Port` / `Smtp__User` / `Smtp__Password` / `Smtp__From` | (optional local SMTP — **blocked on Render free**) |
-| `Brevo__ApiKey` / `Brevo__FromEmail` / `Brevo__FromName` | **Recommended for Render** — HTTPS email to any registered user |
+| `Brevo__ApiKey` / `Brevo__FromEmail` / `Brevo__FromName` | Email (HTTPS) for password reset |
+| `Smtp__*` | Optional local SMTP only — **blocked on Render free** |
+
+### Render PostgreSQL (recommended)
+
+Create a **Free** Postgres in the **same region** as the web service (Oregon), then point the backend at it so data survives redeploys.
+
+**Create form values:**
+
+| Field | Suggested value |
+|-------|-----------------|
+| Name | `learnchain-db` |
+| Project | same as your backend |
+| Region | **Oregon (US West)** (match existing service) |
+| PostgreSQL Version | 16 or 18 (default OK) |
+| Instance | **Free** |
+| Database / User | leave random, or `learnchain` / `learnchain` |
+
+After create:
+
+1. Open the DB → **Connections** → copy **Internal Database URL** (starts with `postgres://…`).
+2. Backend service → **Environment** → set `ConnectionStrings__DefaultConnection` = that Internal URL (replace any old SQLite `DataSource=…` value).
+3. Redeploy the backend. Logs should show `[LearnChain] Database provider: Postgres`.
+4. Register a new user and confirm data remains after restart.
+
+`render.yaml` already declares `learnchain-db` and wires `ConnectionStrings__DefaultConnection` via `fromDatabase` for blueprint deploys.
+
+> Local `dotnet run` / docker-compose still default to **SQLite** for easy coursework. Production on Render uses **PostgreSQL**.
+
+> Free Render Postgres may be deleted after ~30 days of inactivity — poke the app before demos.
 
 ---
 
@@ -253,7 +281,8 @@ See the [`specs/`](./specs/) folder:
 |-------|------------|
 | Frontend | React 19, Vite, Zustand, React Router, Tailwind CSS 4 |
 | Backend | ASP.NET Core 10, EF Core, SQLite, JWT Bearer |
-| Deploy | Vercel (frontend), Render (backend Docker) |
+| Deploy | Vercel (frontend), Render (backend Docker + **PostgreSQL**) |
+| Database | PostgreSQL on Render (prod); SQLite locally |
 
 ---
 

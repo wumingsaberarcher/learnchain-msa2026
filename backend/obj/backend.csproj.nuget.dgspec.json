@@ -10,7 +10,7 @@
         "projectUniqueName": "D:\\learnchain-msa2026\\backend\\backend.csproj",
         "projectName": "backend",
         "projectPath": "D:\\learnchain-msa2026\\backend\\backend.csproj",
-        "packagesPath": "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\e4804d26276312fc1a09078b2e50ac7c\\nuget",
+        "packagesPath": "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\0ed4a52971e923677688d387951b9c4d\\nuget",
         "outputPath": "D:\\learnchain-msa2026\\backend\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
@@ -79,6 +79,10 @@
             "Microsoft.OpenApi": {
               "target": "Package",
               "version": "[2.0.1, )"
+            },
+            "Npgsql.EntityFrameworkCore.PostgreSQL": {
+              "target": "Package",
+              "version": "[10.0.0, )"
             },
             "Scalar.AspNetCore": {
               "target": "Package",
