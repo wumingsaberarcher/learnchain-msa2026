@@ -22,6 +22,9 @@ Build lasting habits through check-ins, streaks, XP, levels, achievements, and a
 VITE_API_BASE=https://learnchain-msa2026.onrender.com/api
 ```
 
+> If `VITE_API_BASE` is unset, the app calls `/api` on the same origin. `frontend/vercel.json` rewrites `/api/*` to the Render backend so that still works. For the most reliable setup, set `VITE_API_BASE` explicitly as above.
+
+**Render** — CORS allows `*.vercel.app` automatically (plus `Cors__AllowedOrigins` if set).
 **Render** — key variables:
 
 | Variable | Value |

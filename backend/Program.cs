@@ -88,18 +88,26 @@ try
     {
         options.AddDefaultPolicy(policy =>
         {
-            if (!string.IsNullOrWhiteSpace(corsOrigins))
-            {
-                policy.WithOrigins(corsOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                      .AllowAnyHeader()
-                      .AllowAnyMethod();
-            }
-            else
-            {
-                policy.AllowAnyOrigin()
-                      .AllowAnyHeader()
-                      .AllowAnyMethod();
-            }
+            var configured = (corsOrigins ?? "")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            // Allow configured origins + any *.vercel.app preview/prod frontends.
+            // Prevents browser "Failed to fetch" when Cors__AllowedOrigins is missing/stale.
+            policy.SetIsOriginAllowed(origin =>
+                {
+                    if (string.IsNullOrWhiteSpace(origin)) return false;
+                    if (configured.Contains(origin)) return true;
+                    if (Uri.TryCreate(origin, UriKind.Absolute, out var uri)
+                        && uri.Host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase))
+                        return true;
+                    // Local Vite
+                    if (origin.StartsWith("http://localhost:", StringComparison.OrdinalIgnoreCase))
+                        return true;
+                    return configured.Count == 0; // no config → allow (dev/docker)
+                })
+                .AllowAnyHeader()
+                .AllowAnyMethod();
         });
     });
 

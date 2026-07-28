@@ -37,11 +37,18 @@ export async function getAllHabits(includeInactive = false): Promise<Habit[]> {
 }
 
 export async function createHabit(payload: CreateHabitPayload): Promise<{ habit: Habit; newlyUnlocked?: string[] }> {
-    const res = await fetch(`${API_BASE}/habit`, {
-        method: 'POST',
-        headers: authHeaders(true),
-        body: JSON.stringify(payload),
-    })
+    let res: Response
+    try {
+        res = await fetch(`${API_BASE}/habit`, {
+            method: 'POST',
+            headers: authHeaders(true),
+            body: JSON.stringify(payload),
+        })
+    } catch {
+        throw new Error(
+            '无法连接服务器（Failed to fetch）。请确认后端已唤醒，或在 Vercel 设置 VITE_API_BASE=https://learnchain-msa2026.onrender.com/api',
+        )
+    }
 
     if (!res.ok) {
         const errorText = await res.text()
