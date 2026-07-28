@@ -81,11 +81,12 @@ export async function revokeBadge(id: number, badgeId: string) {
     return res.json()
 }
 
-export async function banUser(id: number, days: number) {
+/** Ban for a duration in hours (1–720 / max 30 days). */
+export async function banUser(id: number, hours: number) {
     const res = await fetch(`${API_BASE}/admin/users/${id}/ban`, {
         method: 'POST',
         headers: authHeaders(true),
-        body: JSON.stringify({ days }),
+        body: JSON.stringify({ hours }),
     })
     if (!res.ok) throw new Error(await readError(res))
     return res.json()
@@ -94,6 +95,15 @@ export async function banUser(id: number, days: number) {
 export async function unbanUser(id: number) {
     const res = await fetch(`${API_BASE}/admin/users/${id}/unban`, {
         method: 'POST',
+        headers: authHeaders(),
+    })
+    if (!res.ok) throw new Error(await readError(res))
+    return res.json()
+}
+
+export async function deleteUser(id: number) {
+    const res = await fetch(`${API_BASE}/admin/users/${id}`, {
+        method: 'DELETE',
         headers: authHeaders(),
     })
     if (!res.ok) throw new Error(await readError(res))

@@ -2,6 +2,7 @@
 	max-width: 1100px;
 	margin: 0 auto;
 	padding: 1.5rem 1rem 3rem;
+	color: var(--light, #f3f4f6);
 }
 
 .admin-card {
@@ -11,12 +12,7 @@
 	border: 1px solid rgba(255, 255, 255, 0.1);
 	backdrop-filter: blur(16px);
 	box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
-}
-
-[data-theme='light'] .admin-card {
-	background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(245, 247, 252, 0.95));
-	border-color: rgba(0, 0, 0, 0.08);
-	box-shadow: 0 12px 36px rgba(20, 30, 60, 0.08);
+	color: #e8eef5;
 }
 
 .admin-header {
@@ -26,16 +22,24 @@
 	margin-bottom: 1.25rem;
 }
 
+.admin-header-icon {
+	color: var(--primary, #00ffff);
+	flex-shrink: 0;
+	margin-top: 0.2rem;
+}
+
 .admin-header h1 {
 	margin: 0;
 	font-size: 1.5rem;
 	font-weight: 700;
+	color: inherit;
 }
 
 .admin-header p {
 	margin: 0.25rem 0 0;
-	opacity: 0.7;
+	opacity: 0.75;
 	font-size: 0.9rem;
+	color: inherit;
 }
 
 .admin-search-row {
@@ -55,11 +59,7 @@
 	border-radius: 12px;
 	border: 1px solid rgba(255, 255, 255, 0.12);
 	background: rgba(255, 255, 255, 0.04);
-}
-
-[data-theme='light'] .admin-search {
-	border-color: rgba(0, 0, 0, 0.1);
-	background: rgba(0, 0, 0, 0.03);
+	color: inherit;
 }
 
 .admin-search input {
@@ -69,6 +69,10 @@
 	background: transparent;
 	color: inherit;
 	font: inherit;
+}
+
+.admin-search input::placeholder {
+	color: rgba(232, 238, 245, 0.45);
 }
 
 .admin-msg {
@@ -107,6 +111,7 @@
 .admin-detail h2 {
 	margin: 0 0 0.75rem;
 	font-size: 1.05rem;
+	color: inherit;
 }
 
 .admin-user-row {
@@ -127,6 +132,10 @@
 	transition: border-color 0.2s ease, background 0.2s ease;
 }
 
+.admin-user-row strong {
+	color: inherit;
+}
+
 .admin-user-row:hover,
 .admin-user-row.active {
 	border-color: rgba(0, 255, 255, 0.35);
@@ -135,7 +144,8 @@
 
 .admin-user-row span {
 	font-size: 0.8rem;
-	opacity: 0.7;
+	opacity: 0.75;
+	color: inherit;
 }
 
 .admin-banned-tag {
@@ -148,9 +158,27 @@
 }
 
 .admin-hint,
-.admin-meta {
-	opacity: 0.7;
+.admin-meta,
+.admin-sublabel {
+	opacity: 0.78;
 	font-size: 0.9rem;
+	color: inherit;
+}
+
+.admin-sublabel {
+	margin: 0 0 0.5rem;
+	font-weight: 600;
+	opacity: 0.9;
+}
+
+.admin-protected {
+	margin: 0.35rem 0 0.75rem;
+	padding: 0.45rem 0.7rem;
+	border-radius: 8px;
+	font-size: 0.85rem;
+	background: rgba(249, 168, 37, 0.15);
+	border: 1px solid rgba(249, 168, 37, 0.35);
+	color: #fbbf24;
 }
 
 .admin-banned-until {
@@ -161,11 +189,7 @@
 .admin-section {
 	margin-top: 1.25rem;
 	padding-top: 1rem;
-	border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-[data-theme='light'] .admin-section {
-	border-top-color: rgba(0, 0, 0, 0.08);
+	border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .admin-section h3 {
@@ -174,6 +198,7 @@
 	gap: 0.4rem;
 	margin: 0 0 0.65rem;
 	font-size: 0.95rem;
+	color: inherit;
 }
 
 .admin-inline {
@@ -187,43 +212,280 @@
 .admin-inline select {
 	padding: 0.45rem 0.65rem;
 	border-radius: 10px;
-	border: 1px solid rgba(255, 255, 255, 0.15);
-	background: rgba(255, 255, 255, 0.05);
-	color: inherit;
+	border: 1px solid rgba(255, 255, 255, 0.18);
+	background: rgba(8, 10, 18, 0.55);
+	color: #e8eef5;
 	font: inherit;
-	min-width: 100px;
+	min-width: 140px;
 }
 
-[data-theme='light'] .admin-inline input,
-[data-theme='light'] .admin-inline select {
-	border-color: rgba(0, 0, 0, 0.12);
-	background: #fff;
+.admin-inline option {
+	background: #1a1f2e;
+	color: #e8eef5;
 }
 
 .admin-badge-list {
 	list-style: none;
 	padding: 0;
-	margin: 0 0 0.75rem;
+	margin: 0 0 1rem;
 	display: flex;
 	flex-direction: column;
-	gap: 0.35rem;
+	gap: 0.4rem;
 }
 
-.admin-badge-list li {
+.admin-badge-owned {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 0.5rem;
-	padding: 0.4rem 0.6rem;
-	border-radius: 8px;
-	background: rgba(255, 255, 255, 0.04);
+	gap: 0.65rem;
+	padding: 0.5rem 0.65rem;
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.admin-badge-list button {
+.admin-badge-info {
+	display: flex;
+	align-items: center;
+	gap: 0.65rem;
+	min-width: 0;
+}
+
+.admin-badge-info strong,
+.admin-badge-option-text strong {
+	display: block;
+	font-size: 0.9rem;
+	color: inherit;
+}
+
+.admin-badge-info span,
+.admin-badge-option-text span {
+	display: block;
+	font-size: 0.75rem;
+	opacity: 0.7;
+	color: inherit;
+}
+
+.admin-badge-thumb {
+	width: 40px;
+	height: 40px;
+	border-radius: 10px;
+	object-fit: cover;
+	flex-shrink: 0;
+	background: rgba(255, 255, 255, 0.06);
+}
+
+.admin-badge-thumb.placeholder {
+	display: grid;
+	place-items: center;
+	font-weight: 700;
+	opacity: 0.5;
+}
+
+.admin-revoke-btn {
 	border: none;
 	background: transparent;
 	color: #f87171;
 	cursor: pointer;
 	font: inherit;
 	font-size: 0.85rem;
+	flex-shrink: 0;
+}
+
+.admin-revoke-btn:hover {
+	text-decoration: underline;
+}
+
+.admin-badge-picker {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	max-height: 280px;
+	overflow-y: auto;
+	padding: 0.35rem;
+	border-radius: 14px;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	background: rgba(0, 0, 0, 0.2);
+}
+
+.admin-badge-option {
+	display: flex;
+	align-items: center;
+	gap: 0.7rem;
+	width: 100%;
+	padding: 0.55rem 0.65rem;
+	text-align: left;
+	border-radius: 12px;
+	border: 1px solid transparent;
+	background: rgba(255, 255, 255, 0.04);
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.admin-badge-option:hover {
+	background: rgba(255, 255, 255, 0.08);
+}
+
+.admin-badge-option.selected {
+	border-color: rgba(0, 255, 255, 0.45);
+	background: rgba(0, 255, 255, 0.12);
+}
+
+.admin-badge-option-text {
+	min-width: 0;
+}
+
+.admin-danger {
+	border-top-color: rgba(239, 68, 68, 0.25);
+}
+
+.admin-btn-danger {
+	background: rgba(239, 68, 68, 0.18) !important;
+	border: 1px solid rgba(239, 68, 68, 0.45) !important;
+	color: #fecaca !important;
+}
+
+.admin-btn-danger:hover {
+	background: rgba(239, 68, 68, 0.3) !important;
+}
+
+/* Day theme — high-contrast light surfaces (data-theme is day|night) */
+[data-theme='day'] .admin-page,
+.app-shell.theme-day .admin-page {
+	color: #1a2e1a;
+}
+
+[data-theme='day'] .admin-card,
+.app-shell.theme-day .admin-card {
+	background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(245, 250, 242, 0.96));
+	border-color: rgba(46, 125, 50, 0.18);
+	box-shadow: 0 12px 36px rgba(20, 40, 20, 0.1);
+	color: #1a2e1a;
+}
+
+[data-theme='day'] .admin-header-icon,
+.app-shell.theme-day .admin-header-icon {
+	color: #2e7d32;
+}
+
+[data-theme='day'] .admin-header p,
+[data-theme='day'] .admin-hint,
+[data-theme='day'] .admin-meta,
+[data-theme='day'] .admin-sublabel,
+[data-theme='day'] .admin-user-row span,
+[data-theme='day'] .admin-badge-info span,
+[data-theme='day'] .admin-badge-option-text span,
+.app-shell.theme-day .admin-header p,
+.app-shell.theme-day .admin-hint,
+.app-shell.theme-day .admin-meta,
+.app-shell.theme-day .admin-sublabel,
+.app-shell.theme-day .admin-user-row span,
+.app-shell.theme-day .admin-badge-info span,
+.app-shell.theme-day .admin-badge-option-text span {
+	color: #3d5a3a;
+	opacity: 1;
+}
+
+[data-theme='day'] .admin-search,
+.app-shell.theme-day .admin-search {
+	border-color: rgba(46, 125, 50, 0.22);
+	background: rgba(255, 255, 255, 0.85);
+	color: #1a2e1a;
+}
+
+[data-theme='day'] .admin-search input::placeholder,
+.app-shell.theme-day .admin-search input::placeholder {
+	color: rgba(26, 46, 26, 0.45);
+}
+
+[data-theme='day'] .admin-user-row,
+.app-shell.theme-day .admin-user-row {
+	background: rgba(46, 125, 50, 0.06);
+	color: #1a2e1a;
+}
+
+[data-theme='day'] .admin-user-row:hover,
+[data-theme='day'] .admin-user-row.active,
+.app-shell.theme-day .admin-user-row:hover,
+.app-shell.theme-day .admin-user-row.active {
+	border-color: rgba(46, 125, 50, 0.4);
+	background: rgba(46, 125, 50, 0.12);
+}
+
+[data-theme='day'] .admin-section,
+.app-shell.theme-day .admin-section {
+	border-top-color: rgba(46, 125, 50, 0.15);
+}
+
+[data-theme='day'] .admin-inline input,
+[data-theme='day'] .admin-inline select,
+.app-shell.theme-day .admin-inline input,
+.app-shell.theme-day .admin-inline select {
+	border-color: rgba(46, 125, 50, 0.25);
+	background: #fff;
+	color: #1a2e1a;
+}
+
+[data-theme='day'] .admin-inline option,
+.app-shell.theme-day .admin-inline option {
+	background: #fff;
+	color: #1a2e1a;
+}
+
+[data-theme='day'] .admin-badge-owned,
+[data-theme='day'] .admin-badge-option,
+.app-shell.theme-day .admin-badge-owned,
+.app-shell.theme-day .admin-badge-option {
+	background: rgba(255, 255, 255, 0.7);
+	border-color: rgba(46, 125, 50, 0.12);
+	color: #1a2e1a;
+}
+
+[data-theme='day'] .admin-badge-picker,
+.app-shell.theme-day .admin-badge-picker {
+	background: rgba(255, 255, 255, 0.55);
+	border-color: rgba(46, 125, 50, 0.18);
+}
+
+[data-theme='day'] .admin-badge-option.selected,
+.app-shell.theme-day .admin-badge-option.selected {
+	border-color: rgba(46, 125, 50, 0.55);
+	background: rgba(46, 125, 50, 0.12);
+}
+
+[data-theme='day'] .admin-badge-option:hover,
+.app-shell.theme-day .admin-badge-option:hover {
+	background: rgba(46, 125, 50, 0.08);
+}
+
+[data-theme='day'] .admin-msg.success,
+.app-shell.theme-day .admin-msg.success {
+	color: #166534;
+	background: rgba(34, 197, 94, 0.12);
+	border-color: rgba(22, 101, 52, 0.25);
+}
+
+[data-theme='day'] .admin-msg.error,
+[data-theme='day'] .admin-banned-until,
+[data-theme='day'] .admin-revoke-btn,
+.app-shell.theme-day .admin-msg.error,
+.app-shell.theme-day .admin-banned-until,
+.app-shell.theme-day .admin-revoke-btn {
+	color: #b91c1c;
+}
+
+[data-theme='day'] .admin-protected,
+.app-shell.theme-day .admin-protected {
+	color: #92400e;
+	background: rgba(249, 168, 37, 0.18);
+	border-color: rgba(146, 64, 14, 0.25);
+}
+
+[data-theme='day'] .admin-btn-danger,
+.app-shell.theme-day .admin-btn-danger {
+	color: #991b1b !important;
+	background: rgba(239, 68, 68, 0.12) !important;
+	border-color: rgba(185, 28, 28, 0.35) !important;
 }

@@ -152,19 +152,23 @@ public class AdminController : ControllerBase
         if (user.Role == AppRoles.Admin)
             return BadRequest("不能封禁管理员账号");
 
-        DateTime until;
-        if (dto.Until.HasValue)
-            until = DateTime.SpecifyKind(dto.Until.Value.ToUniversalTime(), DateTimeKind.Utc);
-        else if (dto.Days is > 0)
-            until = DateTime.UtcNow.AddDays(dto.Days.Value);
-        else if (dto.Hours is > 0)
-            until = DateTime.UtcNow.AddHours(dto.Hours.Value);
-        else
-            return BadRequest("请提供 days、hours 或 until");
+        const int minHours = 1;
+        const int maxHours = 24 * 30; // 30 days
 
-        user.BannedUntil = until;
+        int hours;
+        if (dto.Hours is > 0)
+            hours = dto.Hours.Value;
+        else if (dto.Days is > 0)
+            hours = dto.Days.Value * 24;
+        else
+            return BadRequest("请提供 hours（1–720）或 days（最多 30）");
+
+        if (hours < minHours || hours > maxHours)
+            return BadRequest("封禁时长须在 1 小时到 30 天之间");
+
+        user.BannedUntil = DateTime.UtcNow.AddHours(hours);
         await _context.SaveChangesAsync();
-        return Ok(new { message = "用户已封禁", bannedUntil = user.BannedUntil });
+        return Ok(new { message = "用户已封禁", bannedUntil = user.BannedUntil, hours });
     }
 
     [HttpPost("users/{id:int}/unban")]
@@ -172,10 +176,50 @@ public class AdminController : ControllerBase
     {
         var user = await _context.Users.FindAsync(id);
         if (user == null) return NotFound("用户不存在");
+        if (user.Role == AppRoles.Admin)
+            return BadRequest("管理员账号不可封禁，也无需解封");
 
         user.BannedUntil = null;
         await _context.SaveChangesAsync();
         return Ok(new { message = "已解除封禁" });
+    }
+
+    [HttpDelete("users/{id:int}")]
+    public async Task<IActionResult> DeleteUser(int id)
+    {
+        var user = await _context.Users.FindAsync(id);
+        if (user == null) return NotFound("用户不存在");
+        if (user.Role == AppRoles.Admin)
+            return BadRequest("不能删除管理员账号");
+
+        var selfIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (int.TryParse(selfIdClaim, out var selfId) && selfId == id)
+            return BadRequest("不能删除当前登录账号");
+
+        var habitIds = await _context.Habits
+            .Where(h => h.UserId == id)
+            .Select(h => h.Id)
+            .ToListAsync();
+
+        if (habitIds.Count > 0)
+        {
+            _context.CheckIns.RemoveRange(
+                _context.CheckIns.Where(c => c.UserId == id || habitIds.Contains(c.HabitId)));
+            _context.HabitMilestones.RemoveRange(
+                _context.HabitMilestones.Where(m => habitIds.Contains(m.HabitId)));
+            _context.Habits.RemoveRange(_context.Habits.Where(h => h.UserId == id));
+        }
+        else
+        {
+            _context.CheckIns.RemoveRange(_context.CheckIns.Where(c => c.UserId == id));
+        }
+
+        _context.UserAchievements.RemoveRange(
+            _context.UserAchievements.Where(a => a.UserId == id));
+        _context.Users.Remove(user);
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "用户已删除", id });
     }
 
     [HttpGet("badges")]
@@ -194,7 +238,9 @@ public class AdminBadgeDto
 
 public class AdminBanDto
 {
-    public int? Days { get; set; }
+    /// <summary>Preferred: ban duration in hours (1–720).</summary>
     public int? Hours { get; set; }
-    public DateTime? Until { get; set; }
+
+    /// <summary>Optional convenience; converted to hours (max 30 days).</summary>
+    public int? Days { get; set; }
 }

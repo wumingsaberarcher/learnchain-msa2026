@@ -47,7 +47,7 @@ On startup the backend creates/syncs **one** Admin from env vars. Normal registr
 
 After setting these on Render, redeploy, then **log in again** so the JWT includes the `Admin` role. The admin UI is at `/admin` (nav link appears only for Admin).
 
-Capabilities: list/search users, set XP, grant/revoke badges, ban for N days / unban. The admin account itself cannot be XP-edited or banned via the API.
+Capabilities: list/search users, set XP, grant/revoke badges, ban (1 hour–30 days stepped), unban, delete account. The admin account itself cannot be XP-edited, banned, or deleted.
 
 ### Render PostgreSQL (recommended)
 
