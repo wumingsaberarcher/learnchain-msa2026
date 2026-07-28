@@ -8,7 +8,7 @@ RUN dotnet restore ./backend/backend.csproj
 
 COPY backend/ ./backend/
 # Bust publish cache when source changes (Render sometimes reuses stale layers).
-ARG CACHE_BUST=2026-07-25-pg1
+ARG CACHE_BUST=2026-07-28-cors1
 RUN echo "cache_bust=$CACHE_BUST" && dotnet publish ./backend/backend.csproj -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime

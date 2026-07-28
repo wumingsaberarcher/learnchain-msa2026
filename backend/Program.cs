@@ -83,32 +83,14 @@ try
     });
     builder.Services.AddHostedService<DailyDigestHostedService>();
 
-    var corsOrigins = builder.Configuration["Cors:AllowedOrigins"];
+    // CORS: Bearer-token API (no cookies) — allow any browser origin so Vercel never gets blocked.
+    // Optional Cors__AllowedOrigins is ignored for simplicity; tighten later if needed.
     builder.Services.AddCors(options =>
     {
         options.AddDefaultPolicy(policy =>
-        {
-            var configured = (corsOrigins ?? "")
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            // Allow configured origins + any *.vercel.app preview/prod frontends.
-            // Prevents browser "Failed to fetch" when Cors__AllowedOrigins is missing/stale.
-            policy.SetIsOriginAllowed(origin =>
-                {
-                    if (string.IsNullOrWhiteSpace(origin)) return false;
-                    if (configured.Contains(origin)) return true;
-                    if (Uri.TryCreate(origin, UriKind.Absolute, out var uri)
-                        && uri.Host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase))
-                        return true;
-                    // Local Vite
-                    if (origin.StartsWith("http://localhost:", StringComparison.OrdinalIgnoreCase))
-                        return true;
-                    return configured.Count == 0; // no config → allow (dev/docker)
-                })
-                .AllowAnyHeader()
-                .AllowAnyMethod();
-        });
+            policy.AllowAnyOrigin()
+                  .AllowAnyHeader()
+                  .AllowAnyMethod());
     });
 
     var app = builder.Build();
@@ -127,6 +109,8 @@ try
         app.MapScalarApiReference();
     }
 
+    // Endpoint routing order: Routing → CORS → Auth (so OPTIONS preflight is never 401'd without ACAO).
+    app.UseRouting();
     app.UseCors();
     app.UseAuthentication();
     app.UseAuthorization();

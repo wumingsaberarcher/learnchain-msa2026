@@ -24,7 +24,7 @@ VITE_API_BASE=https://learnchain-msa2026.onrender.com/api
 
 > If `VITE_API_BASE` is unset, the app calls `/api` on the same origin. `frontend/vercel.json` rewrites `/api/*` to the Render backend so that still works. For the most reliable setup, set `VITE_API_BASE` explicitly as above.
 
-**Render** — CORS allows `*.vercel.app` automatically (plus `Cors__AllowedOrigins` if set).
+Backend CORS is configured with **AllowAnyOrigin** (safe here because auth uses Bearer tokens, not cookies). After changing backend CORS, redeploy Render with **Clear build cache**.
 **Render** — key variables:
 
 | Variable | Value |
