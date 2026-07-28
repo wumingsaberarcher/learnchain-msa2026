@@ -5,6 +5,7 @@ import Dashboard from './pages/ChainDashboard'
 import Habits from './pages/Habits'
 import Profile from './pages/Profile'
 import Achievements from './pages/Achievements'
+import Admin from './pages/Admin'
 import LoginModal from './components/LoginModal'
 import BackgroundAnimation from './components/BackgroundAnimation'
 import ThemeLocaleToggle from './components/ThemeLocaleToggle'
@@ -59,6 +60,16 @@ function App() {
                                         {t('nav.habits')}
                                     </NavLink>
                                 </li>
+                                {isLoggedIn && currentUser?.role === 'Admin' && (
+                                    <li>
+                                        <NavLink
+                                            to="/admin"
+                                            className={({ isActive }) => (isActive ? 'active' : undefined)}
+                                        >
+                                            {t('nav.admin')}
+                                        </NavLink>
+                                    </li>
+                                )}
                             </ul>
 
                             <ThemeLocaleToggle />
@@ -86,6 +97,7 @@ function App() {
                         <Route path="/habits" element={<Habits />} />
                         <Route path="/profile" element={<Profile />} />
                         <Route path="/achievements" element={<Achievements />} />
+                        <Route path="/admin" element={<Admin />} />
                     </Routes>
                 </main>
 

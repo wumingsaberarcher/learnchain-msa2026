@@ -14,6 +14,7 @@ interface HabitState {
         username: string
         totalXP: number
         level: number
+        role?: string
     } | null
 
     fetchHabits: () => Promise<void>
@@ -202,6 +203,7 @@ export const useHabitStore = create<HabitState>((set, get) => {
                     username: userData.username,
                     totalXP: userData.totalXP,
                     level: userData.level,
+                    role: userData.role ?? userData.Role ?? 'User',
                 }
 
                 localStorage.setItem('currentUser', JSON.stringify(updatedUser))
@@ -221,6 +223,18 @@ export const useHabitStore = create<HabitState>((set, get) => {
                 })
 
                 if (!res.ok) {
+                    if (res.status === 403) {
+                        let message = '账号已被封禁'
+                        try {
+                            const body = await res.json()
+                            if (body.bannedUntil) {
+                                message = `账号已被封禁至 ${new Date(body.bannedUntil).toLocaleString()}`
+                            } else if (body.message) {
+                                message = body.message
+                            }
+                        } catch { /* ignore */ }
+                        throw new Error(message)
+                    }
                     return false
                 }
 
@@ -232,6 +246,7 @@ export const useHabitStore = create<HabitState>((set, get) => {
                     username: data.user.username,
                     totalXP: data.user.totalXP,
                     level: data.user.level,
+                    role: data.user.role ?? 'User',
                 }
                 localStorage.setItem('currentUser', JSON.stringify(userInfo))
 

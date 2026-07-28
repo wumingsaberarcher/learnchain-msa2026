@@ -72,11 +72,15 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 return
             }
             setIsLoading(true)
-            const success = await doLogin(login, password)
-            if (success) {
-                handleClose()
-            } else {
-                setError(t('auth.loginFailed'))
+            try {
+                const success = await doLogin(login, password)
+                if (success) {
+                    handleClose()
+                } else {
+                    setError(t('auth.loginFailed'))
+                }
+            } catch (e) {
+                setError(e instanceof Error ? e.message : t('auth.loginFailed'))
             }
             setIsLoading(false)
             return

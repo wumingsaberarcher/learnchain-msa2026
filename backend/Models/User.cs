@@ -1,5 +1,11 @@
 namespace backend.Models;
 
+public static class AppRoles
+{
+    public const string User = "User";
+    public const string Admin = "Admin";
+}
+
 public class User
 {
     public int Id { get; set; }
@@ -19,4 +25,12 @@ public class User
     public string? PasswordResetTokenHash { get; set; }
 
     public DateTime? PasswordResetExpiresAt { get; set; }
+
+    /// <summary>RBAC role: User (default) or Admin.</summary>
+    public string Role { get; set; } = AppRoles.User;
+
+    /// <summary>When set and in the future, the account cannot log in or use the API.</summary>
+    public DateTime? BannedUntil { get; set; }
+
+    public bool IsBanned => BannedUntil.HasValue && BannedUntil.Value > DateTime.UtcNow;
 }

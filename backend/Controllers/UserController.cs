@@ -66,6 +66,7 @@ public class UserController : ControllerBase
             Username = username,
             Email = email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+            Role = AppRoles.User,
             TotalXP = 0,
             Level = 1,
             CreatedAt = DateTime.UtcNow
@@ -92,6 +93,13 @@ public class UserController : ControllerBase
         if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             return Unauthorized("用户名/邮箱或密码错误");
 
+        if (user.IsBanned)
+            return StatusCode(403, new
+            {
+                message = "账号已被封禁",
+                bannedUntil = user.BannedUntil
+            });
+
         var token = GenerateJwtToken(user);
         var newlyUnlocked = await _achievements.EvaluateAndUnlockAsync(user.Id);
 
@@ -106,7 +114,9 @@ public class UserController : ControllerBase
                 user.TotalXP,
                 user.Level,
                 user.Bio,
-                user.CreatedAt
+                user.CreatedAt,
+                user.Role,
+                user.BannedUntil
             },
             newlyUnlocked
         });
@@ -242,6 +252,9 @@ public class UserController : ControllerBase
             user.Level,
             user.Bio,
             user.CreatedAt,
+            user.Role,
+            user.BannedUntil,
+            isBanned = user.IsBanned,
             achievements = await _achievements.GetAchievementStatusAsync(userId)
         });
     }
@@ -305,7 +318,8 @@ public class UserController : ControllerBase
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Email, user.Email)
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Role, string.IsNullOrWhiteSpace(user.Role) ? AppRoles.User : user.Role)
             }),
             Expires = DateTime.UtcNow.AddMinutes(double.Parse(jwtSettings["DurationInMinutes"]!)),
             Issuer = jwtSettings["Issuer"],

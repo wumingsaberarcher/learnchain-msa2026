@@ -44,3 +44,10 @@ services:
         sync: false
       - key: Smtp__UseSsl
         value: "true"
+      # Sole admin bootstrap (set your own secrets in the dashboard)
+      - key: Admin__Username
+        sync: false
+      - key: Admin__Email
+        sync: false
+      - key: Admin__Password
+        sync: false

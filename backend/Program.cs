@@ -1,9 +1,11 @@
 using backend.Data;
+using backend.Middleware;
 using backend.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
+using System.Security.Claims;
 using System.Text;
 
 Console.WriteLine("[LearnChain] Starting…");
@@ -67,6 +69,7 @@ try
             ValidateAudience = true,
             ValidAudience = jwtSettings["Audience"],
             ValidateLifetime = true,
+            RoleClaimType = ClaimTypes.Role,
             ClockSkew = TimeSpan.Zero
         };
     });
@@ -106,6 +109,9 @@ try
         Console.WriteLine("[LearnChain] Database ready.");
     }
 
+    var bootstrapLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("AdminBootstrap");
+    await AdminBootstrap.EnsureAdminAsync(app.Services, app.Configuration, bootstrapLogger);
+
     if (app.Environment.IsDevelopment())
     {
         app.MapOpenApi();
@@ -116,6 +122,7 @@ try
     app.UseRouting();
     app.UseCors();
     app.UseAuthentication();
+    app.UseMiddleware<BanCheckMiddleware>();
     app.UseAuthorization();
 
     app.MapControllers();

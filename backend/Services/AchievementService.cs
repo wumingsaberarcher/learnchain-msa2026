@@ -129,6 +129,35 @@ public class AchievementService
         return newlyUnlocked;
     }
 
+    public async Task<bool> GrantBadgeAsync(int userId, string badgeId)
+    {
+        if (!BadgeIds.All.Contains(badgeId)) return false;
+
+        var exists = await _context.UserAchievements
+            .AnyAsync(a => a.UserId == userId && a.BadgeId == badgeId);
+        if (exists) return false;
+
+        _context.UserAchievements.Add(new UserAchievement
+        {
+            UserId = userId,
+            BadgeId = badgeId,
+            UnlockedAt = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> RevokeBadgeAsync(int userId, string badgeId)
+    {
+        var row = await _context.UserAchievements
+            .FirstOrDefaultAsync(a => a.UserId == userId && a.BadgeId == badgeId);
+        if (row == null) return false;
+
+        _context.UserAchievements.Remove(row);
+        await _context.SaveChangesAsync();
+        return true;
+    }
+
     public async Task<List<object>> GetAchievementStatusAsync(int userId)
     {
         var unlocked = await _context.UserAchievements

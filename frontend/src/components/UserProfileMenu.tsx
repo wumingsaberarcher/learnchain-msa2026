@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronDown, User, Award, LogOut } from 'lucide-react'
+import { ChevronDown, User, Award, LogOut, Shield } from 'lucide-react'
 import { useHabitStore } from '../stores/habitStore'
 import { useAchievementStore } from '../stores/achievementStore'
 import { useTranslation } from '../stores/settingsStore'
@@ -73,6 +73,12 @@ export default function UserProfileMenu() {
                     <Link to="/profile" className="user-profile-link" onClick={() => setOpen(false)}>
                         <User className="w-4 h-4" /> {t('profile.edit')}
                     </Link>
+
+                    {currentUser.role === 'Admin' && (
+                        <Link to="/admin" className="user-profile-link" onClick={() => setOpen(false)}>
+                            <Shield className="w-4 h-4" /> {t('nav.admin')}
+                        </Link>
+                    )}
 
                     <div className="user-profile-achievements-preview">
                         <div className="user-profile-section-title">

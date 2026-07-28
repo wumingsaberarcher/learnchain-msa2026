@@ -33,6 +33,21 @@ Alternatively you may set `VITE_API_BASE=https://learnchain-msa2026.onrender.com
 | `Cors__AllowedOrigins` | `https://learnchain-msa2026.vercel.app` |
 | `Brevo__ApiKey` / `Brevo__FromEmail` / `Brevo__FromName` | Email (HTTPS) for password reset |
 | `Smtp__*` | Optional local SMTP only — **blocked on Render free** |
+| `Admin__Username` / `Admin__Email` / `Admin__Password` | Sole admin bootstrap (your account only; see below) |
+
+### Admin RBAC (sole owner)
+
+On startup the backend creates/syncs **one** Admin from env vars. Normal registration always gets `Role=User`. Other accidental Admins are demoted.
+
+| Variable | Rules |
+|----------|-------|
+| `Admin__Username` | 3–20 English letters |
+| `Admin__Email` | Valid email |
+| `Admin__Password` | 8–64 letters + digits |
+
+After setting these on Render, redeploy, then **log in again** so the JWT includes the `Admin` role. The admin UI is at `/admin` (nav link appears only for Admin).
+
+Capabilities: list/search users, set XP, grant/revoke badges, ban for N days / unban. The admin account itself cannot be XP-edited or banned via the API.
 
 ### Render PostgreSQL (recommended)
 
@@ -191,6 +206,7 @@ Although not one of the three nominated features, the app implements several sec
 - **Password hashing (BCrypt).** Passwords are never stored in plaintext — `BCrypt.Net.BCrypt.HashPassword` on register/change-password and `Verify` on login (`backend/Controllers/UserController.cs`).
 - **Data validation & sanitisation.** Registration/login validate and normalise input: required fields, email-format regex, lower-casing + trimming, and uniqueness checks for username and email.
 - **JWT authentication + authorization.** Protected endpoints require a valid Bearer token via `[Authorize]`, with signing-key, issuer, audience, and lifetime validation configured in `Program.cs`.
+- **RBAC (Admin role).** JWT includes a role claim; `/api/admin/*` requires `[Authorize(Roles = "Admin")]`. A single admin is bootstrapped from `Admin__*` env vars (`AdminBootstrap`). Banned users are rejected at login and by `BanCheckMiddleware`.
 
 ### Also present: Scalar API Reference (Basic requirement)
 

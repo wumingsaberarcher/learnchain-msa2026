@@ -6,6 +6,7 @@ import './styles/chain-summit.css'
 import './styles/profile-achievements.css'
 import './styles/habit-calendar.css'
 import './styles/ai-assistant.css'
+import './styles/admin.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
