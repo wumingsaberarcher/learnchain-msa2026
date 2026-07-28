@@ -8,6 +8,9 @@ using System.Text;
 
 Console.WriteLine("[LearnChain] Starting…");
 
+// Npgsql rejects DateTime Kind=Unspecified for timestamptz (common after SQLite → Postgres).
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
+
 try
 {
     var builder = WebApplication.CreateBuilder(args);

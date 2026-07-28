@@ -16,15 +16,14 @@ Build lasting habits through check-ins, streaks, XP, levels, achievements, and a
 
 ### Environment (Production)
 
-**Vercel** — set in project settings:
+**Vercel** — set in project settings (recommended: same-origin proxy, avoids CORS):
 
 ```
-VITE_API_BASE=https://learnchain-msa2026.onrender.com/api
+VITE_API_BASE=/api
 ```
 
-> If `VITE_API_BASE` is unset, the app calls `/api` on the same origin. `frontend/vercel.json` rewrites `/api/*` to the Render backend so that still works. For the most reliable setup, set `VITE_API_BASE` explicitly as above.
-
-Backend CORS is configured with **AllowAnyOrigin** (safe here because auth uses Bearer tokens, not cookies). After changing backend CORS, redeploy Render with **Clear build cache**.
+`frontend/vercel.json` rewrites `/api/*` → Render.  
+Alternatively you may set `VITE_API_BASE=https://learnchain-msa2026.onrender.com/api` (cross-origin; backend must send CORS headers).
 **Render** — key variables:
 
 | Variable | Value |

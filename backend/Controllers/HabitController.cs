@@ -136,7 +136,7 @@ public class HabitController : ControllerBase
             Frequency = HabitXpService.GetFrequencyLabel(habitType),
             Difficulty = difficulty,
             BaseXP = HabitXpService.GetBaseXP(difficulty),
-            DueDate = request.DueDate?.Date,
+            DueDate = ToUtcDate(request.DueDate),
             CompletionType = habitType == "OneTime" ? 1 : 0,
             IsActive = true,
             IsCompleted = false,
@@ -153,7 +153,7 @@ public class HabitController : ControllerBase
                 {
                     HabitId = habit.Id,
                     Title = string.IsNullOrWhiteSpace(m.Title) ? $"小目标 {index + 1}" : m.Title.Trim(),
-                    DueDate = m.DueDate.Date,
+                    DueDate = ToUtcDate(m.DueDate),
                     XPValue = m.XPValue > 0 ? m.XPValue : HabitXpService.GetDefaultMilestoneXP(difficulty),
                     SortOrder = m.SortOrder > 0 ? m.SortOrder : index,
                     IsCompleted = false
@@ -168,6 +168,18 @@ public class HabitController : ControllerBase
         await EnrichHabitsAsync(new List<Habit> { habit }, currentUserId, DateTime.UtcNow.Date);
         var newlyUnlocked = await _achievements.EvaluateAndUnlockAsync(currentUserId);
         return CreatedAtAction(nameof(GetHabits), new { id = habit.Id }, new { habit, newlyUnlocked });
+    }
+
+    private static DateTime? ToUtcDate(DateTime? value)
+    {
+        if (!value.HasValue) return null;
+        var d = value.Value.Date;
+        return DateTime.SpecifyKind(d, DateTimeKind.Utc);
+    }
+
+    private static DateTime ToUtcDate(DateTime value)
+    {
+        return DateTime.SpecifyKind(value.Date, DateTimeKind.Utc);
     }
 
     [HttpPut("{id}")]
