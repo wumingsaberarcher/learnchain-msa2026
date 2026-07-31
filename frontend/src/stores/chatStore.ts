@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import {
+    getChatHistory,
+    resetChatSession,
     sendChat,
     type ChatActionResult,
     type ChatMessagePayload,
@@ -18,6 +20,7 @@ interface ChatState {
     messages: UiChatMessage[]
     isSending: boolean
     isListening: boolean
+    isHydrating: boolean
     error: string | null
     lastActions: ChatActionResult[]
     userId: number | null
@@ -26,14 +29,14 @@ interface ChatState {
     close: () => void
     setListening: (v: boolean) => void
     clearError: () => void
-    clearHistory: () => void
+    clearHistory: () => Promise<void>
     hydrateForUser: (userId: number | null) => void
     sendMessage: (text: string, language: 'zh' | 'en') => Promise<ChatActionResult[]>
 }
 
 const historyKey = (userId: number) => `learnchain-chat-${userId}`
 
-function loadMessages(userId: number | null): UiChatMessage[] {
+function loadLocalMessages(userId: number | null): UiChatMessage[] {
     if (!userId) return []
     try {
         const raw = localStorage.getItem(historyKey(userId))
@@ -45,7 +48,7 @@ function loadMessages(userId: number | null): UiChatMessage[] {
     }
 }
 
-function saveMessages(userId: number | null, messages: UiChatMessage[]) {
+function saveLocalMessages(userId: number | null, messages: UiChatMessage[]) {
     if (!userId) return
     localStorage.setItem(historyKey(userId), JSON.stringify(messages.slice(-80)))
 }
@@ -59,6 +62,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     messages: [],
     isSending: false,
     isListening: false,
+    isHydrating: false,
     error: null,
     lastActions: [],
     userId: null,
@@ -69,21 +73,50 @@ export const useChatStore = create<ChatState>((set, get) => ({
     setListening: (v) => set({ isListening: v }),
     clearError: () => set({ error: null }),
 
-    clearHistory: () => {
+    clearHistory: async () => {
         const { userId } = get()
-        set({ messages: [], lastActions: [] })
+        set({ messages: [], lastActions: [], error: null })
         if (userId) localStorage.removeItem(historyKey(userId))
+        try {
+            await resetChatSession()
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to reset conversation'
+            set({ error: message })
+        }
     },
 
     hydrateForUser: (userId) => {
         set({
             userId,
-            messages: loadMessages(userId),
+            messages: loadLocalMessages(userId),
             error: null,
             lastActions: [],
             isOpen: false,
             isListening: false,
+            isHydrating: !!userId,
         })
+
+        if (!userId) return
+
+        void getChatHistory()
+            .then(history => {
+                if (get().userId !== userId) return
+                const mapped: UiChatMessage[] = history.messages
+                    .filter(m => m.role === 'user' || m.role === 'assistant')
+                    .map((m, i) => ({
+                        id: `srv-${userId}-${i}-${m.createdAt}`,
+                        role: m.role as 'user' | 'assistant',
+                        content: m.content,
+                        createdAt: Date.parse(m.createdAt) || Date.now(),
+                    }))
+                // Prefer server history when available; keep local cache as fallback
+                const messages = mapped.length > 0 ? mapped : get().messages
+                set({ messages, isHydrating: false })
+                saveLocalMessages(userId, messages)
+            })
+            .catch(() => {
+                if (get().userId === userId) set({ isHydrating: false })
+            })
     },
 
     sendMessage: async (text, language) => {
@@ -105,11 +138,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         const nextMessages = [...get().messages, userMsg]
         set({ messages: nextMessages, isSending: true, error: null, lastActions: [] })
-        saveMessages(get().userId, nextMessages)
+        saveLocalMessages(get().userId, nextMessages)
 
-        const payload: ChatMessagePayload[] = nextMessages
-            .filter(m => m.role === 'user' || m.role === 'assistant')
-            .map(m => ({ role: m.role, content: m.content }))
+        // Server owns memory; only the latest user turn is required in the payload.
+        const payload: ChatMessagePayload[] = [{ role: 'user', content: trimmed }]
 
         try {
             const res = await sendChat(payload, language, {
@@ -130,7 +162,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 isSending: false,
                 lastActions: res.actionsExecuted,
             })
-            saveMessages(get().userId, withAssistant)
+            saveLocalMessages(get().userId, withAssistant)
             return res.actionsExecuted
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Chat failed'

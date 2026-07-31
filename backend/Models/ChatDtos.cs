@@ -29,6 +29,30 @@ public class ChatResponse
 {
     public string Reply { get; set; } = string.Empty;
     public List<ChatActionResult> ActionsExecuted { get; set; } = new();
+    public bool SummaryUpdated { get; set; }
+}
+
+public class ChatHistoryMessageDto
+{
+    public string Role { get; set; } = "user";
+    public string Content { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+}
+
+public class ChatHistoryResponse
+{
+    public string Summary { get; set; } = string.Empty;
+    public List<ChatHistoryMessageDto> Messages { get; set; } = new();
+}
+
+public class UserMemoryDto
+{
+    public int Id { get; set; }
+    public string Type { get; set; } = string.Empty;
+    public string Key { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public int Importance { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }
 
 public class ChatPreferencesDto

@@ -2,14 +2,23 @@ import { useEffect, useState } from 'react'
 import { useAchievementStore } from '../stores/achievementStore'
 import { useAiSettingsStore } from '../stores/aiSettingsStore'
 import { useTranslation } from '../stores/settingsStore'
-import { getChatPreferences, updateChatPreferences } from '../api/chatApi'
+import {
+    deleteUserMemory,
+    getChatPreferences,
+    listUserMemories,
+    resetAllCompanionMemory,
+    updateChatPreferences,
+    type UserMemoryItem,
+} from '../api/chatApi'
+import { useChatStore } from '../stores/chatStore'
 import { isValidPassword } from '../utils/authValidation'
-import { Save, Lock } from 'lucide-react'
+import { Save, Lock, Trash2 } from 'lucide-react'
 
 export default function ProfilePage() {
     const { profile, fetchProfile, updateBio, changePassword } = useAchievementStore()
     const { t } = useTranslation()
     const aiSettings = useAiSettingsStore()
+    const clearChatHistory = useChatStore(s => s.clearHistory)
     const [bio, setBio] = useState('')
     const [oldPwd, setOldPwd] = useState('')
     const [newPwd, setNewPwd] = useState('')
@@ -19,6 +28,13 @@ export default function ProfilePage() {
     const [aiBase, setAiBase] = useState(aiSettings.baseUrl)
     const [aiModel, setAiModel] = useState(aiSettings.model)
     const [digestEnabled, setDigestEnabled] = useState(false)
+    const [memories, setMemories] = useState<UserMemoryItem[]>([])
+
+    const reloadMemories = () => {
+        listUserMemories()
+            .then(setMemories)
+            .catch(() => setMemories([]))
+    }
 
     useEffect(() => { fetchProfile() }, [fetchProfile])
     useEffect(() => { if (profile) setBio(profile.bio) }, [profile])
@@ -26,6 +42,7 @@ export default function ProfilePage() {
         getChatPreferences()
             .then(p => setDigestEnabled(p.dailyDigestEnabled))
             .catch(() => { /* ignore when logged out edge */ })
+        reloadMemories()
     }, [])
 
     const handleSaveBio = async () => {
@@ -70,6 +87,32 @@ export default function ProfilePage() {
             setTimeout(() => setMsg(''), 2500)
         } catch {
             setErr(t('profile.digestFailed'))
+        }
+    }
+
+    const handleDeleteMemory = async (id: number) => {
+        setErr('')
+        try {
+            await deleteUserMemory(id)
+            setMemories(prev => prev.filter(m => m.id !== id))
+            setMsg(t('profile.memoryDeleted'))
+            setTimeout(() => setMsg(''), 2500)
+        } catch {
+            setErr(t('profile.memoryFailed'))
+        }
+    }
+
+    const handleResetAllMemory = async () => {
+        if (!window.confirm(t('profile.memoryResetConfirm'))) return
+        setErr('')
+        try {
+            await resetAllCompanionMemory()
+            await clearChatHistory()
+            setMemories([])
+            setMsg(t('profile.memoryResetDone'))
+            setTimeout(() => setMsg(''), 2500)
+        } catch {
+            setErr(t('profile.memoryFailed'))
         }
     }
 
@@ -200,6 +243,39 @@ export default function ProfilePage() {
                         />
                         <span>{t('profile.digestEnable')}</span>
                     </label>
+                </div>
+
+                <div className="profile-section">
+                    <label>{t('profile.memoryTitle')}</label>
+                    <p className="profile-hint">{t('profile.memoryHint')}</p>
+                    {memories.length === 0 ? (
+                        <p className="profile-hint">{t('profile.memoryEmpty')}</p>
+                    ) : (
+                        <ul className="profile-memory-list">
+                            {memories.map(m => (
+                                <li key={m.id} className="profile-memory-item">
+                                    <div>
+                                        <strong>[{m.type}] {m.key}</strong>
+                                        <p>{m.content}</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
+                                        onClick={() => void handleDeleteMemory(m.id)}
+                                    >
+                                        <Trash2 className="w-4 h-4" /> {t('profile.memoryDelete')}
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    <button
+                        type="button"
+                        className="btn btn-secondary profile-save-btn"
+                        onClick={() => void handleResetAllMemory()}
+                    >
+                        {t('profile.memoryResetAll')}
+                    </button>
                 </div>
 
                 {msg && <div className="profile-msg success">{msg}</div>}

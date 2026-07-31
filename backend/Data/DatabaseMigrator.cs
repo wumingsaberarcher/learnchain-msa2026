@@ -63,6 +63,49 @@ public static class DatabaseMigrator
                 );
                 """;
             cmd.ExecuteNonQuery();
+
+            using var chatSessionCmd = connection.CreateCommand();
+            chatSessionCmd.CommandText = """
+                CREATE TABLE IF NOT EXISTS ChatSessions (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    UserId INTEGER NOT NULL,
+                    Summary TEXT NOT NULL DEFAULT '',
+                    CreatedAt TEXT NOT NULL,
+                    UpdatedAt TEXT NOT NULL
+                );
+                """;
+            chatSessionCmd.ExecuteNonQuery();
+
+            using var chatMsgCmd = connection.CreateCommand();
+            chatMsgCmd.CommandText = """
+                CREATE TABLE IF NOT EXISTS ChatMessages (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    SessionId INTEGER NOT NULL,
+                    Role TEXT NOT NULL,
+                    Content TEXT NOT NULL,
+                    TokenEstimate INTEGER NOT NULL DEFAULT 0,
+                    IsArchived INTEGER NOT NULL DEFAULT 0,
+                    CreatedAt TEXT NOT NULL
+                );
+                """;
+            chatMsgCmd.ExecuteNonQuery();
+
+            using var memoryCmd = connection.CreateCommand();
+            memoryCmd.CommandText = """
+                CREATE TABLE IF NOT EXISTS UserMemories (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    UserId INTEGER NOT NULL,
+                    Type TEXT NOT NULL,
+                    Key TEXT NOT NULL,
+                    Content TEXT NOT NULL,
+                    Importance INTEGER NOT NULL DEFAULT 3,
+                    IsDeleted INTEGER NOT NULL DEFAULT 0,
+                    LastAccessedAt TEXT NOT NULL,
+                    CreatedAt TEXT NOT NULL,
+                    UpdatedAt TEXT NOT NULL
+                );
+                """;
+            memoryCmd.ExecuteNonQuery();
         }
         finally
         {
@@ -93,6 +136,55 @@ public static class DatabaseMigrator
             EnsurePostgresColumn(connection, "Habits", "DueDate", "timestamp with time zone NULL");
             EnsurePostgresColumn(connection, "Habits", "IsCompleted", "boolean NOT NULL DEFAULT false");
             EnsurePostgresColumn(connection, "CheckIns", "MilestoneId", "integer NULL");
+
+            using (var chatSessionCmd = connection.CreateCommand())
+            {
+                chatSessionCmd.CommandText = """
+                    CREATE TABLE IF NOT EXISTS "ChatSessions" (
+                        "Id" serial PRIMARY KEY,
+                        "UserId" integer NOT NULL,
+                        "Summary" text NOT NULL DEFAULT '',
+                        "CreatedAt" timestamp with time zone NOT NULL,
+                        "UpdatedAt" timestamp with time zone NOT NULL
+                    );
+                    """;
+                chatSessionCmd.ExecuteNonQuery();
+            }
+
+            using (var chatMsgCmd = connection.CreateCommand())
+            {
+                chatMsgCmd.CommandText = """
+                    CREATE TABLE IF NOT EXISTS "ChatMessages" (
+                        "Id" serial PRIMARY KEY,
+                        "SessionId" integer NOT NULL,
+                        "Role" text NOT NULL,
+                        "Content" text NOT NULL,
+                        "TokenEstimate" integer NOT NULL DEFAULT 0,
+                        "IsArchived" boolean NOT NULL DEFAULT false,
+                        "CreatedAt" timestamp with time zone NOT NULL
+                    );
+                    """;
+                chatMsgCmd.ExecuteNonQuery();
+            }
+
+            using (var memoryCmd = connection.CreateCommand())
+            {
+                memoryCmd.CommandText = """
+                    CREATE TABLE IF NOT EXISTS "UserMemories" (
+                        "Id" serial PRIMARY KEY,
+                        "UserId" integer NOT NULL,
+                        "Type" text NOT NULL,
+                        "Key" text NOT NULL,
+                        "Content" text NOT NULL,
+                        "Importance" integer NOT NULL DEFAULT 3,
+                        "IsDeleted" boolean NOT NULL DEFAULT false,
+                        "LastAccessedAt" timestamp with time zone NOT NULL,
+                        "CreatedAt" timestamp with time zone NOT NULL,
+                        "UpdatedAt" timestamp with time zone NOT NULL
+                    );
+                    """;
+                memoryCmd.ExecuteNonQuery();
+            }
         }
         finally
         {

@@ -24,6 +24,27 @@ export interface ChatActionResult {
 export interface ChatResponse {
     reply: string
     actionsExecuted: ChatActionResult[]
+    summaryUpdated?: boolean
+}
+
+export interface ChatHistoryMessage {
+    role: ChatRole
+    content: string
+    createdAt: string
+}
+
+export interface ChatHistoryResponse {
+    summary: string
+    messages: ChatHistoryMessage[]
+}
+
+export interface UserMemoryItem {
+    id: number
+    type: string
+    key: string
+    content: string
+    importance: number
+    updatedAt: string
 }
 
 export interface AiProviderSettings {
@@ -64,7 +85,64 @@ export async function sendChat(
     return {
         reply: data.reply,
         actionsExecuted: data.actionsExecuted ?? data.ActionsExecuted ?? [],
+        summaryUpdated: data.summaryUpdated ?? data.SummaryUpdated ?? false,
     }
+}
+
+export async function getChatHistory(): Promise<ChatHistoryResponse> {
+    const res = await fetch(`${API_BASE}/chat/history`, { headers: authHeaders() })
+    if (!res.ok) throw new Error('Failed to load chat history')
+    const data = await res.json()
+    const messages = (data.messages ?? data.Messages ?? []) as Array<Record<string, unknown>>
+    return {
+        summary: data.summary ?? data.Summary ?? '',
+        messages: messages.map(m => ({
+            role: (m.role ?? m.Role ?? 'user') as ChatRole,
+            content: String(m.content ?? m.Content ?? ''),
+            createdAt: String(m.createdAt ?? m.CreatedAt ?? new Date().toISOString()),
+        })),
+    }
+}
+
+/** Reset conversation (messages + rolling summary). Keeps long-term memories. */
+export async function resetChatSession(): Promise<void> {
+    const res = await fetch(`${API_BASE}/chat/session`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+    })
+    if (!res.ok) throw new Error('Failed to reset conversation')
+}
+
+export async function listUserMemories(): Promise<UserMemoryItem[]> {
+    const res = await fetch(`${API_BASE}/chat/memories`, { headers: authHeaders() })
+    if (!res.ok) throw new Error('Failed to load memories')
+    const data = await res.json()
+    const list = (Array.isArray(data) ? data : []) as Array<Record<string, unknown>>
+    return list.map(m => ({
+        id: Number(m.id ?? m.Id),
+        type: String(m.type ?? m.Type ?? ''),
+        key: String(m.key ?? m.Key ?? ''),
+        content: String(m.content ?? m.Content ?? ''),
+        importance: Number(m.importance ?? m.Importance ?? 3),
+        updatedAt: String(m.updatedAt ?? m.UpdatedAt ?? ''),
+    }))
+}
+
+export async function deleteUserMemory(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/chat/memories/${id}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+    })
+    if (!res.ok) throw new Error('Failed to delete memory')
+}
+
+/** Clear conversation + long-term memories. Game data untouched. */
+export async function resetAllCompanionMemory(): Promise<void> {
+    const res = await fetch(`${API_BASE}/chat/memories`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+    })
+    if (!res.ok) throw new Error('Failed to reset memories')
 }
 
 export async function sendTodayReminder(language: 'zh' | 'en'): Promise<{ sent: boolean; message: string }> {

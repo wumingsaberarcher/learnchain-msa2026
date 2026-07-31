@@ -79,3 +79,6 @@ D:\learnchain-msa2026\backend\bin\Debug\net10.0\MailKit.dll
 D:\learnchain-msa2026\backend\bin\Debug\net10.0\MimeKit.dll
 D:\learnchain-msa2026\backend\bin\Debug\net10.0\Npgsql.dll
 D:\learnchain-msa2026\backend\bin\Debug\net10.0\Npgsql.EntityFrameworkCore.PostgreSQL.dll
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\Music\ceta.aac
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\Music\faster-than-light.aac
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\Music\waiting-for-the-sun.aac

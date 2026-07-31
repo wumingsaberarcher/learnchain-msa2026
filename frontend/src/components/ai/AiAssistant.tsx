@@ -85,7 +85,12 @@ export default function AiAssistant() {
                             </div>
                         </div>
                         <div className="ai-chat-header-actions">
-                            <button type="button" className="ai-icon-btn" title={t('chat.clear')} onClick={clearHistory}>
+                            <button
+                                type="button"
+                                className="ai-icon-btn"
+                                title={t('chat.clear')}
+                                onClick={() => void clearHistory()}
+                            >
                                 <Trash2 className="w-4 h-4" />
                             </button>
                             <button type="button" className="ai-icon-btn" title={t('chat.close')} onClick={close}>

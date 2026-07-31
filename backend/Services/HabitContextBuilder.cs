@@ -91,6 +91,15 @@ public class HabitContextBuilder
         var done = habits.Where(h => h.IsDueToday && h.IsCheckedToday).ToList();
         var notDue = habits.Where(h => !h.IsDueToday).ToList();
 
+        var recentBadges = await _context.UserAchievements
+            .Where(a => a.UserId == user.Id)
+            .OrderByDescending(a => a.UnlockedAt)
+            .Take(5)
+            .Select(a => new { a.BadgeId, a.UnlockedAt })
+            .ToListAsync();
+
+        var badgeCount = await _context.UserAchievements.CountAsync(a => a.UserId == user.Id);
+
         var payload = new
         {
             account = new
@@ -102,7 +111,8 @@ public class HabitContextBuilder
                 user.TotalXP,
                 user.Bio,
                 user.CreatedAt,
-                user.DailyDigestEnabled
+                user.DailyDigestEnabled,
+                badgeCount
             },
             todayUtc = DateTime.UtcNow.Date.ToString("yyyy-MM-dd"),
             summary = new
@@ -110,18 +120,21 @@ public class HabitContextBuilder
                 activeHabits = habits.Count,
                 dueToday = pending.Count + done.Count,
                 pendingCount = pending.Count,
-                completedTodayCount = done.Count
+                completedTodayCount = done.Count,
+                longestStreak = habits.Count == 0 ? 0 : habits.Max(h => h.CurrentStreak)
             },
             pendingToday = pending.Select(SummarizeHabit),
             completedToday = done.Select(SummarizeHabit),
             notDueToday = notDue.Select(SummarizeHabit),
+            recentBadges,
             capabilities = new[]
             {
-                "Answer questions about the user's account, habits, streaks, XP, and what is due today",
+                "Answer questions about the user's account, habits, streaks, XP, badges, and what is due today",
                 "Guide the user step-by-step to create a new habit (Daily / EveryOtherDay / Weekly / OneTime)",
                 "Rename an existing habit",
                 "Soft-delete (deactivate) a habit",
                 "Send a today-task reminder email to the user's registered email",
+                "Remember user preferences and important facts across sessions via companion memory",
                 "Cannot change habit type/difficulty via update (create new or rename only); cannot check in for the user"
             }
         };

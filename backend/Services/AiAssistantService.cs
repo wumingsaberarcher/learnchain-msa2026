@@ -16,6 +16,7 @@ public class AiAssistantService
 
     private readonly AppDbContext _context;
     private readonly HabitContextBuilder _habitContext;
+    private readonly CompanionMemoryService _memory;
     private readonly EmailService _email;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<AiAssistantService> _logger;
@@ -29,12 +30,14 @@ public class AiAssistantService
     public AiAssistantService(
         AppDbContext context,
         HabitContextBuilder habitContext,
+        CompanionMemoryService memory,
         EmailService email,
         IHttpClientFactory httpClientFactory,
         ILogger<AiAssistantService> logger)
     {
         _context = context;
         _habitContext = habitContext;
+        _memory = memory;
         _email = email;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
@@ -51,15 +54,27 @@ public class AiAssistantService
         var model = string.IsNullOrWhiteSpace(request.Model) ? DefaultModel : request.Model.Trim();
         var zh = request.Language.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
 
+        var latestUser = request.Messages
+            .LastOrDefault(m => m.Role == "user" && !string.IsNullOrWhiteSpace(m.Content));
+        if (latestUser == null)
+            throw new InvalidOperationException("A user message is required.");
+
+        var session = await _memory.GetOrCreateSessionAsync(user.Id, ct);
+        await _memory.AppendMessageAsync(session, "user", latestUser.Content, ct);
+
         var contextJson = await _habitContext.BuildContextJsonAsync(user);
-        var systemPrompt = BuildSystemPrompt(zh, contextJson);
+        var memories = await _memory.GetRelevantMemoriesAsync(user.Id, latestUser.Content, ct: ct);
+        var recent = await _memory.GetRecentActiveMessagesAsync(
+            session.Id, CompanionMemoryService.ShortTermMessageLimit, ct);
+
+        var systemPrompt = BuildSystemPrompt(zh, contextJson, session.Summary, memories);
 
         var messages = new JsonArray
         {
             new JsonObject { ["role"] = "system", ["content"] = systemPrompt }
         };
 
-        foreach (var m in request.Messages.TakeLast(24))
+        foreach (var m in recent)
         {
             var role = m.Role is "assistant" or "user" ? m.Role : "user";
             if (string.IsNullOrWhiteSpace(m.Content)) continue;
@@ -114,7 +129,6 @@ public class AiAssistantService
 
         if (string.IsNullOrWhiteSpace(finalReply))
         {
-            // One more pass without tools if we exhausted rounds mid-tool-loop
             var body = new JsonObject
             {
                 ["model"] = model,
@@ -126,19 +140,38 @@ public class AiAssistantService
                 ?? (zh ? "我已经处理完相关操作，还有什么可以帮你的吗？" : "Done. Anything else I can help with?");
         }
 
+        await _memory.AppendMessageAsync(session, "assistant", finalReply!, ct);
+        await _memory.MaybeSummarizeAsync(session, user, apiKey, baseUrl, model, zh, ct);
+
         return new ChatResponse
         {
             Reply = finalReply!,
-            ActionsExecuted = actions
+            ActionsExecuted = actions,
+            SummaryUpdated = !string.IsNullOrWhiteSpace(session.Summary)
         };
     }
 
-    private static string BuildSystemPrompt(bool zh, string contextJson)
+    private static string BuildSystemPrompt(
+        bool zh,
+        string contextJson,
+        string rollingSummary,
+        IReadOnlyList<UserMemory> memories)
     {
         var lang = zh ? "Simplified Chinese" : "English";
+        var memoryBlock = memories.Count == 0
+            ? "(none yet)"
+            : string.Join("\n", memories.Select(m =>
+                $"- [{m.Type}/{m.Key}] (importance {m.Importance}): {m.Content}"));
+
+        var summaryBlock = string.IsNullOrWhiteSpace(rollingSummary)
+            ? "(none yet — early in the relationship)"
+            : rollingSummary;
+
         return $"""
-            You are LearnChain's friendly habit coach assistant.
+            You are LearnChain's friendly habit coach companion — not just a tool.
             Always reply in {lang}.
+            You remember the user across sessions via long-term memories and a rolling conversation summary.
+            Naturally weave in game progress (streaks, XP, levels, badges, chain continuity) when helpful — keep it encouraging, not robotic.
 
             You help users understand their account, what they should do today, and create/rename/delete habits via tools.
             When creating a habit, ask clarifying questions (name, type: Daily|EveryOtherDay|Weekly|OneTime, difficulty 1-3, due date for OneTime/Weekly if needed) until you have enough info — then call create_habit.
@@ -147,8 +180,14 @@ public class AiAssistantService
             You cannot mark check-ins for the user; tell them to use the dashboard.
             You cannot change habit type or difficulty after creation — only rename, or create a new one.
 
-            Current user context (JSON):
+            Current game / account state (JSON):
             {contextJson}
+
+            Rolling conversation summary (older dialogue compressed):
+            {summaryBlock}
+
+            Long-term memories about this user (use gently; do not dump as a list unless asked):
+            {memoryBlock}
             """;
     }
 

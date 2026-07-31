@@ -14,4 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<HabitMilestone> HabitMilestones { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<UserAchievement> UserAchievements { get; set; }
+    public DbSet<ChatSession> ChatSessions { get; set; }
+    public DbSet<ChatMessage> ChatMessages { get; set; }
+    public DbSet<UserMemory> UserMemories { get; set; }
 }

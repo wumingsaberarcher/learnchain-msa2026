@@ -79,6 +79,7 @@ try
     builder.Services.AddAuthorization();
     builder.Services.AddScoped<AchievementService>();
     builder.Services.AddScoped<HabitContextBuilder>();
+    builder.Services.AddScoped<CompanionMemoryService>();
     builder.Services.AddScoped<AiAssistantService>();
     builder.Services.AddSingleton<EmailService>();
     builder.Services.AddHttpClient("OpenAiCompatible", client =>

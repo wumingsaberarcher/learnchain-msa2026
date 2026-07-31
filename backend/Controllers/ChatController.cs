@@ -16,17 +16,20 @@ public class ChatController : ControllerBase
     private readonly AppDbContext _context;
     private readonly AiAssistantService _assistant;
     private readonly HabitContextBuilder _habitContext;
+    private readonly CompanionMemoryService _memory;
     private readonly EmailService _email;
 
     public ChatController(
         AppDbContext context,
         AiAssistantService assistant,
         HabitContextBuilder habitContext,
+        CompanionMemoryService memory,
         EmailService email)
     {
         _context = context;
         _assistant = assistant;
         _habitContext = habitContext;
+        _memory = memory;
         _email = email;
     }
 
@@ -114,5 +117,75 @@ public class ChatController : ControllerBase
         user.DailyDigestEnabled = dto.DailyDigestEnabled;
         await _context.SaveChangesAsync();
         return Ok(new ChatPreferencesDto { DailyDigestEnabled = user.DailyDigestEnabled });
+    }
+
+    /// <summary>Load persisted short-term history + rolling summary for the companion UI.</summary>
+    [HttpGet("history")]
+    public async Task<ActionResult<ChatHistoryResponse>> GetHistory(CancellationToken ct)
+    {
+        var user = await GetCurrentUserAsync();
+        if (user == null) return Unauthorized();
+
+        var session = await _memory.GetOrCreateSessionAsync(user.Id, ct);
+        var messages = await _memory.GetRecentActiveMessagesAsync(
+            session.Id, CompanionMemoryService.ShortTermMessageLimit * 2, ct);
+
+        return Ok(new ChatHistoryResponse
+        {
+            Summary = session.Summary,
+            Messages = messages.Select(m => new ChatHistoryMessageDto
+            {
+                Role = m.Role,
+                Content = m.Content,
+                CreatedAt = m.CreatedAt
+            }).ToList()
+        });
+    }
+
+    /// <summary>Reset conversation memory (messages + rolling summary). Keeps long-term memories and game data.</summary>
+    [HttpDelete("session")]
+    public async Task<IActionResult> ResetSession(CancellationToken ct)
+    {
+        var user = await GetCurrentUserAsync();
+        if (user == null) return Unauthorized();
+        await _memory.ResetConversationAsync(user.Id, ct);
+        return Ok(new { message = "Conversation memory cleared" });
+    }
+
+    [HttpGet("memories")]
+    public async Task<ActionResult<List<UserMemoryDto>>> ListMemories(CancellationToken ct)
+    {
+        var user = await GetCurrentUserAsync();
+        if (user == null) return Unauthorized();
+        var list = await _memory.ListMemoriesAsync(user.Id, ct);
+        return Ok(list.Select(m => new UserMemoryDto
+        {
+            Id = m.Id,
+            Type = m.Type,
+            Key = m.Key,
+            Content = m.Content,
+            Importance = m.Importance,
+            UpdatedAt = m.UpdatedAt
+        }).ToList());
+    }
+
+    [HttpDelete("memories/{id:int}")]
+    public async Task<IActionResult> DeleteMemory(int id, CancellationToken ct)
+    {
+        var user = await GetCurrentUserAsync();
+        if (user == null) return Unauthorized();
+        var ok = await _memory.SoftDeleteMemoryAsync(user.Id, id, ct);
+        if (!ok) return NotFound();
+        return Ok(new { message = "Memory deleted" });
+    }
+
+    /// <summary>Nuclear option: clear conversation + long-term memories. Game data untouched.</summary>
+    [HttpDelete("memories")]
+    public async Task<IActionResult> ResetAllMemories(CancellationToken ct)
+    {
+        var user = await GetCurrentUserAsync();
+        if (user == null) return Unauthorized();
+        await _memory.ResetAllMemoryAsync(user.Id, ct);
+        return Ok(new { message = "All companion memories cleared" });
     }
 }
