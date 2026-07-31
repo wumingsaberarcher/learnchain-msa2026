@@ -31,3 +31,6 @@ yarn-error.log*
 # IDE
 .idea/
 .vscode/
+
+# Download leftovers
+**/.jijidown-temp/

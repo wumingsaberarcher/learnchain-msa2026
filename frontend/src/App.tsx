@@ -13,9 +13,12 @@ import UserProfileMenu from './components/UserProfileMenu'
 import BadgeUnlockModal from './components/BadgeUnlockModal'
 import AiAssistant from './components/ai/AiAssistant'
 import IdleRestOverlay from './components/IdleRestOverlay'
+import AppSidebar from './components/AppSidebar'
+import BgmPlayer from './components/BgmPlayer'
 import { useHabitStore } from './stores/habitStore'
 import { useAchievementStore } from './stores/achievementStore'
 import { useIdleRestStore } from './stores/idleRestStore'
+import { useBgmStore } from './stores/bgmStore'
 import { useTranslation } from './stores/settingsStore'
 import { isStaffRole } from './api/adminApi'
 
@@ -25,6 +28,7 @@ function App() {
     const { fetchProfile, syncAchievements } = useAchievementStore()
     const { t, theme } = useTranslation()
     const isResting = useIdleRestStore(s => s.isResting)
+    const toggleSidebar = useBgmStore(s => s.toggleSidebar)
 
     useEffect(() => {
         if (isLoggedIn) {
@@ -36,15 +40,25 @@ function App() {
         <BrowserRouter>
             <div className={`app-shell min-h-screen theme-${theme}`}>
                 <BackgroundAnimation />
+                <BgmPlayer />
+                <AppSidebar />
 
                 <header>
                     <nav>
-                        <NavLink to="/" className="logo">
-                            <div className="logo-icon">
+                        <div className="logo logo-cluster">
+                            <button
+                                type="button"
+                                className="logo-icon-btn"
+                                onClick={toggleSidebar}
+                                aria-label={t('sidebar.open')}
+                                title={t('sidebar.open')}
+                            >
                                 <Target className="w-6 h-6" />
-                            </div>
-                            <span className="logo-text">LearnChain</span>
-                        </NavLink>
+                            </button>
+                            <NavLink to="/" className="logo-home-link">
+                                <span className="logo-text">LearnChain</span>
+                            </NavLink>
+                        </div>
 
                         <div className="nav-right">
                             <ul className="nav-links">

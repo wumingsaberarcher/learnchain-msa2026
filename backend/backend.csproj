@@ -18,4 +18,8 @@
     <PackageReference Include="Scalar.AspNetCore" Version="2.16.10" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Music\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

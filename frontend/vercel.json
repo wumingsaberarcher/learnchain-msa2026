@@ -8,6 +8,10 @@
       "destination": "https://learnchain-msa2026.onrender.com/api/:path*"
     },
     {
+      "source": "/music/:path*",
+      "destination": "https://learnchain-msa2026.onrender.com/music/:path*"
+    },
+    {
       "source": "/((?!assets/).*)",
       "destination": "/index.html"
     }

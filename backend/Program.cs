@@ -2,7 +2,9 @@ using backend.Data;
 using backend.Middleware;
 using backend.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using System.Security.Claims;
@@ -118,8 +120,33 @@ try
         app.MapScalarApiReference();
     }
 
-    // Endpoint routing order: Routing → CORS → Auth (so OPTIONS preflight is never 401'd without ACAO).
+    // Endpoint routing order: Routing → static music → CORS → Auth
     app.UseRouting();
+
+    var musicRoot = Path.Combine(app.Environment.ContentRootPath, "Music");
+    if (Directory.Exists(musicRoot))
+    {
+        var contentTypes = new FileExtensionContentTypeProvider();
+        contentTypes.Mappings[".aac"] = "audio/aac";
+        contentTypes.Mappings[".m4a"] = "audio/mp4";
+        contentTypes.Mappings[".mp3"] = "audio/mpeg";
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = new PhysicalFileProvider(musicRoot),
+            RequestPath = "/music",
+            ContentTypeProvider = contentTypes,
+            OnPrepareResponse = ctx =>
+            {
+                ctx.Context.Response.Headers.CacheControl = "public,max-age=86400";
+            }
+        });
+        Console.WriteLine($"[LearnChain] Serving BGM from {musicRoot}");
+    }
+    else
+    {
+        Console.WriteLine($"[LearnChain] Music folder not found at {musicRoot}");
+    }
+
     app.UseCors();
     app.UseAuthentication();
     app.UseMiddleware<BanCheckMiddleware>();
@@ -127,6 +154,12 @@ try
 
     app.MapControllers();
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "learnchain-backend" }));
+    app.MapGet("/music/tracks", () => Results.Ok(new[]
+    {
+        new { id = "ceta", title = "CETA", file = "ceta.aac", unlock = "default" },
+        new { id = "faster-than-light", title = "Faster Than Light", file = "faster-than-light.aac", unlock = "allBadges" },
+        new { id = "waiting-for-the-sun", title = "Waiting for the Sun", file = "waiting-for-the-sun.aac", unlock = "allBadges" },
+    }));
 
     Console.WriteLine("[LearnChain] Listening…");
     app.Run();
