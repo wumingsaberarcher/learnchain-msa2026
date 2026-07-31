@@ -5,6 +5,7 @@ import { useHabitStore } from '../stores/habitStore'
 import { useAchievementStore } from '../stores/achievementStore'
 import { useTranslation } from '../stores/settingsStore'
 import { BADGE_DEFINITIONS } from '../badges/badgeDefinitions'
+import { isStaffRole } from '../api/adminApi'
 import BadgeCard from './BadgeCard'
 
 export default function UserProfileMenu() {
@@ -74,7 +75,7 @@ export default function UserProfileMenu() {
                         <User className="w-4 h-4" /> {t('profile.edit')}
                     </Link>
 
-                    {currentUser.role === 'Admin' && (
+                    {isStaffRole(currentUser.role) && (
                         <Link to="/admin" className="user-profile-link" onClick={() => setOpen(false)}>
                             <Shield className="w-4 h-4" /> {t('nav.admin')}
                         </Link>

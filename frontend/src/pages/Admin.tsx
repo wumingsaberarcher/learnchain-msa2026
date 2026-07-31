@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { Shield, Search, Ban, BadgeCheck, Sparkles, Trash2 } from 'lucide-react'
+import { Shield, Search, Ban, BadgeCheck, Sparkles, Trash2, KeyRound, Crown, Eye, EyeOff } from 'lucide-react'
 import { useHabitStore } from '../stores/habitStore'
 import { useTranslation } from '../stores/settingsStore'
 import { BADGE_DEFINITIONS, BADGE_MAP } from '../badges/badgeDefinitions'
@@ -9,21 +9,31 @@ import {
     deleteUser,
     getAdminUser,
     grantBadge,
+    isProtectedStaffRole,
+    isStaffRole,
+    isSuperAdminRole,
     listAdminUsers,
     listBadgeIds,
     revokeBadge,
+    setUserPassword,
+    setUserRole,
     setUserXp,
     unbanUser,
     type AdminUserDetail,
     type AdminUserSummary,
 } from '../api/adminApi'
 
-/** Stepped ban durations: 1h → 30d */
 const BAN_HOURS = [1, 3, 6, 12, 24, 72, 168, 336, 720] as const
 
 function banLabel(hours: number, t: (key: 'admin.banHours' | 'admin.banDays', params?: Record<string, string | number>) => string) {
     if (hours < 24) return t('admin.banHours', { n: hours })
     return t('admin.banDays', { n: hours / 24 })
+}
+
+function roleLabel(role: string, t: (key: 'admin.role.user' | 'admin.role.admin' | 'admin.role.super') => string) {
+    if (role === 'SuperAdmin') return t('admin.role.super')
+    if (role === 'Admin') return t('admin.role.admin')
+    return t('admin.role.user')
 }
 
 export default function AdminPage() {
@@ -37,12 +47,22 @@ export default function AdminPage() {
     const [xpInput, setXpInput] = useState('')
     const [banHours, setBanHours] = useState<number>(24)
     const [grantBadgeId, setGrantBadgeId] = useState('')
+    const [passwordInput, setPasswordInput] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
     const [msg, setMsg] = useState('')
     const [err, setErr] = useState('')
     const [loading, setLoading] = useState(false)
 
-    const isAdmin = currentUser?.role === 'Admin'
-    const targetIsAdmin = detail?.role === 'Admin'
+    const isStaff = isStaffRole(currentUser?.role)
+    const isSuper = isSuperAdminRole(currentUser?.role)
+    const targetProtected = detail ? isProtectedStaffRole(detail.role) : false
+    const targetIsSuper = detail ? isSuperAdminRole(detail.role) : false
+    /** Regular Admin cannot manage staff; SuperAdmin can manage Admin (not SuperAdmin). */
+    const canManageTarget = !!detail && (
+        isSuper
+            ? !targetIsSuper
+            : !targetProtected
+    )
 
     const refreshList = useCallback(async () => {
         setLoading(true)
@@ -59,6 +79,8 @@ export default function AdminPage() {
 
     const loadDetail = useCallback(async (id: number) => {
         setErr('')
+        setShowPassword(false)
+        setPasswordInput('')
         try {
             const d = await getAdminUser(id)
             setDetail(d)
@@ -72,7 +94,7 @@ export default function AdminPage() {
     }, [t])
 
     useEffect(() => {
-        if (!isLoggedIn || !isAdmin) return
+        if (!isLoggedIn || !isStaff) return
         void refreshList()
         listBadgeIds()
             .then(ids => {
@@ -85,7 +107,7 @@ export default function AdminPage() {
                 setBadgeIds(sorted)
             })
             .catch(() => setBadgeIds([]))
-    }, [isLoggedIn, isAdmin, refreshList])
+    }, [isLoggedIn, isStaff, refreshList])
 
     const grantableIds = useMemo(() => {
         if (!detail) return [] as string[]
@@ -98,7 +120,7 @@ export default function AdminPage() {
     }, [detail])
 
     if (!isLoggedIn) return <Navigate to="/" replace />
-    if (!isAdmin) {
+    if (!isStaff) {
         return (
             <div className="admin-page">
                 <div className="admin-card">
@@ -116,7 +138,7 @@ export default function AdminPage() {
     }
 
     const onSetXp = async () => {
-        if (!detail || targetIsAdmin) return
+        if (!detail || !canManageTarget) return
         const xp = parseInt(xpInput, 10)
         if (Number.isNaN(xp) || xp < 0) {
             setErr(t('admin.invalidXp'))
@@ -157,7 +179,7 @@ export default function AdminPage() {
     }
 
     const onBan = async () => {
-        if (!detail || targetIsAdmin) return
+        if (!detail || !canManageTarget) return
         if (!BAN_HOURS.includes(banHours as typeof BAN_HOURS[number])) {
             setErr(t('admin.invalidBan'))
             return
@@ -173,7 +195,7 @@ export default function AdminPage() {
     }
 
     const onUnban = async () => {
-        if (!detail || targetIsAdmin) return
+        if (!detail || !canManageTarget) return
         try {
             await unbanUser(detail.id)
             flash(t('admin.unbanned'))
@@ -185,7 +207,7 @@ export default function AdminPage() {
     }
 
     const onDelete = async () => {
-        if (!detail || targetIsAdmin) return
+        if (!detail || !canManageTarget) return
         const ok = window.confirm(t('admin.deleteConfirm', { name: detail.username }))
         if (!ok) return
         try {
@@ -199,6 +221,49 @@ export default function AdminPage() {
         }
     }
 
+    const onPromote = async () => {
+        if (!detail || !isSuper || targetIsSuper) return
+        try {
+            await setUserRole(detail.id, 'Admin')
+            flash(t('admin.roleGranted'))
+            await loadDetail(detail.id)
+            await refreshList()
+        } catch (e) {
+            setErr(e instanceof Error ? e.message : t('admin.actionFailed'))
+        }
+    }
+
+    const onDemote = async () => {
+        if (!detail || !isSuper || detail.role !== 'Admin') return
+        const ok = window.confirm(t('admin.roleRevokeConfirm', { name: detail.username }))
+        if (!ok) return
+        try {
+            await setUserRole(detail.id, 'User')
+            flash(t('admin.roleRevoked'))
+            await loadDetail(detail.id)
+            await refreshList()
+        } catch (e) {
+            setErr(e instanceof Error ? e.message : t('admin.actionFailed'))
+        }
+    }
+
+    const onSetPassword = async () => {
+        if (!detail || !isSuper) return
+        if (!passwordInput.trim()) {
+            setErr(t('admin.invalidPassword'))
+            return
+        }
+        try {
+            const res = await setUserPassword(detail.id, passwordInput.trim())
+            flash(t('admin.passwordUpdated'))
+            setPasswordInput(res.password)
+            setShowPassword(true)
+            await loadDetail(detail.id)
+        } catch (e) {
+            setErr(e instanceof Error ? e.message : t('admin.actionFailed'))
+        }
+    }
+
     return (
         <div className="admin-page">
             <div className="admin-card">
@@ -206,7 +271,7 @@ export default function AdminPage() {
                     <Shield className="w-6 h-6 admin-header-icon" />
                     <div>
                         <h1>{t('admin.title')}</h1>
-                        <p>{t('admin.subtitle')}</p>
+                        <p>{isSuper ? t('admin.subtitleSuper') : t('admin.subtitle')}</p>
                     </div>
                 </div>
 
@@ -238,9 +303,12 @@ export default function AdminPage() {
                                 className={`admin-user-row${selectedId === u.id ? ' active' : ''}`}
                                 onClick={() => void loadDetail(u.id)}
                             >
-                                <strong>{u.username}</strong>
+                                <strong>
+                                    {u.username}
+                                    {u.role === 'SuperAdmin' && ' ★'}
+                                </strong>
                                 <span>{u.email}</span>
-                                <span>Lv.{u.level} · {u.totalXP} XP · {u.role}</span>
+                                <span>Lv.{u.level} · {u.totalXP} XP · {roleLabel(u.role, t)}</span>
                                 {u.isBanned && <em className="admin-banned-tag">{t('admin.bannedTag')}</em>}
                             </button>
                         ))}
@@ -253,15 +321,81 @@ export default function AdminPage() {
                             <>
                                 <h2>{detail.username}</h2>
                                 <p className="admin-meta">
-                                    {detail.email} · {detail.role} · ID {detail.id}
+                                    {detail.email} · {roleLabel(detail.role, t)} · ID {detail.id}
                                 </p>
-                                {targetIsAdmin && (
-                                    <p className="admin-protected">{t('admin.adminProtected')}</p>
+                                {!canManageTarget && (
+                                    <p className="admin-protected">
+                                        {targetIsSuper ? t('admin.superProtected') : t('admin.adminProtected')}
+                                    </p>
                                 )}
                                 {detail.isBanned && detail.bannedUntil && (
                                     <p className="admin-banned-until">
                                         {t('admin.bannedUntil')}: {new Date(detail.bannedUntil).toLocaleString()}
                                     </p>
+                                )}
+
+                                {isSuper && (
+                                    <section className="admin-section">
+                                        <h3><Crown className="w-4 h-4" /> {t('admin.secretsSection')}</h3>
+                                        <div className="admin-secrets">
+                                            <p><strong>{t('admin.secretEmail')}:</strong> {detail.email}</p>
+                                            <p><strong>{t('admin.secretCreated')}:</strong> {new Date(detail.createdAt).toLocaleString()}</p>
+                                            <p><strong>{t('admin.secretBio')}:</strong> {detail.bio?.trim() || t('admin.secretEmpty')}</p>
+                                            <p><strong>{t('admin.secretDigest')}:</strong> {detail.dailyDigestEnabled ? t('admin.yes') : t('admin.no')}</p>
+                                            <p className="admin-password-row">
+                                                <strong>{t('admin.secretPassword')}:</strong>{' '}
+                                                {detail.passwordAvailable && detail.password ? (
+                                                    <>
+                                                        <code>{showPassword ? detail.password : '••••••••'}</code>
+                                                        <button
+                                                            type="button"
+                                                            className="admin-revoke-btn"
+                                                            onClick={() => setShowPassword(v => !v)}
+                                                        >
+                                                            {showPassword
+                                                                ? <><EyeOff className="w-3.5 h-3.5 inline" /> {t('admin.hidePassword')}</>
+                                                                : <><Eye className="w-3.5 h-3.5 inline" /> {t('admin.showPassword')}</>}
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <span className="admin-hint">{t('admin.passwordUnavailable')}</span>
+                                                )}
+                                            </p>
+                                        </div>
+                                        {!targetIsSuper && (
+                                            <div className="admin-inline" style={{ marginTop: '0.75rem' }}>
+                                                <input
+                                                    type="text"
+                                                    value={passwordInput}
+                                                    onChange={e => setPasswordInput(e.target.value)}
+                                                    placeholder={t('admin.newPasswordPlaceholder')}
+                                                    autoComplete="off"
+                                                />
+                                                <button type="button" className="btn btn-secondary" onClick={() => void onSetPassword()}>
+                                                    <KeyRound className="w-4 h-4 inline mr-1" />
+                                                    {t('admin.setPassword')}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </section>
+                                )}
+
+                                {isSuper && !targetIsSuper && (
+                                    <section className="admin-section">
+                                        <h3><Crown className="w-4 h-4" /> {t('admin.roleSection')}</h3>
+                                        <p className="admin-hint">{t('admin.roleHint')}</p>
+                                        <div className="admin-inline">
+                                            {detail.role === 'User' ? (
+                                                <button type="button" className="btn btn-primary" onClick={() => void onPromote()}>
+                                                    {t('admin.grantAdmin')}
+                                                </button>
+                                            ) : detail.role === 'Admin' ? (
+                                                <button type="button" className="btn btn-secondary" onClick={() => void onDemote()}>
+                                                    {t('admin.revokeAdmin')}
+                                                </button>
+                                            ) : null}
+                                        </div>
+                                    </section>
                                 )}
 
                                 <section className="admin-section">
@@ -272,13 +406,13 @@ export default function AdminPage() {
                                             min={0}
                                             value={xpInput}
                                             onChange={e => setXpInput(e.target.value)}
-                                            disabled={targetIsAdmin}
+                                            disabled={!canManageTarget}
                                         />
                                         <button
                                             type="button"
                                             className="btn btn-primary"
                                             onClick={() => void onSetXp()}
-                                            disabled={targetIsAdmin}
+                                            disabled={!canManageTarget}
                                         >
                                             {t('admin.saveXp')}
                                         </button>
@@ -363,8 +497,10 @@ export default function AdminPage() {
 
                                 <section className="admin-section">
                                     <h3><Ban className="w-4 h-4" /> {t('admin.banSection')}</h3>
-                                    {targetIsAdmin ? (
-                                        <p className="admin-hint">{t('admin.cannotBanAdmin')}</p>
+                                    {!canManageTarget ? (
+                                        <p className="admin-hint">
+                                            {targetIsSuper ? t('admin.cannotBanSuper') : t('admin.cannotBanAdmin')}
+                                        </p>
                                     ) : (
                                         <div className="admin-inline">
                                             <select
@@ -393,8 +529,10 @@ export default function AdminPage() {
 
                                 <section className="admin-section admin-danger">
                                     <h3><Trash2 className="w-4 h-4" /> {t('admin.deleteSection')}</h3>
-                                    {targetIsAdmin ? (
-                                        <p className="admin-hint">{t('admin.cannotDeleteAdmin')}</p>
+                                    {!canManageTarget ? (
+                                        <p className="admin-hint">
+                                            {targetIsSuper ? t('admin.cannotDeleteSuper') : t('admin.cannotDeleteAdmin')}
+                                        </p>
                                     ) : (
                                         <>
                                             <p className="admin-hint">{t('admin.deleteHint')}</p>

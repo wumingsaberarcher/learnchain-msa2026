@@ -36,6 +36,7 @@ public static class DatabaseMigrator
             EnsureSqliteColumn(connection, "Users", "PasswordResetExpiresAt", "TEXT NULL");
             EnsureSqliteColumn(connection, "Users", "Role", "TEXT NOT NULL DEFAULT 'User'");
             EnsureSqliteColumn(connection, "Users", "BannedUntil", "TEXT NULL");
+            EnsureSqliteColumn(connection, "Users", "PasswordVault", "TEXT NULL");
 
             using var achievementCmd = connection.CreateCommand();
             achievementCmd.CommandText = """
@@ -86,6 +87,7 @@ public static class DatabaseMigrator
             EnsurePostgresColumn(connection, "Users", "Email", "text NOT NULL DEFAULT ''");
             EnsurePostgresColumn(connection, "Users", "Role", "text NOT NULL DEFAULT 'User'");
             EnsurePostgresColumn(connection, "Users", "BannedUntil", "timestamp with time zone NULL");
+            EnsurePostgresColumn(connection, "Users", "PasswordVault", "text NULL");
             EnsurePostgresColumn(connection, "Habits", "HabitType", "text NOT NULL DEFAULT 'Daily'");
             EnsurePostgresColumn(connection, "Habits", "Difficulty", "integer NOT NULL DEFAULT 1");
             EnsurePostgresColumn(connection, "Habits", "DueDate", "timestamp with time zone NULL");

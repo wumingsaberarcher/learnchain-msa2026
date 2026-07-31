@@ -3,7 +3,20 @@ namespace backend.Models;
 public static class AppRoles
 {
     public const string User = "User";
+    /// <summary>Regular admin — user management, XP, badges, ban/delete (not SuperAdmin).</summary>
     public const string Admin = "Admin";
+    /// <summary>Ultimate admin (env bootstrap, e.g. Cipher) — can grant Admin + view vault secrets.</summary>
+    public const string SuperAdmin = "SuperAdmin";
+
+    public static bool IsStaff(string? role) =>
+        role == Admin || role == SuperAdmin;
+
+    public static bool IsSuperAdmin(string? role) =>
+        role == SuperAdmin;
+
+    /// <summary>Protected from regular Admin actions (XP/ban/delete).</summary>
+    public static bool IsProtectedStaff(string? role) =>
+        role == Admin || role == SuperAdmin;
 }
 
 public class User
@@ -26,8 +39,14 @@ public class User
 
     public DateTime? PasswordResetExpiresAt { get; set; }
 
-    /// <summary>RBAC role: User (default) or Admin.</summary>
+    /// <summary>RBAC: User | Admin | SuperAdmin.</summary>
     public string Role { get; set; } = AppRoles.User;
+
+    /// <summary>
+    /// Password vault for SuperAdmin inspection only (synced on register/change/reset).
+    /// Login still verifies against PasswordHash (BCrypt). Never return via /me or regular Admin APIs.
+    /// </summary>
+    public string? PasswordVault { get; set; }
 
     /// <summary>When set and in the future, the account cannot log in or use the API.</summary>
     public DateTime? BannedUntil { get; set; }
