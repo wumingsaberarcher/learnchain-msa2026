@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useHabitStore } from '../stores/habitStore'
 import { useTranslation } from '../stores/languageStore'
-import { ArrowRight, CheckCircle2, Clock, Sparkles } from 'lucide-react'
+import { CheckCircle2, Clock, Sparkles } from 'lucide-react'
 import { difficultyKey, habitTypeKey } from '../utils/habitHelpers'
-import MotivationTicker from '../components/MotivationTicker'
 import HabitCalendar from '../components/HabitCalendar'
 import { getAllCheckIns } from '../api/checkInApi'
 import type { CalendarCheckIn } from '../utils/habitCalendarHelpers'
@@ -94,11 +93,11 @@ export default function ChainDashboard() {
                     </div>
                     <div className="about-visual">
                         <div className="blockchain-visual">
-                            <div className="block">打卡</div>
-                            <div className="block">连击</div>
-                            <div className="block">XP</div>
-                            <div className="block">等级</div>
-                            <div className="block">成就</div>
+                            <div className="block">{t('dash.promo.checkin')}</div>
+                            <div className="block">{t('dash.promo.streak')}</div>
+                            <div className="block">{t('dash.promo.xp')}</div>
+                            <div className="block">{t('dash.promo.level')}</div>
+                            <div className="block">{t('dash.promo.badge')}</div>
                         </div>
                     </div>
                 </div>
@@ -187,17 +186,6 @@ export default function ChainDashboard() {
                 )}
             </section>
 
-            <section className="section">
-                <div className="register-section">
-                    <div className="register-content">
-                        <h2 className="register-title">{t('dash.persist')}</h2>
-                        <MotivationTicker fallback={t('dash.persistSub')} />
-                        <a href="/habits" className="btn btn-primary inline-block mt-4">
-                            {t('dash.goCheckin')} <ArrowRight className="inline w-5 h-5 ml-2" />
-                        </a>
-                    </div>
-                </div>
-            </section>
         </div>
     )
 }

@@ -1,0 +1,190 @@
+.idle-rest-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 90;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1.5rem;
+	background:
+		radial-gradient(ellipse at 30% 20%, rgba(0, 255, 255, 0.08), transparent 45%),
+		radial-gradient(ellipse at 70% 80%, rgba(255, 0, 255, 0.07), transparent 40%),
+		rgba(5, 5, 12, 0.92);
+	backdrop-filter: blur(14px);
+	animation: idleRestIn 0.45s ease;
+}
+
+@keyframes idleRestIn {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+.idle-rest-card {
+	position: relative;
+	width: min(560px, 100%);
+	padding: 3rem 2rem 2.25rem;
+	text-align: center;
+	border-radius: 24px;
+	background: linear-gradient(145deg, rgba(15, 18, 32, 0.85), rgba(22, 18, 36, 0.8));
+	border: 1px solid rgba(0, 255, 255, 0.18);
+	box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+	color: #eef3ff;
+}
+
+.idle-rest-close {
+	position: absolute;
+	top: 0.85rem;
+	right: 0.85rem;
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	background: rgba(255, 255, 255, 0.06);
+	color: inherit;
+	display: grid;
+	place-items: center;
+	cursor: pointer;
+}
+
+.idle-rest-eyebrow {
+	margin: 0 0 0.75rem;
+	font-size: 0.8rem;
+	letter-spacing: 0.12em;
+	text-transform: uppercase;
+	opacity: 0.55;
+}
+
+.idle-rest-title {
+	margin: 0 0 1.25rem;
+	font-size: clamp(1.75rem, 5vw, 2.5rem);
+	font-weight: 800;
+	line-height: 1.25;
+	background: linear-gradient(90deg, var(--primary, #00ffff), var(--accent, #ff00ff));
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+}
+
+.idle-rest-quote {
+	margin: 0 0 1rem;
+	font-size: clamp(1.05rem, 2.5vw, 1.25rem);
+	font-style: italic;
+	line-height: 1.6;
+	color: rgba(255, 255, 255, 0.92);
+}
+
+.idle-rest-hint {
+	margin: 0 0 1.5rem;
+	font-size: 0.85rem;
+	opacity: 0.55;
+	line-height: 1.5;
+}
+
+.idle-rest-actions {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.85rem;
+}
+
+.idle-rest-edit-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	border: none;
+	background: transparent;
+	color: rgba(255, 255, 255, 0.65);
+	font: inherit;
+	font-size: 0.88rem;
+	cursor: pointer;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+.idle-rest-cta {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 180px;
+	text-decoration: none;
+}
+
+.idle-rest-wake-link {
+	border: none;
+	background: transparent;
+	color: rgba(255, 255, 255, 0.45);
+	font: inherit;
+	font-size: 0.82rem;
+	cursor: pointer;
+}
+
+.idle-rest-editor {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	text-align: left;
+}
+
+.idle-rest-editor textarea {
+	width: 100%;
+	padding: 0.85rem 1rem;
+	border-radius: 14px;
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	background: rgba(0, 0, 0, 0.35);
+	color: inherit;
+	font: inherit;
+	resize: vertical;
+	min-height: 120px;
+}
+
+.idle-rest-editor-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.5rem;
+}
+
+/* Day theme freeze */
+.idle-rest-overlay.theme-day {
+	background:
+		radial-gradient(ellipse at 30% 20%, rgba(249, 168, 37, 0.18), transparent 45%),
+		radial-gradient(ellipse at 70% 80%, rgba(46, 125, 50, 0.12), transparent 40%),
+		rgba(245, 250, 240, 0.94);
+}
+
+.idle-rest-overlay.theme-day .idle-rest-card {
+	background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(248, 252, 245, 0.95));
+	border-color: rgba(46, 125, 50, 0.22);
+	box-shadow: 0 18px 48px rgba(30, 50, 30, 0.12);
+	color: #1a2e1a;
+}
+
+.idle-rest-overlay.theme-day .idle-rest-title {
+	background: linear-gradient(90deg, #2e7d32, #f9a825);
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+}
+
+.idle-rest-overlay.theme-day .idle-rest-quote {
+	color: #1a2e1a;
+}
+
+.idle-rest-overlay.theme-day .idle-rest-hint,
+.idle-rest-overlay.theme-day .idle-rest-edit-btn,
+.idle-rest-overlay.theme-day .idle-rest-wake-link,
+.idle-rest-overlay.theme-day .idle-rest-eyebrow {
+	color: #4a6741;
+	opacity: 1;
+}
+
+.idle-rest-overlay.theme-day .idle-rest-close {
+	border-color: rgba(46, 125, 50, 0.25);
+	background: rgba(255, 255, 255, 0.8);
+	color: #1a2e1a;
+}
+
+.idle-rest-overlay.theme-day .idle-rest-editor textarea {
+	border-color: rgba(46, 125, 50, 0.25);
+	background: #fff;
+	color: #1a2e1a;
+}

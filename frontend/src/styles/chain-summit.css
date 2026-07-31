@@ -1355,6 +1355,34 @@ nav {
 	color: var(--primary);
 }
 
+/* Theme + Locale floating FAB (bottom-left, mirrors AI fab) */
+.theme-locale-fab {
+	position: fixed;
+	left: 1.25rem;
+	bottom: 1.25rem;
+	z-index: 80;
+}
+
+.theme-locale-fab .theme-locale-toggle {
+	width: 64px;
+	height: 64px;
+	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+	backdrop-filter: blur(10px);
+}
+
+@media (max-width: 480px) {
+	.theme-locale-fab {
+		left: 0.75rem;
+		bottom: 0.75rem;
+	}
+
+	.theme-locale-fab .theme-locale-toggle {
+		width: 56px;
+		height: 56px;
+		border-radius: 12px;
+	}
+}
+
 /* Theme + Locale 4-corner toggle */
 .theme-locale-toggle {
 	position: relative;
@@ -2167,6 +2195,21 @@ nav {
 	animation-delay: -2s;
 }
 
+.app-shell.theme-day .blockchain-visual::before {
+	border-color: rgba(46, 125, 50, 0.35);
+}
+
+.app-shell.theme-day .block {
+	background: linear-gradient(135deg, #2e7d32, #f9a825);
+	color: #fff;
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+	animation-name: hexPulseDay;
+}
+
+.app-shell.theme-day .block::before {
+	background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+}
+
 @keyframes hexPulse {
 
 	0%,
@@ -2178,6 +2221,19 @@ nav {
 	50% {
 		transform: scale(1.1) rotate(180deg);
 		box-shadow: 0 0 40px rgba(255, 0, 255, 0.6);
+	}
+}
+
+@keyframes hexPulseDay {
+	0%,
+	100% {
+		transform: scale(1) rotate(0deg);
+		box-shadow: 0 0 18px rgba(46, 125, 50, 0.35);
+	}
+
+	50% {
+		transform: scale(1.1) rotate(180deg);
+		box-shadow: 0 0 32px rgba(249, 168, 37, 0.5);
 	}
 }
 

@@ -78,6 +78,11 @@ const zh = {
     'dash.done': '已完成',
     'dash.persist': '坚持就是胜利',
     'dash.persistSub': '每一次打卡，都是在为更好的自己投资。',
+    'dash.promo.checkin': '打卡',
+    'dash.promo.streak': '连击',
+    'dash.promo.xp': 'XP',
+    'dash.promo.level': '等级',
+    'dash.promo.badge': '成就',
     'dash.difficulty': '难度',
     'dash.streakDays': '天连击',
 
@@ -231,6 +236,19 @@ const zh = {
     'motivation.default1': '今天的努力，是明天的底气。',
     'motivation.default2': '小步前进，也是向前。',
     'motivation.default3': '你比昨天更强大了。',
+
+    // Idle rest screen
+    'rest.title': '歇息片刻',
+    'rest.eyebrow': '休息一下',
+    'rest.editHint': '可编辑自己的标语；内置几句会与你的自定义一起轮换出现。',
+    'rest.edit': '编辑我的标语',
+    'rest.editLabel': '自定义标语',
+    'rest.editPlaceholder': '每行一句标语…',
+    'rest.save': '保存',
+    'rest.cancel': '取消',
+    'rest.wake': '继续浏览',
+    'rest.builtin1': '休息是为了走更长的路。',
+    'rest.builtin2': '慢一点没关系，别停下来。',
 
     // Badges
     'badge.unlocked': '成就解锁！',
@@ -429,6 +447,11 @@ const en: Record<keyof typeof zh, string> = {
     'dash.done': 'Done',
     'dash.persist': 'Persistence Wins',
     'dash.persistSub': 'Every check-in is an investment in a better you.',
+    'dash.promo.checkin': 'Check',
+    'dash.promo.streak': 'Streak',
+    'dash.promo.xp': 'XP',
+    'dash.promo.level': 'Level',
+    'dash.promo.badge': 'Badge',
     'dash.difficulty': 'difficulty',
     'dash.streakDays': 'day streak',
 
@@ -576,6 +599,18 @@ const en: Record<keyof typeof zh, string> = {
     'motivation.default1': 'Today\'s effort is tomorrow\'s strength.',
     'motivation.default2': 'Small steps still move you forward.',
     'motivation.default3': 'You are stronger than yesterday.',
+
+    'rest.title': 'Take a breath',
+    'rest.eyebrow': 'Idle pause',
+    'rest.editHint': 'You can edit your own slogans; built-in lines rotate with your custom ones.',
+    'rest.edit': 'Edit my slogans',
+    'rest.editLabel': 'Custom slogans',
+    'rest.editPlaceholder': 'One slogan per line…',
+    'rest.save': 'Save',
+    'rest.cancel': 'Cancel',
+    'rest.wake': 'Keep browsing',
+    'rest.builtin1': 'Rest is part of the journey.',
+    'rest.builtin2': 'Slow is fine — just don\'t stop.',
 
     'badge.unlocked': 'Achievement Unlocked!',
     'badge.awesome': 'Awesome!',

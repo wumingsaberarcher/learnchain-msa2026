@@ -12,8 +12,10 @@ import ThemeLocaleToggle from './components/ThemeLocaleToggle'
 import UserProfileMenu from './components/UserProfileMenu'
 import BadgeUnlockModal from './components/BadgeUnlockModal'
 import AiAssistant from './components/ai/AiAssistant'
+import IdleRestOverlay from './components/IdleRestOverlay'
 import { useHabitStore } from './stores/habitStore'
 import { useAchievementStore } from './stores/achievementStore'
+import { useIdleRestStore } from './stores/idleRestStore'
 import { useTranslation } from './stores/settingsStore'
 
 function App() {
@@ -21,6 +23,7 @@ function App() {
     const { isLoggedIn, currentUser } = useHabitStore()
     const { fetchProfile, syncAchievements } = useAchievementStore()
     const { t, theme } = useTranslation()
+    const isResting = useIdleRestStore(s => s.isResting)
 
     useEffect(() => {
         if (isLoggedIn) {
@@ -72,8 +75,6 @@ function App() {
                                 )}
                             </ul>
 
-                            <ThemeLocaleToggle />
-
                             <div className="nav-auth">
                                 {isLoggedIn && currentUser ? (
                                     <UserProfileMenu />
@@ -102,7 +103,13 @@ function App() {
                 </main>
 
                 <BadgeUnlockModal />
-                <AiAssistant />
+                {!isResting && (
+                    <div className="theme-locale-fab">
+                        <ThemeLocaleToggle />
+                    </div>
+                )}
+                {!isResting && <AiAssistant />}
+                <IdleRestOverlay pauseIdle={isLoginModalOpen} />
 
                 <LoginModal
                     isOpen={isLoginModalOpen}
