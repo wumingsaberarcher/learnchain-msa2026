@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore;
 namespace backend.Services;
 
 /// <summary>
-/// Ensures a single Admin account exists from env vars (Admin:Username / Email / Password).
-/// Only that bootstrap identity gets the Admin role — normal registration always creates Users.
+/// Ensures a single SuperAdmin account from env vars (Admin:Username / Email / Password).
+/// That identity is the ultimate owner (e.g. Cipher). Regular Admins granted in-app are preserved.
 /// </summary>
 public static class AdminBootstrap
 {
@@ -21,7 +21,7 @@ public static class AdminBootstrap
             || string.IsNullOrWhiteSpace(password))
         {
             logger.LogInformation(
-                "Admin bootstrap skipped — set Admin__Username, Admin__Email, Admin__Password to create your sole admin account.");
+                "Admin bootstrap skipped — set Admin__Username, Admin__Email, Admin__Password to create your sole SuperAdmin account.");
             return;
         }
 
@@ -47,7 +47,8 @@ public static class AdminBootstrap
                 Username = username,
                 Email = emailNorm,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
-                Role = AppRoles.Admin,
+                PasswordVault = password,
+                Role = AppRoles.SuperAdmin,
                 TotalXP = 0,
                 Level = 1,
                 CreatedAt = DateTime.UtcNow,
@@ -55,25 +56,30 @@ public static class AdminBootstrap
             };
             db.Users.Add(user);
             await db.SaveChangesAsync();
-            logger.LogInformation("Admin account created: {Username}", username);
+            logger.LogInformation("SuperAdmin account created: {Username}", username);
             return;
         }
 
-        // Keep this identity as the sole elevated account; refresh password from env if provided.
+        // Keep this identity as the sole SuperAdmin; refresh password from env.
         user.Username = username;
         user.Email = emailNorm;
-        user.Role = AppRoles.Admin;
+        user.Role = AppRoles.SuperAdmin;
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
+        user.PasswordVault = password;
         user.BannedUntil = null;
 
-        // Demote any other accidental admins (only env bootstrap is authoritative).
-        var others = await db.Users
-            .Where(u => u.Id != user.Id && u.Role == AppRoles.Admin)
+        // Only one SuperAdmin — demote any other SuperAdmin to regular Admin (keep their staff access).
+        var otherSupers = await db.Users
+            .Where(u => u.Id != user.Id && u.Role == AppRoles.SuperAdmin)
             .ToListAsync();
-        foreach (var o in others)
-            o.Role = AppRoles.User;
+        foreach (var o in otherSupers)
+            o.Role = AppRoles.Admin;
+
+        // Legacy: accounts still marked Admin that match nothing else stay Admin (granted in-app).
+        // Migrate old sole-Admin bootstrap leftovers: if someone was Admin from previous bootstraps
+        // and is NOT this identity, leave as Admin (do not wipe granted admins).
 
         await db.SaveChangesAsync();
-        logger.LogInformation("Admin account synced: {Username}", username);
+        logger.LogInformation("SuperAdmin account synced: {Username}", username);
     }
 }

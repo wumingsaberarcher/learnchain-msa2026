@@ -17,6 +17,7 @@ import { useHabitStore } from './stores/habitStore'
 import { useAchievementStore } from './stores/achievementStore'
 import { useIdleRestStore } from './stores/idleRestStore'
 import { useTranslation } from './stores/settingsStore'
+import { isStaffRole } from './api/adminApi'
 
 function App() {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
@@ -63,7 +64,7 @@ function App() {
                                         {t('nav.habits')}
                                     </NavLink>
                                 </li>
-                                {isLoggedIn && currentUser?.role === 'Admin' && (
+                                {isLoggedIn && isStaffRole(currentUser?.role) && (
                                     <li>
                                         <NavLink
                                             to="/admin"

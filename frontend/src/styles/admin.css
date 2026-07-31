@@ -351,6 +351,31 @@
 	background: rgba(239, 68, 68, 0.3) !important;
 }
 
+.admin-secrets {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	font-size: 0.9rem;
+}
+
+.admin-secrets p {
+	margin: 0;
+}
+
+.admin-password-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.admin-password-row code {
+	padding: 0.15rem 0.45rem;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.08);
+	font-size: 0.85rem;
+}
+
 /* Day theme — high-contrast light surfaces (data-theme is day|night) */
 [data-theme='day'] .admin-page,
 .app-shell.theme-day .admin-page {
@@ -488,4 +513,34 @@
 	color: #991b1b !important;
 	background: rgba(239, 68, 68, 0.12) !important;
 	border-color: rgba(185, 28, 28, 0.35) !important;
+}
+
+.admin-secrets {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	font-size: 0.9rem;
+}
+
+.admin-secrets p {
+	margin: 0;
+}
+
+.admin-password-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.admin-password-row code {
+	padding: 0.15rem 0.45rem;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.08);
+	font-size: 0.85rem;
+}
+
+[data-theme='day'] .admin-password-row code,
+.app-shell.theme-day .admin-password-row code {
+	background: rgba(46, 125, 50, 0.08);
 }

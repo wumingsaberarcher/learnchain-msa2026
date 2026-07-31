@@ -8,6 +8,18 @@ function authHeaders(json = false): HeadersInit {
     return headers
 }
 
+export function isStaffRole(role?: string | null) {
+    return role === 'Admin' || role === 'SuperAdmin'
+}
+
+export function isSuperAdminRole(role?: string | null) {
+    return role === 'SuperAdmin'
+}
+
+export function isProtectedStaffRole(role?: string | null) {
+    return role === 'Admin' || role === 'SuperAdmin'
+}
+
 export interface AdminUserSummary {
     id: number
     username: string
@@ -25,6 +37,12 @@ export interface AdminUserSummary {
 export interface AdminUserDetail extends Omit<AdminUserSummary, 'habitCount' | 'badgeCount'> {
     bio?: string
     achievements: { badgeId: string; unlocked: boolean; unlockedAt?: string | null }[]
+    /** SuperAdmin-only fields */
+    dailyDigestEnabled?: boolean
+    password?: string | null
+    passwordAvailable?: boolean
+    hasPendingReset?: boolean
+    viewerIsSuperAdmin?: boolean
 }
 
 async function readError(res: Response) {
@@ -81,7 +99,6 @@ export async function revokeBadge(id: number, badgeId: string) {
     return res.json()
 }
 
-/** Ban for a duration in hours (1–720 / max 30 days). */
 export async function banUser(id: number, hours: number) {
     const res = await fetch(`${API_BASE}/admin/users/${id}/ban`, {
         method: 'POST',
@@ -108,6 +125,28 @@ export async function deleteUser(id: number) {
     })
     if (!res.ok) throw new Error(await readError(res))
     return res.json()
+}
+
+/** SuperAdmin: set role to Admin or User. */
+export async function setUserRole(id: number, role: 'Admin' | 'User') {
+    const res = await fetch(`${API_BASE}/admin/users/${id}/role`, {
+        method: 'PUT',
+        headers: authHeaders(true),
+        body: JSON.stringify({ role }),
+    })
+    if (!res.ok) throw new Error(await readError(res))
+    return res.json()
+}
+
+/** SuperAdmin: set password and receive it back once. */
+export async function setUserPassword(id: number, password: string) {
+    const res = await fetch(`${API_BASE}/admin/users/${id}/password`, {
+        method: 'PUT',
+        headers: authHeaders(true),
+        body: JSON.stringify({ password }),
+    })
+    if (!res.ok) throw new Error(await readError(res))
+    return res.json() as Promise<{ message: string; password: string }>
 }
 
 export async function listBadgeIds(): Promise<string[]> {

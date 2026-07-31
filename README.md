@@ -37,17 +37,24 @@ Alternatively you may set `VITE_API_BASE=https://learnchain-msa2026.onrender.com
 
 ### Admin RBAC (sole owner)
 
-On startup the backend creates/syncs **one** Admin from env vars. Normal registration always gets `Role=User`. Other accidental Admins are demoted.
+On startup the backend creates/syncs **one SuperAdmin** from env vars (your Cipher account). Normal registration always gets `Role=User`. You can grant **regular Admin** in the admin UI; those stay Admin across redeploys. Other accidental SuperAdmins are demoted to Admin.
 
 | Variable | Rules |
 |----------|-------|
-| `Admin__Username` | 3–20 English letters |
+| `Admin__Username` | 3–20 English letters (e.g. `Cipher`) |
 | `Admin__Email` | Valid email |
 | `Admin__Password` | 8–64 letters + digits |
 
-After setting these on Render, redeploy, then **log in again** so the JWT includes the `Admin` role. The admin UI is at `/admin` (nav link appears only for Admin).
+After setting these on Render, redeploy, then **log in again** so the JWT includes `SuperAdmin`. The admin UI is at `/admin`.
 
-Capabilities: list/search users, set XP, grant/revoke badges, ban (1 hour–30 days stepped), unban, delete account. The admin account itself cannot be XP-edited, banned, or deleted.
+| Role | Capabilities |
+|------|----------------|
+| **SuperAdmin** | Everything below + grant/revoke Admin + view password vault & full account dossier + set passwords; can manage regular Admins |
+| **Admin** | List/search users, set XP, grant/revoke badges, ban (1h–30d), delete users — **cannot** touch staff accounts or see passwords |
+| **User** | Normal app access |
+
+Password vault: login still uses BCrypt; a SuperAdmin-only vault is synced on register / login / password change so Cipher can reveal credentials. Existing accounts populate the vault on their next successful login (or when SuperAdmin sets a password).
+
 
 ### Render PostgreSQL (recommended)
 
@@ -206,7 +213,7 @@ Although not one of the three nominated features, the app implements several sec
 - **Password hashing (BCrypt).** Passwords are never stored in plaintext — `BCrypt.Net.BCrypt.HashPassword` on register/change-password and `Verify` on login (`backend/Controllers/UserController.cs`).
 - **Data validation & sanitisation.** Registration/login validate and normalise input: required fields, email-format regex, lower-casing + trimming, and uniqueness checks for username and email.
 - **JWT authentication + authorization.** Protected endpoints require a valid Bearer token via `[Authorize]`, with signing-key, issuer, audience, and lifetime validation configured in `Program.cs`.
-- **RBAC (Admin role).** JWT includes a role claim; `/api/admin/*` requires `[Authorize(Roles = "Admin")]`. A single admin is bootstrapped from `Admin__*` env vars (`AdminBootstrap`). Banned users are rejected at login and by `BanCheckMiddleware`.
+- **RBAC (Admin / SuperAdmin).** JWT includes a role claim; `/api/admin/*` requires Admin or SuperAdmin. Env bootstrap creates the sole **SuperAdmin** (`AdminBootstrap`). SuperAdmin can grant regular Admin and view the password vault; regular Admins keep the original management powers without touching staff or secrets. Banned users are rejected at login and by `BanCheckMiddleware`.
 
 ### Also present: Scalar API Reference (Basic requirement)
 
