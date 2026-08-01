@@ -170,7 +170,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const nextMessages = [...get().messages, userMsg]
         set({ messages: nextMessages, isSending: true, error: null, lastActions: [] })
         saveLocalMessages(get().userId, nextMessages)
-        useCompanionStore.getState().setEmotion('normal', true)
+        if (!useCompanionStore.getState().galModeOpen) {
+            useCompanionStore.getState().setEmotion('normal', true)
+        }
 
         const payload: ChatMessagePayload[] = [{ role: 'user', content: trimmed }]
 
@@ -195,18 +197,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 lastActions: res.actionsExecuted,
             })
             saveLocalMessages(get().userId, withAssistant)
-            useCompanionStore.getState().reactToText(res.reply, true)
-            window.setTimeout(() => {
-                useCompanionStore.getState().setEmotion(
-                    useCompanionStore.getState().emotion,
-                    false,
-                )
-            }, 2200)
+            // Gal mode drives face via emotion timeline typewriter — skip one-shot react
+            if (!useCompanionStore.getState().galModeOpen) {
+                useCompanionStore.getState().reactToText(res.reply, true)
+                window.setTimeout(() => {
+                    useCompanionStore.getState().setEmotion(
+                        useCompanionStore.getState().emotion,
+                        false,
+                    )
+                }, 2200)
+            }
             return res.actionsExecuted
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Chat failed'
             set({ isSending: false, error: message })
-            useCompanionStore.getState().setEmotion('sorrow', false)
+            if (!useCompanionStore.getState().galModeOpen) {
+                useCompanionStore.getState().setEmotion('sorrow', false)
+            }
             return []
         }
     },

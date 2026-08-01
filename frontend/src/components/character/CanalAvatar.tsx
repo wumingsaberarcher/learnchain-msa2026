@@ -1,3 +1,4 @@
+import type { MouseEvent } from 'react'
 import Character from './Character'
 import type { Emotion } from './emotionAssets'
 import './CanalAvatar.css'
@@ -9,6 +10,9 @@ interface CanalAvatarProps {
   size?: 'sm' | 'md' | 'lg' | 'fab'
   className?: string
   title?: string
+  interactive?: boolean
+  onMouseEnter?: (e: MouseEvent<HTMLElement>) => void
+  onClick?: (e: MouseEvent<HTMLElement>) => void
 }
 
 /**
@@ -21,16 +25,42 @@ export default function CanalAvatar({
   size = 'md',
   className = '',
   title = 'Canal',
+  interactive = false,
+  onMouseEnter,
+  onClick,
 }: CanalAvatarProps) {
+  const clickable = interactive || !!onClick
+  const classNames = `canal-avatar canal-avatar-${size} ${clickable ? 'canal-avatar-interactive' : ''} ${className}`.trim()
+
+  const stage = (
+    <div className="canal-avatar-stage">
+      <Character emotion={emotion} isTalking={isTalking} animate={false} />
+    </div>
+  )
+
+  if (clickable) {
+    return (
+      <button
+        type="button"
+        className={classNames}
+        title={title}
+        aria-label={title}
+        onMouseEnter={onMouseEnter}
+        onClick={onClick}
+      >
+        {stage}
+      </button>
+    )
+  }
+
   return (
     <div
-      className={`canal-avatar canal-avatar-${size} ${className}`.trim()}
+      className={classNames}
       title={title}
       aria-label={title}
+      onMouseEnter={onMouseEnter}
     >
-      <div className="canal-avatar-stage">
-        <Character emotion={emotion} isTalking={isTalking} animate={false} />
-      </div>
+      {stage}
     </div>
   )
 }

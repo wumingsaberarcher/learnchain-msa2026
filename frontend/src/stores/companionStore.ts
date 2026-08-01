@@ -3,7 +3,26 @@ import type { Emotion } from '../components/character/emotionAssets'
 import { inferEmotionFromText } from '../companions/companionLines'
 
 const AVATAR_KEY = 'learnchain-user-avatar-v1'
+const HOVER_KEY = 'learnchain-canal-hover-surprised-v1'
+const ENTERED_GAL_KEY = 'learnchain-canal-entered-gal-v1'
 const MAX_AVATAR_BYTES = 450_000
+
+function loadFlag(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === '1'
+  } catch {
+    return false
+  }
+}
+
+function saveFlag(key: string, value: boolean) {
+  try {
+    if (value) localStorage.setItem(key, '1')
+    else localStorage.removeItem(key)
+  } catch {
+    /* ignore */
+  }
+}
 
 function loadAvatar(): string | null {
   try {
@@ -52,22 +71,68 @@ interface CompanionState {
   emotion: Emotion
   isTalking: boolean
   userAvatarUrl: string | null
+  hasAvatarHoverSurprised: boolean
+  hasEnteredGalMode: boolean
+  galModeOpen: boolean
+  /** True while smoke burst plays on enter */
+  galSmokePlaying: boolean
   setEmotion: (emotion: Emotion, talking?: boolean) => void
   reactToText: (text: string, talking?: boolean) => void
+  tryHoverSurprise: () => void
+  enterGalMode: () => void
+  exitGalMode: () => void
+  clearGalSmoke: () => void
   setUserAvatarFromFile: (file: File) => Promise<void>
   clearUserAvatar: () => void
 }
 
-export const useCompanionStore = create<CompanionState>((set) => ({
+export const useCompanionStore = create<CompanionState>((set, get) => ({
   emotion: 'normal',
   isTalking: false,
   userAvatarUrl: loadAvatar(),
+  hasAvatarHoverSurprised: loadFlag(HOVER_KEY),
+  hasEnteredGalMode: loadFlag(ENTERED_GAL_KEY),
+  galModeOpen: false,
+  galSmokePlaying: false,
 
   setEmotion: (emotion, talking = false) => set({ emotion, isTalking: talking }),
 
   reactToText: (text, talking = true) => {
     set({ emotion: inferEmotionFromText(text), isTalking: talking })
   },
+
+  tryHoverSurprise: () => {
+    const { hasAvatarHoverSurprised, hasEnteredGalMode } = get()
+    if (hasAvatarHoverSurprised || hasEnteredGalMode) return
+    saveFlag(HOVER_KEY, true)
+    set({
+      hasAvatarHoverSurprised: true,
+      emotion: 'surprise',
+      isTalking: false,
+    })
+  },
+
+  enterGalMode: () => {
+    saveFlag(ENTERED_GAL_KEY, true)
+    set({
+      hasEnteredGalMode: true,
+      galModeOpen: true,
+      galSmokePlaying: true,
+      emotion: 'normal',
+      isTalking: false,
+    })
+  },
+
+  exitGalMode: () => {
+    set({
+      galModeOpen: false,
+      galSmokePlaying: false,
+      isTalking: false,
+      emotion: 'normal',
+    })
+  },
+
+  clearGalSmoke: () => set({ galSmokePlaying: false }),
 
   setUserAvatarFromFile: async (file) => {
     if (!file.type.startsWith('image/')) throw new Error('not_image')

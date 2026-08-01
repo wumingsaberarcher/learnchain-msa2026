@@ -84,60 +84,76 @@ public class AiAssistantService
         var actions = new List<ChatActionResult>();
         string? finalReply = null;
 
-        for (var round = 0; round < MaxToolRounds; round++)
+        try
         {
-            var body = new JsonObject
+            for (var round = 0; round < MaxToolRounds; round++)
             {
-                ["model"] = model,
-                ["messages"] = messages,
-                ["tools"] = BuildToolsSchema(),
-                ["tool_choice"] = "auto",
-                ["temperature"] = 0.4
-            };
-
-            var completion = await CallChatCompletionsAsync(baseUrl, apiKey, body, ct);
-            var choice = completion["choices"]?[0]?["message"] as JsonObject
-                ?? throw new InvalidOperationException("LLM returned an empty response.");
-
-            messages.Add(SanitizeAssistantMessage(choice));
-
-            var toolCalls = choice["tool_calls"] as JsonArray;
-            if (toolCalls == null || toolCalls.Count == 0)
-            {
-                finalReply = ReadMessageContent(choice["content"])?.Trim();
-                break;
-            }
-
-            foreach (var callNode in toolCalls)
-            {
-                if (callNode is not JsonObject call) continue;
-                var id = ReadStringNode(call["id"]) ?? Guid.NewGuid().ToString("N");
-                var name = ReadStringNode(call["function"]?["name"]) ?? "";
-                var argsJson = ReadToolArguments(call["function"]?["arguments"]);
-
-                var (resultText, action) = await ExecuteToolAsync(user, name, argsJson, zh, ct);
-                if (action != null) actions.Add(action);
-
-                messages.Add(new JsonObject
+                // DeepClone messages: JsonNode can only have one parent. Reusing the same
+                // JsonArray across request bodies throws "The node already has a parent."
+                var body = new JsonObject
                 {
-                    ["role"] = "tool",
-                    ["tool_call_id"] = id,
-                    ["content"] = resultText
-                });
+                    ["model"] = model,
+                    ["messages"] = messages.DeepClone(),
+                    ["tools"] = BuildToolsSchema(),
+                    ["tool_choice"] = "auto",
+                    ["temperature"] = 0.4
+                };
+
+                var completion = await CallChatCompletionsAsync(baseUrl, apiKey, body, ct);
+                var choice = completion["choices"]?[0]?["message"] as JsonObject
+                    ?? throw new InvalidOperationException("LLM returned an empty response.");
+
+                messages.Add(SanitizeAssistantMessage(choice));
+
+                var toolCalls = choice["tool_calls"] as JsonArray;
+                if (toolCalls == null || toolCalls.Count == 0)
+                {
+                    finalReply = ReadMessageContent(choice["content"])?.Trim();
+                    break;
+                }
+
+                foreach (var callNode in toolCalls)
+                {
+                    if (callNode is not JsonObject call) continue;
+                    var id = ReadStringNode(call["id"]) ?? Guid.NewGuid().ToString("N");
+                    var name = ReadStringNode(call["function"]?["name"]) ?? "";
+                    var argsJson = ReadToolArguments(call["function"]?["arguments"]);
+
+                    var (resultText, action) = await ExecuteToolAsync(user, name, argsJson, zh, ct);
+                    if (action != null) actions.Add(action);
+
+                    messages.Add(new JsonObject
+                    {
+                        ["role"] = "tool",
+                        ["tool_call_id"] = id,
+                        ["content"] = resultText
+                    });
+                }
             }
+
+            if (string.IsNullOrWhiteSpace(finalReply))
+            {
+                var body = new JsonObject
+                {
+                    ["model"] = model,
+                    ["messages"] = messages.DeepClone(),
+                    ["temperature"] = 0.4
+                };
+                var completion = await CallChatCompletionsAsync(baseUrl, apiKey, body, ct);
+                finalReply = ReadMessageContent(completion["choices"]?[0]?["message"]?["content"])?.Trim();
+            }
+        }
+        catch (Exception ex) when (actions.Count > 0)
+        {
+            // Tools already succeeded (e.g. habit created); still return a usable reply.
+            _logger.LogWarning(ex, "Chat follow-up failed after {Count} tool action(s); returning action summary", actions.Count);
         }
 
         if (string.IsNullOrWhiteSpace(finalReply))
         {
-            var body = new JsonObject
-            {
-                ["model"] = model,
-                ["messages"] = messages,
-                ["temperature"] = 0.4
-            };
-            var completion = await CallChatCompletionsAsync(baseUrl, apiKey, body, ct);
-            finalReply = ReadMessageContent(completion["choices"]?[0]?["message"]?["content"])?.Trim()
-                ?? (zh ? "我已经处理完相关操作，还有什么可以帮你的吗？" : "Done. Anything else I can help with?");
+            finalReply = actions.Count > 0
+                ? string.Join(zh ? "；" : "; ", actions.Select(a => a.Summary))
+                : (zh ? "我已经处理完相关操作，还有什么可以帮你的吗？" : "Done. Anything else I can help with?");
         }
 
         await _memory.AppendMessageAsync(session, "assistant", finalReply!, ct);

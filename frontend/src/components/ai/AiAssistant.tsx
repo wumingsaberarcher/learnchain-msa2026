@@ -8,6 +8,7 @@ import { useCompanionStore } from '../../stores/companionStore'
 import { useHabitStore } from '../../stores/habitStore'
 import { useTranslation } from '../../stores/settingsStore'
 import CanalAvatar from '../character/CanalAvatar'
+import GalgameStage from './GalgameStage'
 import { useSpeechInput } from './useSpeechInput'
 import VoiceVolumeIcon from './VoiceVolumeIcon'
 
@@ -19,7 +20,10 @@ export default function AiAssistant() {
         toggle, close, setListening, clearHistory, hydrateForUser, sendMessage, clearError,
     } = useChatStore()
     const apiKey = useAiSettingsStore(s => s.apiKey)
-    const { emotion, isTalking, userAvatarUrl, setUserAvatarFromFile, clearUserAvatar } = useCompanionStore()
+    const {
+        emotion, isTalking, userAvatarUrl, galModeOpen,
+        setUserAvatarFromFile, clearUserAvatar, tryHoverSurprise, enterGalMode,
+    } = useCompanionStore()
 
     const [draft, setDraft] = useState('')
     const [reminderMsg, setReminderMsg] = useState('')
@@ -91,211 +95,225 @@ export default function AiAssistant() {
     const userInitial = (currentUser?.username?.[0] ?? 'U').toUpperCase()
 
     return (
-        <div className={`ai-assistant theme-${theme}`}>
-            {isOpen && (
-                <div className="ai-chat-panel" role="dialog" aria-label={t('chat.title')}>
-                    <div className="ai-chat-header">
-                        <div className="ai-chat-header-title">
-                            <CanalAvatar
-                                emotion={emotion}
-                                isTalking={isTalking || isSending}
-                                size="lg"
-                            />
-                            <div>
-                                <strong>{t('chat.title')}</strong>
-                                <p>{t('chat.subtitle')}</p>
-                            </div>
-                        </div>
-                        <div className="ai-chat-header-actions">
-                            <button
-                                type="button"
-                                className="ai-icon-btn"
-                                title={t('chat.uploadAvatar')}
-                                onClick={() => avatarInputRef.current?.click()}
-                            >
-                                <ImagePlus className="w-4 h-4" />
-                            </button>
-                            <button
-                                type="button"
-                                className="ai-icon-btn"
-                                title={t('chat.clear')}
-                                onClick={() => void clearHistory()}
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </button>
-                            <button type="button" className="ai-icon-btn" title={t('chat.close')} onClick={close}>
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-                        <input
-                            ref={avatarInputRef}
-                            type="file"
-                            accept="image/*"
-                            hidden
-                            onChange={e => void onAvatarFile(e.target.files?.[0])}
-                        />
-                    </div>
+        <>
+            {galModeOpen && <GalgameStage />}
 
-                    <div className="ai-chat-avatars-row">
-                        <div className="ai-avatar-chip">
-                            <CanalAvatar
-                                emotion={emotion}
-                                isTalking={isTalking || isSending}
-                                size="md"
-                            />
-                            <span>Canal</span>
-                        </div>
-                        <div className="ai-avatar-chip user">
-                            <button
-                                type="button"
-                                className="ai-avatar-circle user"
-                                title={t('chat.uploadAvatar')}
-                                onClick={() => avatarInputRef.current?.click()}
-                            >
-                                {userAvatarUrl ? (
-                                    <img src={userAvatarUrl} alt="" />
-                                ) : (
-                                    <span>{userInitial}</span>
-                                )}
-                            </button>
-                            <span>{t('chat.you')}</span>
-                            {userAvatarUrl && (
-                                <button type="button" className="ai-avatar-clear" onClick={clearUserAvatar}>
-                                    {t('chat.clearAvatar')}
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                    {avatarErr && <div className="ai-chat-error">{avatarErr}</div>}
-
-                    {!apiKey.trim() && (
-                        <div className="ai-chat-banner">
-                            {t('chat.needApiKey')}{' '}
-                            <Link to="/profile" onClick={close}>{t('chat.goProfile')}</Link>
-                        </div>
-                    )}
-
-                    <div className="ai-chat-messages" ref={listRef}>
-                        {messages.length === 0 && (
-                            <div className="ai-chat-empty">
-                                <p>{t('chat.welcome')}</p>
-                                <ul>
-                                    <li>{t('chat.hintToday')}</li>
-                                    <li>{t('chat.hintCreate')}</li>
-                                    <li>{t('chat.hintRemind')}</li>
-                                </ul>
-                            </div>
-                        )}
-                        {messages.map(m => {
-                            const isAside = m.kind === 'aside'
-                            const isUser = m.role === 'user'
-                            return (
-                                <div
-                                    key={m.id}
-                                    className={`ai-msg-row ${isUser ? 'user' : 'assistant'}${isAside ? ' aside' : ''}`}
-                                >
-                                    {!isUser && (
-                                        <CanalAvatar
-                                            emotion={m.emotion ?? emotion}
-                                            size="sm"
-                                        />
-                                    )}
-                                    <div className={`ai-bubble ai-bubble-${m.role}${isAside ? ' aside' : ''}`}>
-                                        {isAside && (
-                                            <span className="ai-aside-tag">
-                                                {m.scene === 'focus' ? t('chat.asideFocus') : t('chat.asideIdle')}
-                                            </span>
-                                        )}
-                                        {m.content}
-                                    </div>
-                                    {isUser && (
-                                        <div className="ai-msg-avatar user">
-                                            {userAvatarUrl ? (
-                                                <img src={userAvatarUrl} alt="" />
-                                            ) : (
-                                                <span>{userInitial}</span>
-                                            )}
-                                        </div>
-                                    )}
+            <div className={`ai-assistant theme-${theme}`}>
+                {isOpen && !galModeOpen && (
+                    <div className="ai-chat-panel" role="dialog" aria-label={t('chat.title')}>
+                        <div className="ai-chat-header">
+                            <div className="ai-chat-header-title">
+                                <CanalAvatar
+                                    emotion={emotion}
+                                    isTalking={isTalking || isSending}
+                                    size="lg"
+                                    interactive
+                                    title={t('chat.galEnterHint')}
+                                    onMouseEnter={() => tryHoverSurprise()}
+                                    onClick={() => enterGalMode()}
+                                />
+                                <div>
+                                    <strong>{t('chat.title')}</strong>
+                                    <p>{t('chat.subtitle')}</p>
                                 </div>
-                            )
-                        })}
-                        {isSending && (
-                            <div className="ai-msg-row assistant">
-                                <CanalAvatar emotion={emotion} isTalking size="sm" />
-                                <div className="ai-bubble ai-bubble-assistant ai-typing">{t('chat.thinking')}</div>
+                            </div>
+                            <div className="ai-chat-header-actions">
+                                <button
+                                    type="button"
+                                    className="ai-icon-btn"
+                                    title={t('chat.uploadAvatar')}
+                                    onClick={() => avatarInputRef.current?.click()}
+                                >
+                                    <ImagePlus className="w-4 h-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    className="ai-icon-btn"
+                                    title={t('chat.clear')}
+                                    onClick={() => void clearHistory()}
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                                <button type="button" className="ai-icon-btn" title={t('chat.close')} onClick={close}>
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <input
+                                ref={avatarInputRef}
+                                type="file"
+                                accept="image/*"
+                                hidden
+                                onChange={e => void onAvatarFile(e.target.files?.[0])}
+                            />
+                        </div>
+
+                        <div className="ai-chat-avatars-row">
+                            <div className="ai-avatar-chip">
+                                <CanalAvatar
+                                    emotion={emotion}
+                                    isTalking={isTalking || isSending}
+                                    size="md"
+                                    interactive
+                                    title={t('chat.galEnterHint')}
+                                    onMouseEnter={() => tryHoverSurprise()}
+                                    onClick={() => enterGalMode()}
+                                />
+                                <span>Canal</span>
+                            </div>
+                            <div className="ai-avatar-chip user">
+                                <button
+                                    type="button"
+                                    className="ai-avatar-circle user"
+                                    title={t('chat.uploadAvatar')}
+                                    onClick={() => avatarInputRef.current?.click()}
+                                >
+                                    {userAvatarUrl ? (
+                                        <img src={userAvatarUrl} alt="" />
+                                    ) : (
+                                        <span>{userInitial}</span>
+                                    )}
+                                </button>
+                                <span>{t('chat.you')}</span>
+                                {userAvatarUrl && (
+                                    <button type="button" className="ai-avatar-clear" onClick={clearUserAvatar}>
+                                        {t('chat.clearAvatar')}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        {avatarErr && <div className="ai-chat-error">{avatarErr}</div>}
+
+                        {!apiKey.trim() && (
+                            <div className="ai-chat-banner">
+                                {t('chat.needApiKey')}{' '}
+                                <Link to="/profile" onClick={close}>{t('chat.goProfile')}</Link>
                             </div>
                         )}
-                        {lastActions.map((a, i) => (
-                            <div key={`${a.type}-${i}`} className="ai-action-chip">{a.summary}</div>
-                        ))}
+
+                        <div className="ai-chat-messages" ref={listRef}>
+                            {messages.length === 0 && (
+                                <div className="ai-chat-empty">
+                                    <p>{t('chat.welcome')}</p>
+                                    <ul>
+                                        <li>{t('chat.hintToday')}</li>
+                                        <li>{t('chat.hintCreate')}</li>
+                                        <li>{t('chat.hintRemind')}</li>
+                                    </ul>
+                                </div>
+                            )}
+                            {messages.map(m => {
+                                const isAside = m.kind === 'aside'
+                                const isUser = m.role === 'user'
+                                return (
+                                    <div
+                                        key={m.id}
+                                        className={`ai-msg-row ${isUser ? 'user' : 'assistant'}${isAside ? ' aside' : ''}`}
+                                    >
+                                        {!isUser && (
+                                            <CanalAvatar
+                                                emotion={m.emotion ?? emotion}
+                                                size="sm"
+                                            />
+                                        )}
+                                        <div className={`ai-bubble ai-bubble-${m.role}${isAside ? ' aside' : ''}`}>
+                                            {isAside && (
+                                                <span className="ai-aside-tag">
+                                                    {m.scene === 'focus' ? t('chat.asideFocus') : t('chat.asideIdle')}
+                                                </span>
+                                            )}
+                                            {m.content}
+                                        </div>
+                                        {isUser && (
+                                            <div className="ai-msg-avatar user">
+                                                {userAvatarUrl ? (
+                                                    <img src={userAvatarUrl} alt="" />
+                                                ) : (
+                                                    <span>{userInitial}</span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                            {isSending && (
+                                <div className="ai-msg-row assistant">
+                                    <CanalAvatar emotion={emotion} isTalking size="sm" />
+                                    <div className="ai-bubble ai-bubble-assistant ai-typing">{t('chat.thinking')}</div>
+                                </div>
+                            )}
+                            {lastActions.map((a, i) => (
+                                <div key={`${a.type}-${i}`} className="ai-action-chip">{a.summary}</div>
+                            ))}
+                        </div>
+
+                        {errorText && (
+                            <div className="ai-chat-error" onClick={clearError}>{errorText}</div>
+                        )}
+                        {reminderMsg && <div className="ai-chat-info">{reminderMsg}</div>}
+
+                        <div className="ai-chat-input-row">
+                            <button
+                                type="button"
+                                className="ai-icon-btn"
+                                title={t('chat.sendReminder')}
+                                onClick={handleReminder}
+                                disabled={isSending}
+                            >
+                                <Mail className="w-4 h-4" />
+                            </button>
+                            <textarea
+                                className="ai-chat-input"
+                                rows={1}
+                                value={draft}
+                                placeholder={t('chat.placeholder')}
+                                onChange={e => setDraft(e.target.value)}
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault()
+                                        void handleSend()
+                                    }
+                                }}
+                            />
+                            <button
+                                type="button"
+                                className={`ai-icon-btn ${isListening ? 'listening' : ''}`}
+                                title={speech.supported ? (isListening ? t('chat.voiceStop') : t('chat.voice')) : t('chat.voiceUnsupported')}
+                                disabled={!speech.supported || isSending}
+                                onClick={() => speech.toggle()}
+                                aria-pressed={isListening}
+                            >
+                                {isListening
+                                    ? <VoiceVolumeIcon level={speech.volumeLevel} className="w-4 h-4" />
+                                    : <Mic className="w-4 h-4" />}
+                            </button>
+                            <button
+                                type="button"
+                                className="ai-send-btn"
+                                onClick={() => void handleSend()}
+                                disabled={isSending || !draft.trim()}
+                                title={t('chat.send')}
+                            >
+                                <Send className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
-
-                    {errorText && (
-                        <div className="ai-chat-error" onClick={clearError}>{errorText}</div>
-                    )}
-                    {reminderMsg && <div className="ai-chat-info">{reminderMsg}</div>}
-
-                    <div className="ai-chat-input-row">
-                        <button
-                            type="button"
-                            className="ai-icon-btn"
-                            title={t('chat.sendReminder')}
-                            onClick={handleReminder}
-                            disabled={isSending}
-                        >
-                            <Mail className="w-4 h-4" />
-                        </button>
-                        <textarea
-                            className="ai-chat-input"
-                            rows={1}
-                            value={draft}
-                            placeholder={t('chat.placeholder')}
-                            onChange={e => setDraft(e.target.value)}
-                            onKeyDown={e => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    e.preventDefault()
-                                    void handleSend()
-                                }
-                            }}
-                        />
-                        <button
-                            type="button"
-                            className={`ai-icon-btn ${isListening ? 'listening' : ''}`}
-                            title={speech.supported ? (isListening ? t('chat.voiceStop') : t('chat.voice')) : t('chat.voiceUnsupported')}
-                            disabled={!speech.supported || isSending}
-                            onClick={() => speech.toggle()}
-                            aria-pressed={isListening}
-                        >
-                            {isListening
-                                ? <VoiceVolumeIcon level={speech.volumeLevel} className="w-4 h-4" />
-                                : <Mic className="w-4 h-4" />}
-                        </button>
-                        <button
-                            type="button"
-                            className="ai-send-btn"
-                            onClick={() => void handleSend()}
-                            disabled={isSending || !draft.trim()}
-                            title={t('chat.send')}
-                        >
-                            <Send className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            <button
-                type="button"
-                className={`ai-fab ${isOpen ? 'open' : ''}`}
-                onClick={toggle}
-                aria-label={t('chat.title')}
-            >
-                {isOpen ? (
-                    <X className="w-6 h-6" />
-                ) : (
-                    <CanalAvatar emotion={emotion} size="fab" />
                 )}
-            </button>
-        </div>
+
+                {!galModeOpen && (
+                    <button
+                        type="button"
+                        className={`ai-fab ${isOpen ? 'open' : ''}`}
+                        onClick={toggle}
+                        aria-label={t('chat.title')}
+                    >
+                        {isOpen ? (
+                            <X className="w-6 h-6" />
+                        ) : (
+                            <CanalAvatar emotion={emotion} size="fab" />
+                        )}
+                    </button>
+                )}
+            </div>
+        </>
     )
 }
