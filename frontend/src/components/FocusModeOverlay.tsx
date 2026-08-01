@@ -9,7 +9,7 @@ import {
     VolumeX,
 } from 'lucide-react'
 import { createCheckIn } from '../api/checkInApi'
-import { type BgmTrackId, useBgmStore } from '../stores/bgmStore'
+import { BGM_TRACKS, type BgmTrackId, useBgmStore } from '../stores/bgmStore'
 import { focusBonusXp, useFocusModeStore } from '../stores/focusModeStore'
 import { useTranslation } from '../stores/settingsStore'
 import { difficultyKey } from '../utils/habitHelpers'
@@ -63,12 +63,11 @@ export default function FocusModeOverlay({ onCompleted }: FocusModeOverlayProps)
         selectTrack,
         setVolume,
         setMuted,
-        allTracks,
-        isUnlocked,
         userTracks,
+        isUnlocked,
     } = useBgmStore()
 
-    const playableTracks = allTracks()
+    const playableTracks = [...BGM_TRACKS, ...userTracks]
 
     const [customMinutes, setCustomMinutes] = useState('')
     const [checkingIn, setCheckingIn] = useState(false)
