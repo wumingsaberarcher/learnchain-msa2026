@@ -29,7 +29,7 @@ export default function CanalAvatar({
       aria-label={title}
     >
       <div className="canal-avatar-stage">
-        <Character emotion={emotion} isTalking={isTalking} animate={size === 'lg'} />
+        <Character emotion={emotion} isTalking={isTalking} animate={false} />
       </div>
     </div>
   )
