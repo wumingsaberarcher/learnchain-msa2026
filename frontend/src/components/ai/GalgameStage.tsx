@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Mic, Send, X } from 'lucide-react'
+import { LogOut, Mic, Send, X } from 'lucide-react'
 import { useChatStore } from '../../stores/chatStore'
 import { useCompanionStore } from '../../stores/companionStore'
 import { useTranslation } from '../../stores/settingsStore'
@@ -39,6 +39,9 @@ export default function GalgameStage() {
   const typeTimerRef = useRef<number | null>(null)
   const charIndexRef = useRef(0)
   const startedIntroRef = useRef(false)
+  const forceEmotionRef = useRef<Emotion | null>(null)
+  const exitAfterFarewellRef = useRef(false)
+  const farewellHoverLockRef = useRef(false)
 
   const stopTypewriter = useCallback(() => {
     if (typeTimerRef.current != null) {
@@ -49,17 +52,23 @@ export default function GalgameStage() {
   }, [])
 
   const playLine = useCallback(
-    (text: string) => {
+    (text: string, options?: { forceEmotion?: Emotion; onComplete?: () => void }) => {
       stopTypewriter()
       const line = text.trim()
-      if (!line) return
+      if (!line) {
+        options?.onComplete?.()
+        return
+      }
 
+      forceEmotionRef.current = options?.forceEmotion ?? null
       timelineRef.current = buildEmotionTimeline(line)
       charIndexRef.current = 0
       setFullText(line)
       setDisplayText('')
       setTyping(true)
-      setEmotion(emotionAt(timelineRef.current, 0), true)
+
+      const face0 = options?.forceEmotion ?? emotionAt(timelineRef.current, 0)
+      setEmotion(face0, true)
 
       typeTimerRef.current = window.setInterval(() => {
         charIndexRef.current += 1
@@ -67,11 +76,14 @@ export default function GalgameStage() {
         if (i >= line.length) {
           setDisplayText(line)
           stopTypewriter()
-          setEmotion(emotionAt(timelineRef.current, line.length), false)
+          const faceEnd = forceEmotionRef.current ?? emotionAt(timelineRef.current, line.length)
+          setEmotion(faceEnd, false)
+          forceEmotionRef.current = null
+          options?.onComplete?.()
           return
         }
         setDisplayText(line.slice(0, i))
-        const next: Emotion = emotionAt(timelineRef.current, i)
+        const next: Emotion = forceEmotionRef.current ?? emotionAt(timelineRef.current, i)
         setEmotion(next, true)
       }, MS_PER_CHAR)
     },
@@ -81,7 +93,6 @@ export default function GalgameStage() {
   useEffect(() => {
     if (startedIntroRef.current) return
     startedIntroRef.current = true
-    // Let smoke play a beat, then intro line
     const delay = galSmokePlaying ? 520 : 80
     const timer = window.setTimeout(() => {
       playLine(t('chat.galIntro'))
@@ -101,6 +112,47 @@ export default function GalgameStage() {
     onError: () => setListening(false),
   })
 
+  const startFarewell = useCallback(
+    (thenExit: boolean) => {
+      const face: Emotion = Math.random() < 0.5 ? 'angry' : 'sorrow'
+      const line = face === 'angry' ? t('chat.galFarewellAngry') : t('chat.galFarewellSorrow')
+      exitAfterFarewellRef.current = thenExit
+      playLine(line, {
+        forceEmotion: face,
+        onComplete: () => {
+          if (exitAfterFarewellRef.current) {
+            exitAfterFarewellRef.current = false
+            window.setTimeout(() => exitGalMode(), 420)
+          }
+        },
+      })
+    },
+    [exitGalMode, playLine, t],
+  )
+
+  const onExitHover = () => {
+    if (farewellHoverLockRef.current || isSending) return
+    farewellHoverLockRef.current = true
+    startFarewell(false)
+  }
+
+  const onExitLeave = () => {
+    // Allow farewell again next time they hover (after a short cool-down)
+    window.setTimeout(() => {
+      farewellHoverLockRef.current = false
+    }, 900)
+  }
+
+  const handleExitClick = () => {
+    if (exitAfterFarewellRef.current) {
+      exitGalMode()
+      return
+    }
+    // Click without (or during) hover farewell → say goodbye then leave
+    farewellHoverLockRef.current = true
+    startFarewell(true)
+  }
+
   const handleSend = async () => {
     if (!draft.trim() || isSending || typing) return
     const text = draft.trim()
@@ -109,7 +161,6 @@ export default function GalgameStage() {
     setEmotion('normal', true)
     setDisplayText(language.startsWith('zh') ? '……' : '...')
     await sendMessage(text, language)
-    // Latest assistant reply is in store after sendMessage resolves
     const msgs = useChatStore.getState().messages
     const lastAssistant = [...msgs].reverse().find((m) => m.role === 'assistant' && m.kind !== 'aside')
     if (lastAssistant?.content) {
@@ -134,7 +185,7 @@ export default function GalgameStage() {
         type="button"
         className="gal-close"
         title={t('chat.galClose')}
-        onClick={exitGalMode}
+        onClick={handleExitClick}
       >
         <X className="w-5 h-5" />
       </button>
@@ -196,6 +247,17 @@ export default function GalgameStage() {
             onClick={() => void handleSend()}
           >
             <Send className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            className="gal-exit-btn"
+            title={t('chat.galExit')}
+            onMouseEnter={onExitHover}
+            onMouseLeave={onExitLeave}
+            onClick={handleExitClick}
+          >
+            <LogOut className="w-4 h-4" />
+            <span>{t('chat.galExit')}</span>
           </button>
         </div>
 

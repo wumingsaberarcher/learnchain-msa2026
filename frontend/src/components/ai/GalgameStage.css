@@ -185,6 +185,38 @@
 	background: color-mix(in srgb, #7dd3fc 35%, rgba(255, 255, 255, 0.08));
 }
 
+.gal-exit-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.4rem;
+	flex-shrink: 0;
+	min-width: 7.5rem;
+	height: 40px;
+	padding: 0 0.9rem;
+	border: 1px solid rgba(255, 120, 120, 0.55);
+	border-radius: 10px;
+	background: linear-gradient(180deg, #c62828 0%, #8e1414 100%);
+	color: #fff5f5;
+	font: inherit;
+	font-size: 0.88rem;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	cursor: pointer;
+	box-shadow: 0 0 0 1px rgba(255, 80, 80, 0.25), 0 6px 16px rgba(140, 20, 20, 0.35);
+	transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease;
+}
+
+.gal-exit-btn:hover {
+	transform: translateY(-1px) scale(1.02);
+	filter: brightness(1.08);
+	box-shadow: 0 0 0 2px rgba(255, 140, 140, 0.45), 0 8px 20px rgba(160, 30, 30, 0.45);
+}
+
+.gal-exit-btn:active {
+	transform: translateY(0) scale(0.99);
+}
+
 .gal-error {
 	border: none;
 	text-align: left;
@@ -207,5 +239,14 @@
 	.gal-dialog-stack {
 		width: calc(100% - 1.25rem);
 		margin-bottom: 0.75rem;
+	}
+
+	.gal-exit-btn {
+		min-width: 0;
+		padding: 0 0.7rem;
+	}
+
+	.gal-exit-btn span {
+		display: none;
 	}
 }
