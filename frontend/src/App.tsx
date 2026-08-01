@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import { Target } from 'lucide-react'
 import Dashboard from './pages/ChainDashboard'
+import About from './pages/About'
 import Habits from './pages/Habits'
 import Profile from './pages/Profile'
 import Achievements from './pages/Achievements'
@@ -13,21 +14,24 @@ import UserProfileMenu from './components/UserProfileMenu'
 import BadgeUnlockModal from './components/BadgeUnlockModal'
 import AiAssistant from './components/ai/AiAssistant'
 import IdleRestOverlay from './components/IdleRestOverlay'
+import FocusModeOverlay from './components/FocusModeOverlay'
 import AppSidebar from './components/AppSidebar'
 import BgmPlayer from './components/BgmPlayer'
 import { useHabitStore } from './stores/habitStore'
 import { useAchievementStore } from './stores/achievementStore'
 import { useIdleRestStore } from './stores/idleRestStore'
+import { useFocusModeStore } from './stores/focusModeStore'
 import { useBgmStore } from './stores/bgmStore'
 import { useTranslation } from './stores/settingsStore'
 import { isStaffRole } from './api/adminApi'
 
 function App() {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
-    const { isLoggedIn, currentUser } = useHabitStore()
-    const { fetchProfile, syncAchievements } = useAchievementStore()
+    const { isLoggedIn, currentUser, fetchHabits, fetchTodayCheckedHabits, fetchCurrentUser, markHabitCheckedToday } = useHabitStore()
+    const { fetchProfile, syncAchievements, handleNewUnlocks } = useAchievementStore()
     const { t, theme } = useTranslation()
     const isResting = useIdleRestStore(s => s.isResting)
+    const isFocusing = useFocusModeStore(s => s.isActive)
     const toggleSidebar = useBgmStore(s => s.toggleSidebar)
 
     useEffect(() => {
@@ -111,6 +115,7 @@ function App() {
                     <Routes>
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/habits" element={<Habits />} />
+                        <Route path="/about" element={<About />} />
                         <Route path="/profile" element={<Profile />} />
                         <Route path="/achievements" element={<Achievements />} />
                         <Route path="/admin" element={<Admin />} />
@@ -118,13 +123,29 @@ function App() {
                 </main>
 
                 <BadgeUnlockModal />
-                {!isResting && (
+                {!isResting && !isFocusing && (
                     <div className="theme-locale-fab">
                         <ThemeLocaleToggle />
                     </div>
                 )}
-                {!isResting && <AiAssistant />}
-                <IdleRestOverlay pauseIdle={isLoginModalOpen} />
+                {!isResting && !isFocusing && <AiAssistant />}
+                <IdleRestOverlay pauseIdle={isLoginModalOpen || isFocusing} />
+                <FocusModeOverlay
+                    onCompleted={async (result) => {
+                        const bonus = result.focusBonusXp ?? 0
+                        const msg = bonus > 0
+                            ? t('focus.successBonus', { total: result.xpEarned, bonus })
+                            : t('focus.success', { total: result.xpEarned })
+                        window.dispatchEvent(new CustomEvent('learnchain:toast', { detail: msg }))
+                        if (result.newlyUnlocked?.length) {
+                            handleNewUnlocks(result.newlyUnlocked)
+                        }
+                        markHabitCheckedToday(result.habitId)
+                        await fetchCurrentUser()
+                        await fetchHabits()
+                        await fetchTodayCheckedHabits()
+                    }}
+                />
 
                 <LoginModal
                     isOpen={isLoginModalOpen}

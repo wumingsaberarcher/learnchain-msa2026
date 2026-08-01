@@ -427,6 +427,27 @@ p a:hover {
 	box-shadow: 0 6px 20px rgba(0, 255, 255, 0.25);
 }
 
+.btn-habit-focus {
+	background: rgba(34, 211, 238, 0.12);
+	color: var(--primary);
+	border: 1px solid rgba(34, 211, 238, 0.4);
+	box-shadow: none;
+}
+
+.btn-habit-focus:hover:not(:disabled) {
+	transform: translateY(-2px);
+	background: rgba(34, 211, 238, 0.2);
+	border-color: rgba(74, 222, 128, 0.55);
+}
+
+.habit-milestone-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	align-items: center;
+	justify-content: flex-end;
+}
+
 .btn-habit-checkin:hover:not(:disabled) {
 	transform: translateY(-2px);
 	box-shadow: 0 10px 28px rgba(0, 255, 255, 0.35);
@@ -3363,6 +3384,13 @@ footer p a:hover {
 	background: linear-gradient(45deg, #43A047, #F9A825) !important;
 	color: #fff !important;
 	box-shadow: 0 6px 20px rgba(76, 175, 80, 0.25);
+}
+
+.app-shell.theme-day .btn-habit-focus {
+	background: rgba(67, 160, 71, 0.12) !important;
+	color: #2E7D32 !important;
+	border: 1px solid rgba(67, 160, 71, 0.4);
+	box-shadow: none !important;
 }
 
 .app-shell.theme-day .btn-secondary {

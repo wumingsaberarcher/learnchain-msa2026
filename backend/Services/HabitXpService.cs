@@ -11,6 +11,12 @@ public static class HabitXpService
         _ => 10
     };
 
+    /// <summary>Focus-mode bonus = 50% of base XP by difficulty (Easy +5, Medium +10, Hard +15).</summary>
+    public static int GetFocusBonusXP(int difficulty) => Math.Max(5, GetBaseXP(difficulty) / 2);
+
+    /// <summary>Minimum focused seconds required to earn the focus bonus.</summary>
+    public const int FocusBonusMinSeconds = 60;
+
     public static string GetFrequencyLabel(string habitType) => habitType switch
     {
         "EveryOtherDay" => "每两天",

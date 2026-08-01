@@ -9,6 +9,8 @@ import './styles/ai-assistant.css'
 import './styles/admin.css'
 import './styles/idle-rest.css'
 import './styles/app-sidebar.css'
+import './styles/focus-mode.css'
+import './styles/about.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

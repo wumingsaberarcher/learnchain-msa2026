@@ -13,6 +13,12 @@ public class CreateCheckInRequest
     public int HabitId { get; set; }
     public int? MilestoneId { get; set; }
     public string? Notes { get; set; }
+    /// <summary>When true, may grant focus-mode bonus XP (subject to duration).</summary>
+    public bool FromFocusMode { get; set; }
+    /// <summary>Elapsed focus time in seconds.</summary>
+    public int FocusSeconds { get; set; }
+    /// <summary>User's estimated focus duration in minutes (for notes / analytics).</summary>
+    public int EstimatedMinutes { get; set; }
 }
 
 [ApiController]
@@ -165,6 +171,24 @@ public class CheckInController : ControllerBase
             xpEarned = HabitXpService.GetBaseXP(habit.Difficulty);
         }
 
+        var baseXp = xpEarned;
+        var focusBonusXp = 0;
+        if (request.FromFocusMode && request.FocusSeconds >= HabitXpService.FocusBonusMinSeconds)
+        {
+            focusBonusXp = HabitXpService.GetFocusBonusXP(habit.Difficulty);
+            xpEarned += focusBonusXp;
+        }
+
+        if (request.FromFocusMode)
+        {
+            var mins = Math.Max(0, request.FocusSeconds / 60);
+            var secs = Math.Max(0, request.FocusSeconds % 60);
+            var focusNote = focusBonusXp > 0
+                ? $"专注模式 {mins}分{secs}秒（预估 {Math.Max(1, request.EstimatedMinutes)} 分钟）· 额外 +{focusBonusXp} XP"
+                : $"专注模式 {mins}分{secs}秒（未满 {HabitXpService.FocusBonusMinSeconds} 秒，无额外 XP）";
+            notes = string.IsNullOrWhiteSpace(notes) ? focusNote : $"{notes} · {focusNote}";
+        }
+
         var checkIn = new CheckIn
         {
             HabitId = habit.Id,
@@ -195,6 +219,8 @@ public class CheckInController : ControllerBase
             checkIn.UserId,
             checkIn.CompletedAt,
             checkIn.XPEarned,
+            baseXp,
+            focusBonusXp,
             checkIn.Notes,
             checkIn.MilestoneId,
             newlyUnlocked

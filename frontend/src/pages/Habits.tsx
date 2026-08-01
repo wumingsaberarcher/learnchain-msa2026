@@ -24,7 +24,10 @@ import {
     Sparkles,
     Loader2,
     Flag,
+    Timer,
 } from 'lucide-react'
+import { useFocusModeStore } from '../stores/focusModeStore'
+import { useBgmStore } from '../stores/bgmStore'
 
 interface CheckIn {
     id: number
@@ -91,6 +94,30 @@ export default function Habits() {
             return () => clearTimeout(timer)
         }
     }, [successMessage])
+
+    useEffect(() => {
+        const onToast = (e: Event) => {
+            const detail = (e as CustomEvent<string>).detail
+            if (typeof detail === 'string' && detail.trim()) setSuccessMessage(detail)
+        }
+        window.addEventListener('learnchain:toast', onToast)
+        return () => window.removeEventListener('learnchain:toast', onToast)
+    }, [])
+
+    const openFocus = (
+        habit: { id: number; name: string; difficulty?: number; baseXP: number },
+        milestone?: { id: number; title: string; xpValue: number },
+    ) => {
+        useBgmStore.getState().setSidebarOpen(false)
+        useFocusModeStore.getState().startSetup({
+            habitId: habit.id,
+            habitName: habit.name,
+            difficulty: habit.difficulty || 1,
+            baseXP: milestone ? milestone.xpValue : habit.baseXP,
+            milestoneId: milestone?.id,
+            milestoneTitle: milestone?.title,
+        })
+    }
 
     const handleCreateHabit = async (payload: CreateHabitPayload) => {
         try {
@@ -333,14 +360,27 @@ export default function Habits() {
                                                                         </div>
                                                                     </div>
                                                                     {!m.isCompleted && (
-                                                                        <button
-                                                                            type="button"
-                                                                            disabled={!isDue || isMsChecking}
-                                                                            className="btn-habit btn-habit-checkin btn-habit-milestone"
-                                                                            onClick={() => handleCheckIn(habit.id, m.id)}
-                                                                        >
-                                                                            {isMsChecking ? t('habits.checking') : t('habits.milestoneCheckin')}
-                                                                        </button>
+                                                                        <div className="habit-milestone-actions">
+                                                                            <button
+                                                                                type="button"
+                                                                                disabled={!isDue || isMsChecking}
+                                                                                className="btn-habit btn-habit-checkin btn-habit-milestone"
+                                                                                onClick={() => handleCheckIn(habit.id, m.id)}
+                                                                            >
+                                                                                {isMsChecking ? t('habits.checking') : t('habits.milestoneCheckin')}
+                                                                            </button>
+                                                                            {isDue && (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    className="btn-habit btn-habit-focus"
+                                                                                    onClick={() => openFocus(habit, m)}
+                                                                                    disabled={isMsChecking}
+                                                                                >
+                                                                                    <Timer className="w-3.5 h-3.5 inline mr-1" />
+                                                                                    {t('focus.open')}
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
                                                                     )}
                                                                 </div>
                                                             )
@@ -355,16 +395,27 @@ export default function Habits() {
                                 {!isEditing && (
                                     <div className="habit-card-actions">
                                         {showMainCheckIn && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleCheckIn(habit.id)}
-                                                disabled={isChecking}
-                                                className={`btn-habit btn-habit-checkin${isChecking ? ' loading' : ''}`}
-                                            >
-                                                {isChecking ? (
-                                                    <><Loader2 className="w-3.5 h-3.5 inline mr-1 animate-spin" />{t('habits.checking')}</>
-                                                ) : habit.habitType === 'OneTime' ? t('habits.finalCheckin') : t('habits.checkin')}
-                                            </button>
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleCheckIn(habit.id)}
+                                                    disabled={isChecking}
+                                                    className={`btn-habit btn-habit-checkin${isChecking ? ' loading' : ''}`}
+                                                >
+                                                    {isChecking ? (
+                                                        <><Loader2 className="w-3.5 h-3.5 inline mr-1 animate-spin" />{t('habits.checking')}</>
+                                                    ) : habit.habitType === 'OneTime' ? t('habits.finalCheckin') : t('habits.checkin')}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn-habit btn-habit-focus"
+                                                    onClick={() => openFocus(habit)}
+                                                    disabled={isChecking}
+                                                >
+                                                    <Timer className="w-3.5 h-3.5 inline mr-1" />
+                                                    {t('focus.open')}
+                                                </button>
+                                            </>
                                         )}
                                         {!showMainCheckIn && isChecked && !habit.isCompleted && habit.habitType !== 'OneTime' && (
                                             <button type="button" disabled className="btn-habit btn-habit-checkin done">
