@@ -260,6 +260,12 @@ const zh = {
     'chat.sendReminder': '发送今日邮件提醒',
     'chat.reminderSent': '今日提醒已发送',
     'chat.reminderFailed': '发送提醒失败',
+    'chat.uploadAvatar': '上传我的头像',
+    'chat.clearAvatar': '清除',
+    'chat.avatarFailed': '头像上传失败，请换一张图片试试',
+    'chat.you': '你',
+    'chat.asideIdle': 'Canal · 休息时',
+    'chat.asideFocus': 'Canal · 专注时',
 
     // Focus mode
     'focus.title': '专注模式',
@@ -761,6 +767,12 @@ const en: Record<keyof typeof zh, string> = {
     'chat.sendReminder': 'Send today’s email reminder',
     'chat.reminderSent': 'Today’s reminder sent',
     'chat.reminderFailed': 'Failed to send reminder',
+    'chat.uploadAvatar': 'Upload my avatar',
+    'chat.clearAvatar': 'Clear',
+    'chat.avatarFailed': 'Avatar upload failed — try another image',
+    'chat.you': 'You',
+    'chat.asideIdle': 'Canal · while resting',
+    'chat.asideFocus': 'Canal · during focus',
 
     'focus.title': 'Focus Mode',
     'focus.eyebrow': 'Locked focus',

@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Bot, Mail, Mic, MicOff, Send, Trash2, X } from 'lucide-react'
+import { ImagePlus, Mail, Mic, MicOff, Send, Trash2, X } from 'lucide-react'
 import { sendTodayReminder } from '../../api/chatApi'
 import { useChatStore } from '../../stores/chatStore'
 import { useAiSettingsStore } from '../../stores/aiSettingsStore'
+import { useCompanionStore } from '../../stores/companionStore'
 import { useHabitStore } from '../../stores/habitStore'
 import { useTranslation } from '../../stores/settingsStore'
+import Character from '../character/Character'
+import faceFallback from '../../../Canal/face.png'
 import { useSpeechInput } from './useSpeechInput'
 
 export default function AiAssistant() {
@@ -16,10 +19,13 @@ export default function AiAssistant() {
         toggle, close, setListening, clearHistory, hydrateForUser, sendMessage, clearError,
     } = useChatStore()
     const apiKey = useAiSettingsStore(s => s.apiKey)
+    const { emotion, isTalking, userAvatarUrl, setUserAvatarFromFile, clearUserAvatar } = useCompanionStore()
 
     const [draft, setDraft] = useState('')
     const [reminderMsg, setReminderMsg] = useState('')
+    const [avatarErr, setAvatarErr] = useState('')
     const listRef = useRef<HTMLDivElement>(null)
+    const avatarInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
         hydrateForUser(isLoggedIn && currentUser ? currentUser.id : null)
@@ -70,7 +76,19 @@ export default function AiAssistant() {
         setTimeout(() => setReminderMsg(''), 4000)
     }
 
+    const onAvatarFile = async (file: File | undefined) => {
+        if (!file) return
+        setAvatarErr('')
+        try {
+            await setUserAvatarFromFile(file)
+        } catch {
+            setAvatarErr(t('chat.avatarFailed'))
+        }
+        if (avatarInputRef.current) avatarInputRef.current.value = ''
+    }
+
     const errorText = error === 'missing_api_key' ? t('chat.missingApiKey') : error
+    const userInitial = (currentUser?.username?.[0] ?? 'U').toUpperCase()
 
     return (
         <div className={`ai-assistant theme-${theme}`}>
@@ -78,13 +96,23 @@ export default function AiAssistant() {
                 <div className="ai-chat-panel" role="dialog" aria-label={t('chat.title')}>
                     <div className="ai-chat-header">
                         <div className="ai-chat-header-title">
-                            <Bot className="w-5 h-5" />
+                            <div className="ai-chat-canal-mini" aria-hidden>
+                                <Character emotion={emotion} isTalking={isTalking || isSending} />
+                            </div>
                             <div>
                                 <strong>{t('chat.title')}</strong>
                                 <p>{t('chat.subtitle')}</p>
                             </div>
                         </div>
                         <div className="ai-chat-header-actions">
+                            <button
+                                type="button"
+                                className="ai-icon-btn"
+                                title={t('chat.uploadAvatar')}
+                                onClick={() => avatarInputRef.current?.click()}
+                            >
+                                <ImagePlus className="w-4 h-4" />
+                            </button>
                             <button
                                 type="button"
                                 className="ai-icon-btn"
@@ -97,7 +125,44 @@ export default function AiAssistant() {
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
+                        <input
+                            ref={avatarInputRef}
+                            type="file"
+                            accept="image/*"
+                            hidden
+                            onChange={e => void onAvatarFile(e.target.files?.[0])}
+                        />
                     </div>
+
+                    <div className="ai-chat-avatars-row">
+                        <div className="ai-avatar-chip">
+                            <div className="ai-avatar-circle canal">
+                                <img src={faceFallback} alt="" />
+                            </div>
+                            <span>Canal</span>
+                        </div>
+                        <div className="ai-avatar-chip user">
+                            <button
+                                type="button"
+                                className="ai-avatar-circle user"
+                                title={t('chat.uploadAvatar')}
+                                onClick={() => avatarInputRef.current?.click()}
+                            >
+                                {userAvatarUrl ? (
+                                    <img src={userAvatarUrl} alt="" />
+                                ) : (
+                                    <span>{userInitial}</span>
+                                )}
+                            </button>
+                            <span>{t('chat.you')}</span>
+                            {userAvatarUrl && (
+                                <button type="button" className="ai-avatar-clear" onClick={clearUserAvatar}>
+                                    {t('chat.clearAvatar')}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    {avatarErr && <div className="ai-chat-error">{avatarErr}</div>}
 
                     {!apiKey.trim() && (
                         <div className="ai-chat-banner">
@@ -117,12 +182,47 @@ export default function AiAssistant() {
                                 </ul>
                             </div>
                         )}
-                        {messages.map(m => (
-                            <div key={m.id} className={`ai-bubble ai-bubble-${m.role}`}>
-                                {m.content}
+                        {messages.map(m => {
+                            const isAside = m.kind === 'aside'
+                            const isUser = m.role === 'user'
+                            return (
+                                <div
+                                    key={m.id}
+                                    className={`ai-msg-row ${isUser ? 'user' : 'assistant'}${isAside ? ' aside' : ''}`}
+                                >
+                                    {!isUser && (
+                                        <div className="ai-msg-avatar">
+                                            <img src={faceFallback} alt="" />
+                                        </div>
+                                    )}
+                                    <div className={`ai-bubble ai-bubble-${m.role}${isAside ? ' aside' : ''}`}>
+                                        {isAside && (
+                                            <span className="ai-aside-tag">
+                                                {m.scene === 'focus' ? t('chat.asideFocus') : t('chat.asideIdle')}
+                                            </span>
+                                        )}
+                                        {m.content}
+                                    </div>
+                                    {isUser && (
+                                        <div className="ai-msg-avatar user">
+                                            {userAvatarUrl ? (
+                                                <img src={userAvatarUrl} alt="" />
+                                            ) : (
+                                                <span>{userInitial}</span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        })}
+                        {isSending && (
+                            <div className="ai-msg-row assistant">
+                                <div className="ai-msg-avatar">
+                                    <img src={faceFallback} alt="" />
+                                </div>
+                                <div className="ai-bubble ai-bubble-assistant ai-typing">{t('chat.thinking')}</div>
                             </div>
-                        ))}
-                        {isSending && <div className="ai-bubble ai-bubble-assistant ai-typing">{t('chat.thinking')}</div>}
+                        )}
                         {lastActions.map((a, i) => (
                             <div key={`${a.type}-${i}`} className="ai-action-chip">{a.summary}</div>
                         ))}
@@ -184,7 +284,13 @@ export default function AiAssistant() {
                 onClick={toggle}
                 aria-label={t('chat.title')}
             >
-                {isOpen ? <X className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
+                {isOpen ? (
+                    <X className="w-6 h-6" />
+                ) : (
+                    <span className="ai-fab-face">
+                        <img src={faceFallback} alt="" />
+                    </span>
+                )}
             </button>
         </div>
     )

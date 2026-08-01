@@ -11,11 +11,20 @@ import {
 import { createCheckIn } from '../api/checkInApi'
 import { BGM_TRACKS, type BgmTrackId, useBgmStore } from '../stores/bgmStore'
 import { focusBonusXp, useFocusModeStore } from '../stores/focusModeStore'
+import { useChatStore } from '../stores/chatStore'
 import { useTranslation } from '../stores/settingsStore'
 import { difficultyKey } from '../utils/habitHelpers'
+import { pickCompanionLine, randomFocusEmotion } from '../companions/companionLines'
+import type { Emotion } from './character/emotionAssets'
+import CompanionPeek from './character/CompanionPeek'
 
 const ESTIMATE_PRESETS = [15, 25, 45, 60]
 const BONUS_MIN_SECONDS = 60
+const FOCUS_PEEK_FIRST_MS = 28_000
+const FOCUS_PEEK_SHOW_MIN = 7_000
+const FOCUS_PEEK_SHOW_MAX = 14_000
+const FOCUS_PEEK_HIDE_MIN = 18_000
+const FOCUS_PEEK_HIDE_MAX = 40_000
 
 function formatElapsed(totalSeconds: number): string {
     const h = Math.floor(totalSeconds / 3600)
@@ -40,7 +49,7 @@ interface FocusModeOverlayProps {
 }
 
 export default function FocusModeOverlay({ onCompleted }: FocusModeOverlayProps) {
-    const { t } = useTranslation()
+    const { t, language } = useTranslation()
     const {
         isActive,
         phase,
@@ -67,11 +76,16 @@ export default function FocusModeOverlay({ onCompleted }: FocusModeOverlayProps)
         isUnlocked,
     } = useBgmStore()
 
+    const appendCompanionAside = useChatStore(s => s.appendCompanionAside)
+
     const playableTracks = [...BGM_TRACKS, ...userTracks]
 
     const [customMinutes, setCustomMinutes] = useState('')
     const [checkingIn, setCheckingIn] = useState(false)
     const [error, setError] = useState('')
+    const [peekVisible, setPeekVisible] = useState(false)
+    const [peekLine, setPeekLine] = useState('')
+    const [peekEmotion, setPeekEmotion] = useState<Emotion>('normal')
 
     useEffect(() => {
         if (!isActive || phase !== 'running' || !startedAt) return
@@ -90,6 +104,44 @@ export default function FocusModeOverlay({ onCompleted }: FocusModeOverlayProps)
         window.addEventListener('beforeunload', onBeforeUnload)
         return () => window.removeEventListener('beforeunload', onBeforeUnload)
     }, [isActive, phase])
+
+    useEffect(() => {
+        if (!isActive || phase !== 'running') {
+            setPeekVisible(false)
+            setPeekLine('')
+            return
+        }
+
+        const lang = language.startsWith('zh') ? 'zh' : 'en'
+        const timers: number[] = []
+        let cancelled = false
+
+        const hideThenSchedule = () => {
+            if (cancelled) return
+            setPeekVisible(false)
+            const hideFor = FOCUS_PEEK_HIDE_MIN + Math.random() * (FOCUS_PEEK_HIDE_MAX - FOCUS_PEEK_HIDE_MIN)
+            timers.push(window.setTimeout(showPeek, hideFor))
+        }
+
+        const showPeek = () => {
+            if (cancelled) return
+            const emotion = randomFocusEmotion()
+            const line = pickCompanionLine('focus', lang)
+            setPeekEmotion(emotion)
+            setPeekLine(line)
+            setPeekVisible(true)
+            appendCompanionAside(line, 'focus', emotion)
+            const showFor = FOCUS_PEEK_SHOW_MIN + Math.random() * (FOCUS_PEEK_SHOW_MAX - FOCUS_PEEK_SHOW_MIN)
+            timers.push(window.setTimeout(hideThenSchedule, showFor))
+        }
+
+        timers.push(window.setTimeout(showPeek, FOCUS_PEEK_FIRST_MS))
+
+        return () => {
+            cancelled = true
+            timers.forEach(clearTimeout)
+        }
+    }, [isActive, phase, language, appendCompanionAside])
 
     if (!isActive || !target) return null
 
@@ -287,6 +339,19 @@ export default function FocusModeOverlay({ onCompleted }: FocusModeOverlayProps)
                     </div>
                 </div>
             </div>
+
+            {phase === 'running' && (
+                <div className="focus-mode-peek-layer">
+                    <CompanionPeek
+                        visible={peekVisible}
+                        emotion={peekEmotion}
+                        isTalking={peekVisible}
+                        line={peekLine}
+                        mood="focus"
+                        side="bottom"
+                    />
+                </div>
+            )}
         </div>
     )
 }

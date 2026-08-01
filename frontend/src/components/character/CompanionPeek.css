@@ -1,0 +1,82 @@
+.companion-peek {
+	position: absolute;
+	z-index: 5;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.55rem;
+	pointer-events: none;
+	max-width: min(280px, 70vw);
+}
+
+.companion-peek-right {
+	right: 0.5rem;
+	bottom: 1rem;
+}
+
+.companion-peek-left {
+	left: 0.5rem;
+	bottom: 1rem;
+}
+
+.companion-peek-bottom {
+	left: 50%;
+	bottom: 0.75rem;
+	width: min(420px, 92vw);
+	max-width: none;
+	align-items: stretch;
+}
+
+.companion-peek-figure {
+	width: 160px;
+	filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.35));
+}
+
+.companion-peek-focus .companion-peek-figure {
+	width: 180px;
+}
+
+.companion-peek-lazy .companion-peek-figure {
+	width: 150px;
+	opacity: 0.95;
+}
+
+.companion-peek-character {
+	max-width: 100%;
+}
+
+.companion-peek-dialog {
+	align-self: stretch;
+	padding: 0.7rem 0.85rem;
+	border-radius: 14px;
+	background: rgba(8, 14, 22, 0.72);
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	backdrop-filter: blur(10px);
+	color: #f2f7fb;
+	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.companion-peek-bottom .companion-peek-dialog {
+	background: rgba(8, 14, 22, 0.58);
+}
+
+.companion-peek-name {
+	display: inline-block;
+	font-size: 0.72rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	opacity: 0.65;
+	margin-bottom: 0.25rem;
+}
+
+.companion-peek-dialog p {
+	margin: 0;
+	font-size: 0.92rem;
+	line-height: 1.45;
+}
+
+.app-shell.theme-day .companion-peek-dialog {
+	background: rgba(255, 255, 255, 0.82);
+	border-color: rgba(46, 125, 50, 0.2);
+	color: #142418;
+}

@@ -14,6 +14,13 @@
 	animation: idleRestIn 0.45s ease;
 }
 
+.idle-rest-peek-layer {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: 6;
+}
+
 @keyframes idleRestIn {
 	from { opacity: 0; }
 	to { opacity: 1; }

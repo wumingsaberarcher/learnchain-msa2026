@@ -9,6 +9,13 @@
 	isolation: isolate;
 }
 
+.focus-mode-peek-layer {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: 8;
+}
+
 .focus-mode-atmosphere {
 	position: absolute;
 	inset: 0;

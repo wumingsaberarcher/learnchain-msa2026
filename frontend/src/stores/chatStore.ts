@@ -7,12 +7,19 @@ import {
     type ChatMessagePayload,
 } from '../api/chatApi'
 import { useAiSettingsStore } from './aiSettingsStore'
+import { useCompanionStore } from './companionStore'
+import type { Emotion } from '../components/character/emotionAssets'
+import type { CompanionScene } from '../companions/companionLines'
 
 export interface UiChatMessage {
     id: string
     role: 'user' | 'assistant' | 'system'
     content: string
     createdAt: number
+    /** Local-only aside lines from idle/focus peek (not sent to LLM). */
+    kind?: 'chat' | 'aside'
+    scene?: CompanionScene
+    emotion?: Emotion
 }
 
 interface ChatState {
@@ -32,6 +39,7 @@ interface ChatState {
     clearHistory: () => Promise<void>
     hydrateForUser: (userId: number | null) => void
     sendMessage: (text: string, language: 'zh' | 'en') => Promise<ChatActionResult[]>
+    appendCompanionAside: (content: string, scene: 'idle' | 'focus', emotion?: Emotion) => void
 }
 
 const historyKey = (userId: number) => `learnchain-chat-${userId}`
@@ -50,7 +58,7 @@ function loadLocalMessages(userId: number | null): UiChatMessage[] {
 
 function saveLocalMessages(userId: number | null, messages: UiChatMessage[]) {
     if (!userId) return
-    localStorage.setItem(historyKey(userId), JSON.stringify(messages.slice(-80)))
+    localStorage.setItem(historyKey(userId), JSON.stringify(messages.slice(-100)))
 }
 
 function uid() {
@@ -101,6 +109,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         void getChatHistory()
             .then(history => {
                 if (get().userId !== userId) return
+                const local = get().messages
+                const asides = local.filter(m => m.kind === 'aside')
                 const mapped: UiChatMessage[] = history.messages
                     .filter(m => m.role === 'user' || m.role === 'assistant')
                     .map((m, i) => ({
@@ -108,15 +118,35 @@ export const useChatStore = create<ChatState>((set, get) => ({
                         role: m.role as 'user' | 'assistant',
                         content: m.content,
                         createdAt: Date.parse(m.createdAt) || Date.now(),
+                        kind: 'chat' as const,
                     }))
-                // Prefer server history when available; keep local cache as fallback
-                const messages = mapped.length > 0 ? mapped : get().messages
+                const messages = mapped.length > 0
+                    ? [...mapped, ...asides].sort((a, b) => a.createdAt - b.createdAt).slice(-100)
+                    : local
                 set({ messages, isHydrating: false })
                 saveLocalMessages(userId, messages)
             })
             .catch(() => {
                 if (get().userId === userId) set({ isHydrating: false })
             })
+    },
+
+    appendCompanionAside: (content, scene, emotion) => {
+        const trimmed = content.trim()
+        if (!trimmed) return
+        const msg: UiChatMessage = {
+            id: uid(),
+            role: 'assistant',
+            content: trimmed,
+            createdAt: Date.now(),
+            kind: 'aside',
+            scene,
+            emotion,
+        }
+        const messages = [...get().messages, msg]
+        set({ messages })
+        saveLocalMessages(get().userId, messages)
+        if (emotion) useCompanionStore.getState().setEmotion(emotion, true)
     },
 
     sendMessage: async (text, language) => {
@@ -134,13 +164,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
             role: 'user',
             content: trimmed,
             createdAt: Date.now(),
+            kind: 'chat',
         }
 
         const nextMessages = [...get().messages, userMsg]
         set({ messages: nextMessages, isSending: true, error: null, lastActions: [] })
         saveLocalMessages(get().userId, nextMessages)
+        useCompanionStore.getState().setEmotion('normal', true)
 
-        // Server owns memory; only the latest user turn is required in the payload.
         const payload: ChatMessagePayload[] = [{ role: 'user', content: trimmed }]
 
         try {
@@ -155,6 +186,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 role: 'assistant',
                 content: res.reply,
                 createdAt: Date.now(),
+                kind: 'chat',
             }
             const withAssistant = [...get().messages, assistantMsg]
             set({
@@ -163,10 +195,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 lastActions: res.actionsExecuted,
             })
             saveLocalMessages(get().userId, withAssistant)
+            useCompanionStore.getState().reactToText(res.reply, true)
+            window.setTimeout(() => {
+                useCompanionStore.getState().setEmotion(
+                    useCompanionStore.getState().emotion,
+                    false,
+                )
+            }, 2200)
             return res.actionsExecuted
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Chat failed'
             set({ isSending: false, error: message })
+            useCompanionStore.getState().setEmotion('sorrow', false)
             return []
         }
     },
