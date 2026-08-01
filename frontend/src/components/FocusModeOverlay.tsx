@@ -9,7 +9,7 @@ import {
     VolumeX,
 } from 'lucide-react'
 import { createCheckIn } from '../api/checkInApi'
-import { BGM_TRACKS, type BgmTrackId, useBgmStore } from '../stores/bgmStore'
+import { type BgmTrackId, useBgmStore } from '../stores/bgmStore'
 import { focusBonusXp, useFocusModeStore } from '../stores/focusModeStore'
 import { useTranslation } from '../stores/settingsStore'
 import { difficultyKey } from '../utils/habitHelpers'
@@ -56,7 +56,6 @@ export default function FocusModeOverlay({ onCompleted }: FocusModeOverlayProps)
 
     const {
         trackId,
-        unlocked,
         volume,
         muted,
         isPlaying,
@@ -64,7 +63,12 @@ export default function FocusModeOverlay({ onCompleted }: FocusModeOverlayProps)
         selectTrack,
         setVolume,
         setMuted,
+        allTracks,
+        isUnlocked,
+        userTracks,
     } = useBgmStore()
+
+    const playableTracks = allTracks()
 
     const [customMinutes, setCustomMinutes] = useState('')
     const [checkingIn, setCheckingIn] = useState(false)
@@ -100,7 +104,7 @@ export default function FocusModeOverlay({ onCompleted }: FocusModeOverlayProps)
         : target.habitName
 
     const onPickTrack = (id: BgmTrackId) => {
-        if (!unlocked.includes(id)) return
+        if (!isUnlocked(id)) return
         selectTrack(id, true)
     }
 
@@ -244,8 +248,8 @@ export default function FocusModeOverlay({ onCompleted }: FocusModeOverlayProps)
                     </div>
                     {needsGesture && <p className="focus-mode-bgm-hint">{t('sidebar.tapToPlay')}</p>}
                     <ul className="focus-mode-tracks">
-                        {BGM_TRACKS.map(track => {
-                            const open = unlocked.includes(track.id)
+                        {playableTracks.map(track => {
+                            const open = isUnlocked(track.id)
                             const active = trackId === track.id
                             return (
                                 <li key={track.id}>

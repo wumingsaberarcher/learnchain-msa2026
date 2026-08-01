@@ -1,40 +1,7 @@
-.about-page {
-	width: min(960px, 100%);
-	margin: 0 auto;
-	padding: 1.5rem 1rem 3.5rem;
-	display: flex;
-	flex-direction: column;
-	gap: 1.35rem;
-}
-
 .about-page-hero {
 	display: flex;
 	align-items: flex-start;
 	gap: 0.9rem;
-}
-
-.about-page-hero-icon {
-	width: 44px;
-	height: 44px;
-	border-radius: 14px;
-	display: grid;
-	place-items: center;
-	flex-shrink: 0;
-	background: rgba(0, 255, 255, 0.12);
-	border: 1px solid rgba(0, 255, 255, 0.28);
-	color: var(--primary, #00ffff);
-}
-
-.about-page-hero h1 {
-	margin: 0;
-	font-size: clamp(1.55rem, 3.5vw, 2rem);
-	line-height: 1.2;
-}
-
-.about-page-hero p {
-	margin: 0.35rem 0 0;
-	opacity: 0.72;
-	font-size: 0.98rem;
 }
 
 .about-card,

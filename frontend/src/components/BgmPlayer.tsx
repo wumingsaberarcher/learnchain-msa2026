@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BADGE_DEFINITIONS } from '../badges/badgeDefinitions'
 import { useAchievementStore } from '../stores/achievementStore'
 import {
@@ -14,18 +14,25 @@ import {
  */
 export default function BgmPlayer() {
     const audioRef = useRef<HTMLAudioElement | null>(null)
+    const [resolvedSrc, setResolvedSrc] = useState<string | null>(null)
+
     const trackId = useBgmStore(s => s.trackId)
     const volume = useBgmStore(s => s.volume)
     const muted = useBgmStore(s => s.muted)
+    const userTracks = useBgmStore(s => s.userTracks)
+    const libraryReady = useBgmStore(s => s.libraryReady)
     const setPlaying = useBgmStore(s => s.setPlaying)
     const setNeedsGesture = useBgmStore(s => s.setNeedsGesture)
     const unlockAllBadgeTracks = useBgmStore(s => s.unlockAllBadgeTracks)
     const selectTrack = useBgmStore(s => s.selectTrack)
+    const hydrateUserLibrary = useBgmStore(s => s.hydrateUserLibrary)
+    const resolveTrackSrc = useBgmStore(s => s.resolveTrackSrc)
 
     const achievements = useAchievementStore(s => s.achievements)
 
-    const track = BGM_TRACKS.find(t => t.id === trackId) ?? BGM_TRACKS[0]
-    const src = bgmTrackUrl(track.file)
+    useEffect(() => {
+        void hydrateUserLibrary()
+    }, [hydrateUserLibrary])
 
     useEffect(() => {
         const audio = new Audio()
@@ -48,13 +55,22 @@ export default function BgmPlayer() {
     }, [setPlaying])
 
     useEffect(() => {
-        const audio = audioRef.current
-        if (!audio) return
-        const currentFile = audio.getAttribute('data-file')
-        if (currentFile === track.file && audio.src) return
+        if (!libraryReady) return
+        let cancelled = false
+        void resolveTrackSrc(trackId).then(src => {
+            if (!cancelled) setResolvedSrc(src)
+        })
+        return () => { cancelled = true }
+    }, [trackId, userTracks, libraryReady, resolveTrackSrc])
 
-        audio.src = src
-        audio.setAttribute('data-file', track.file)
+    useEffect(() => {
+        const audio = audioRef.current
+        if (!audio || !resolvedSrc) return
+        const currentSrc = audio.getAttribute('data-src')
+        if (currentSrc === resolvedSrc && audio.src) return
+
+        audio.src = resolvedSrc
+        audio.setAttribute('data-src', resolvedSrc)
         audio.volume = muted ? 0 : volume
         void audio.play()
             .then(() => {
@@ -62,7 +78,7 @@ export default function BgmPlayer() {
                 setPlaying(true)
             })
             .catch(() => setNeedsGesture(true))
-    }, [src, track.file, muted, volume, setNeedsGesture, setPlaying])
+    }, [resolvedSrc, muted, volume, setNeedsGesture, setPlaying])
 
     useEffect(() => {
         const audio = audioRef.current
@@ -71,14 +87,13 @@ export default function BgmPlayer() {
         audio.muted = muted
     }, [volume, muted])
 
-    // First gesture unlocks autoplay for CETA (and later tracks).
     useEffect(() => {
         const tryStart = () => {
             const audio = audioRef.current
             if (!audio) return
-            if (!audio.src) {
-                audio.src = src
-                audio.setAttribute('data-file', track.file)
+            if (!audio.src && resolvedSrc) {
+                audio.src = resolvedSrc
+                audio.setAttribute('data-src', resolvedSrc)
             }
             audio.volume = muted ? 0 : volume
             void audio.play()
@@ -98,9 +113,8 @@ export default function BgmPlayer() {
         }
         events.forEach(e => window.addEventListener(e, onGesture, { passive: true }))
         return () => events.forEach(e => window.removeEventListener(e, onGesture))
-    }, [src, track.file, muted, volume, setNeedsGesture, setPlaying])
+    }, [resolvedSrc, muted, volume, setNeedsGesture, setPlaying])
 
-    // All badges → unlock hidden tracks + autoplay Waiting for the Sun.
     useEffect(() => {
         if (achievements.length < BADGE_DEFINITIONS.length) return
         if (!hasAllBadgesUnlocked(achievements)) return
@@ -112,8 +126,10 @@ export default function BgmPlayer() {
         const audio = audioRef.current
         if (!audio) return
         const waiting = BGM_TRACKS.find(t => t.id === 'waiting-for-the-sun')!
-        audio.src = bgmTrackUrl(waiting.file)
-        audio.setAttribute('data-file', waiting.file)
+        const src = bgmTrackUrl(waiting.file!)
+        audio.src = src
+        audio.setAttribute('data-src', src)
+        setResolvedSrc(src)
         audio.volume = muted ? 0 : volume
         void audio.play()
             .then(() => {

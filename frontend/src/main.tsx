@@ -11,6 +11,7 @@ import './styles/idle-rest.css'
 import './styles/app-sidebar.css'
 import './styles/focus-mode.css'
 import './styles/about.css'
+import './styles/music.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

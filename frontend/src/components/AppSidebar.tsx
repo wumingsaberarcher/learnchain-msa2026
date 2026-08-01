@@ -1,33 +1,22 @@
-import { Link, useLocation } from 'react-router-dom'
-import { Info, Lock, Menu, Music2, Volume2, VolumeX, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import {
+    Info,
+    Lock,
+    Menu,
+    Music2,
+    X,
+} from 'lucide-react'
 import { useTranslation } from '../stores/settingsStore'
-import { BGM_TRACKS, type BgmTrackId, useBgmStore } from '../stores/bgmStore'
+import { useBgmStore } from '../stores/bgmStore'
 
 export default function AppSidebar() {
     const { t } = useTranslation()
-    const location = useLocation()
-    const {
-        sidebarOpen,
-        setSidebarOpen,
-        trackId,
-        unlocked,
-        volume,
-        muted,
-        isPlaying,
-        needsGesture,
-        selectTrack,
-        setVolume,
-        setMuted,
-    } = useBgmStore()
+    const { sidebarOpen, setSidebarOpen, isPlaying, trackId, getTrack } = useBgmStore()
 
     if (!sidebarOpen) return null
 
-    const onPick = (id: BgmTrackId) => {
-        if (!unlocked.includes(id)) return
-        selectTrack(id, true)
-    }
-
     const close = () => setSidebarOpen(false)
+    const current = getTrack(trackId)
 
     return (
         <>
@@ -38,10 +27,17 @@ export default function AppSidebar() {
                 onClick={close}
             />
             <aside className="app-sidebar" role="dialog" aria-label={t('sidebar.title')}>
+                <div className="app-sidebar-glow" aria-hidden />
+
                 <div className="app-sidebar-header">
                     <div className="app-sidebar-title">
-                        <Menu className="w-5 h-5" />
-                        <span>{t('sidebar.title')}</span>
+                        <span className="app-sidebar-title-icon">
+                            <Menu className="w-4 h-4" />
+                        </span>
+                        <div>
+                            <strong>{t('sidebar.title')}</strong>
+                            <p>{t('sidebar.menuHint')}</p>
+                        </div>
                     </div>
                     <button
                         type="button"
@@ -54,87 +50,41 @@ export default function AppSidebar() {
                 </div>
 
                 <nav className="app-sidebar-nav" aria-label={t('sidebar.title')}>
-                    <a href="#sidebar-music" className="app-sidebar-nav-item active">
-                        <Music2 className="w-4 h-4" />
-                        <span>{t('sidebar.navMusic')}</span>
-                    </a>
-                    <Link
-                        to="/about"
-                        className={`app-sidebar-nav-item${location.pathname === '/about' ? ' current' : ''}`}
-                        onClick={close}
-                    >
-                        <Info className="w-4 h-4" />
-                        <span>{t('sidebar.navAbout')}</span>
+                    <Link to="/music" className="app-sidebar-nav-card" onClick={close}>
+                        <span className="app-sidebar-nav-icon music">
+                            <Music2 className="w-5 h-5" />
+                        </span>
+                        <span className="app-sidebar-nav-copy">
+                            <strong>{t('sidebar.navMusic')}</strong>
+                            <em>{t('sidebar.navMusicHint')}</em>
+                        </span>
+                    </Link>
+                    <Link to="/about" className="app-sidebar-nav-card" onClick={close}>
+                        <span className="app-sidebar-nav-icon about">
+                            <Info className="w-5 h-5" />
+                        </span>
+                        <span className="app-sidebar-nav-copy">
+                            <strong>{t('sidebar.navAbout')}</strong>
+                            <em>{t('sidebar.navAboutHint')}</em>
+                        </span>
                     </Link>
                 </nav>
 
-                <div id="sidebar-music" className="app-sidebar-music">
-                    <p className="app-sidebar-hint">{t('sidebar.bgmHint')}</p>
-                    {needsGesture && (
-                        <p className="app-sidebar-gesture">{t('sidebar.tapToPlay')}</p>
-                    )}
-
-                    <div className="app-sidebar-section">
-                        <h3>{t('sidebar.bgm')}</h3>
-                        <ul className="bgm-track-list">
-                            {BGM_TRACKS.map(track => {
-                                const open = unlocked.includes(track.id)
-                                const active = trackId === track.id
-                                return (
-                                    <li key={track.id}>
-                                        <button
-                                            type="button"
-                                            className={`bgm-track-btn${active ? ' active' : ''}${open ? '' : ' locked'}`}
-                                            onClick={() => onPick(track.id)}
-                                            disabled={!open}
-                                            title={open ? track.title : t('sidebar.lockedHint')}
-                                        >
-                                            <span className="bgm-track-main">
-                                                {open ? (
-                                                    <Music2 className="w-4 h-4" />
-                                                ) : (
-                                                    <Lock className="w-4 h-4" />
-                                                )}
-                                                <span>
-                                                    <strong>{track.title}</strong>
-                                                    {!open && (
-                                                        <em>{t('sidebar.locked')}</em>
-                                                    )}
-                                                    {open && active && isPlaying && (
-                                                        <em>{t('sidebar.nowPlaying')}</em>
-                                                    )}
-                                                </span>
-                                            </span>
-                                        </button>
-                                    </li>
-                                )
-                            })}
-                        </ul>
+                <div className="app-sidebar-now">
+                    <div className="app-sidebar-now-label">
+                        {isPlaying ? t('sidebar.nowPlaying') : t('sidebar.paused')}
                     </div>
-
-                    <div className="app-sidebar-section">
-                        <h3>{t('sidebar.volume')}</h3>
-                        <div className="bgm-volume-row">
-                            <button
-                                type="button"
-                                className="bgm-mute-btn"
-                                onClick={() => setMuted(!muted)}
-                                aria-label={muted ? t('sidebar.unmute') : t('sidebar.mute')}
-                            >
-                                {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                            </button>
-                            <input
-                                type="range"
-                                min={0}
-                                max={1}
-                                step={0.01}
-                                value={volume}
-                                onChange={e => setVolume(Number(e.target.value))}
-                                aria-label={t('sidebar.volume')}
-                            />
-                        </div>
+                    <div className="app-sidebar-now-track">
+                        <Music2 className="w-4 h-4" />
+                        <span>{current?.title ?? 'CETA'}</span>
                     </div>
+                    <p className="app-sidebar-now-hint">{t('sidebar.goMusicHint')}</p>
                 </div>
+
+                <p className="app-sidebar-foot">
+                    <Lock className="w-3.5 h-3.5" />
+                    {t('sidebar.lockedHint')}
+                </p>
             </aside>
         </>
     )

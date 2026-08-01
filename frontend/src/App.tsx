@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
 import { Target } from 'lucide-react'
 import Dashboard from './pages/ChainDashboard'
 import About from './pages/About'
+import Music from './pages/Music'
 import Habits from './pages/Habits'
 import Profile from './pages/Profile'
 import Achievements from './pages/Achievements'
@@ -115,6 +116,7 @@ function App() {
                     <Routes>
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/habits" element={<Habits />} />
+                        <Route path="/music" element={<Music />} />
                         <Route path="/about" element={<About />} />
                         <Route path="/profile" element={<Profile />} />
                         <Route path="/achievements" element={<Achievements />} />
