@@ -7,8 +7,7 @@ import { useAiSettingsStore } from '../../stores/aiSettingsStore'
 import { useCompanionStore } from '../../stores/companionStore'
 import { useHabitStore } from '../../stores/habitStore'
 import { useTranslation } from '../../stores/settingsStore'
-import Character from '../character/Character'
-import faceFallback from '../../../Canal/face.png'
+import CanalAvatar from '../character/CanalAvatar'
 import { useSpeechInput } from './useSpeechInput'
 
 export default function AiAssistant() {
@@ -96,9 +95,11 @@ export default function AiAssistant() {
                 <div className="ai-chat-panel" role="dialog" aria-label={t('chat.title')}>
                     <div className="ai-chat-header">
                         <div className="ai-chat-header-title">
-                            <div className="ai-chat-canal-mini" aria-hidden>
-                                <Character emotion={emotion} isTalking={isTalking || isSending} />
-                            </div>
+                            <CanalAvatar
+                                emotion={emotion}
+                                isTalking={isTalking || isSending}
+                                size="lg"
+                            />
                             <div>
                                 <strong>{t('chat.title')}</strong>
                                 <p>{t('chat.subtitle')}</p>
@@ -136,9 +137,11 @@ export default function AiAssistant() {
 
                     <div className="ai-chat-avatars-row">
                         <div className="ai-avatar-chip">
-                            <div className="ai-avatar-circle canal">
-                                <img src={faceFallback} alt="" />
-                            </div>
+                            <CanalAvatar
+                                emotion={emotion}
+                                isTalking={isTalking || isSending}
+                                size="md"
+                            />
                             <span>Canal</span>
                         </div>
                         <div className="ai-avatar-chip user">
@@ -191,9 +194,10 @@ export default function AiAssistant() {
                                     className={`ai-msg-row ${isUser ? 'user' : 'assistant'}${isAside ? ' aside' : ''}`}
                                 >
                                     {!isUser && (
-                                        <div className="ai-msg-avatar">
-                                            <img src={faceFallback} alt="" />
-                                        </div>
+                                        <CanalAvatar
+                                            emotion={m.emotion ?? emotion}
+                                            size="sm"
+                                        />
                                     )}
                                     <div className={`ai-bubble ai-bubble-${m.role}${isAside ? ' aside' : ''}`}>
                                         {isAside && (
@@ -217,9 +221,7 @@ export default function AiAssistant() {
                         })}
                         {isSending && (
                             <div className="ai-msg-row assistant">
-                                <div className="ai-msg-avatar">
-                                    <img src={faceFallback} alt="" />
-                                </div>
+                                <CanalAvatar emotion={emotion} isTalking size="sm" />
                                 <div className="ai-bubble ai-bubble-assistant ai-typing">{t('chat.thinking')}</div>
                             </div>
                         )}
@@ -287,9 +289,7 @@ export default function AiAssistant() {
                 {isOpen ? (
                     <X className="w-6 h-6" />
                 ) : (
-                    <span className="ai-fab-face">
-                        <img src={faceFallback} alt="" />
-                    </span>
+                    <CanalAvatar emotion={emotion} size="fab" />
                 )}
             </button>
         </div>

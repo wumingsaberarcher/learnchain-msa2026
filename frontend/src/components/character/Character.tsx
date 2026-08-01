@@ -16,9 +16,10 @@ import './Character.css'
 export default function Character({
   emotion = 'normal',
   isTalking = false,
+  animate = true,
   className = '',
   style,
-}: CharacterProps) {
+}: CharacterProps & { animate?: boolean }) {
   const face: Emotion = emotion
   const parts = emotionAssets[face]
 
@@ -27,14 +28,18 @@ export default function Character({
       className={`canal-character ${className}`.trim()}
       style={style}
       animate={
-        isTalking
-          ? { y: [0, -3, 0, -2, 0], scale: [1, 1.012, 1, 1.008, 1] }
-          : { y: [0, -4, 0], scale: [1, 1.015, 1] }
+        animate
+          ? (isTalking
+            ? { y: [0, -3, 0, -2, 0], scale: [1, 1.012, 1, 1.008, 1] }
+            : { y: [0, -4, 0], scale: [1, 1.015, 1] })
+          : { y: 0, scale: 1 }
       }
       transition={
-        isTalking
-          ? { duration: 0.9, repeat: Infinity, ease: 'easeInOut' }
-          : { duration: 3.6, repeat: Infinity, ease: 'easeInOut' }
+        animate
+          ? (isTalking
+            ? { duration: 0.9, repeat: Infinity, ease: 'easeInOut' }
+            : { duration: 3.6, repeat: Infinity, ease: 'easeInOut' })
+          : { duration: 0 }
       }
       aria-label={`Canal companion (${face})`}
     >

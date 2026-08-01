@@ -1,13 +1,25 @@
 import { useCallback, useEffect, useRef } from 'react'
 
+type SpeechRecognitionResultLike = {
+    0: { transcript: string }
+    isFinal: boolean
+    length: number
+}
+
+type SpeechRecognitionEventLike = {
+    resultIndex: number
+    results: ArrayLike<SpeechRecognitionResultLike> & { length: number }
+}
+
 type SpeechRecognitionLike = {
     lang: string
     continuous: boolean
     interimResults: boolean
+    maxAlternatives: number
     start: () => void
     stop: () => void
     abort: () => void
-    onresult: ((ev: { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => void) | null
+    onresult: ((ev: SpeechRecognitionEventLike) => void) | null
     onerror: ((ev: { error: string }) => void) | null
     onend: (() => void) | null
 }
@@ -20,6 +32,16 @@ function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
     return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null
 }
 
+/**
+ * Pick Web Speech locale.
+ * Always prefer zh-CN for this bilingual app: it emits Chinese characters (not pinyin)
+ * and Chrome's Chinese model still accepts English words / mixed 中英 sentences.
+ * Using en-US while speaking Chinese is what produces pinyin-like romanization.
+ */
+function resolveSpeechLang(_uiLanguage: 'zh' | 'en'): string {
+    return 'zh-CN'
+}
+
 export function useSpeechInput(options: {
     language: 'zh' | 'en'
     onResult: (transcript: string) => void
@@ -27,66 +49,129 @@ export function useSpeechInput(options: {
     onError?: (message: string) => void
 }) {
     const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
+    const listeningRef = useRef(false)
+    const startingRef = useRef(false)
+    const optionsRef = useRef(options)
+    optionsRef.current = options
+
     const supported = typeof window !== 'undefined' && !!getSpeechRecognitionCtor()
 
-    useEffect(() => {
-        return () => {
-            recognitionRef.current?.abort()
-            recognitionRef.current = null
+    const setListening = useCallback((value: boolean) => {
+        listeningRef.current = value
+        optionsRef.current.onListeningChange(value)
+    }, [])
+
+    const cleanupRecognition = useCallback(() => {
+        const rec = recognitionRef.current
+        recognitionRef.current = null
+        startingRef.current = false
+        if (!rec) return
+        rec.onresult = null
+        rec.onerror = null
+        rec.onend = null
+        try {
+            rec.abort()
+        } catch {
+            try {
+                rec.stop()
+            } catch {
+                /* ignore */
+            }
         }
     }, [])
 
+    useEffect(() => {
+        return () => {
+            cleanupRecognition()
+            listeningRef.current = false
+        }
+    }, [cleanupRecognition])
+
     const stop = useCallback(() => {
-        recognitionRef.current?.stop()
-        options.onListeningChange(false)
-    }, [options])
+        const rec = recognitionRef.current
+        setListening(false)
+        if (!rec) return
+        try {
+            rec.stop()
+        } catch {
+            cleanupRecognition()
+        }
+    }, [cleanupRecognition, setListening])
 
     const start = useCallback(() => {
         const Ctor = getSpeechRecognitionCtor()
         if (!Ctor) {
-            options.onError?.('unsupported')
+            optionsRef.current.onError?.('unsupported')
             return
         }
+        if (startingRef.current || listeningRef.current) return
 
-        recognitionRef.current?.abort()
+        // Tear down any leftover instance so Chrome allows a fresh start()
+        cleanupRecognition()
+        startingRef.current = true
+
         const recognition = new Ctor()
-        recognition.lang = options.language === 'zh' ? 'zh-CN' : 'en-US'
+        recognition.lang = resolveSpeechLang(optionsRef.current.language)
         recognition.continuous = false
-        recognition.interimResults = false
+        recognition.interimResults = true
+        recognition.maxAlternatives = 1
 
         recognition.onresult = (ev) => {
-            const result = ev.results[0]
-            if (result) {
-                options.onResult(result[0].transcript)
+            let finalChunk = ''
+            for (let i = ev.resultIndex; i < ev.results.length; i++) {
+                const row = ev.results[i]
+                if (!row) continue
+                const text = row[0]?.transcript?.trim()
+                if (!text) continue
+                if (row.isFinal) finalChunk += text
+            }
+            if (finalChunk) {
+                optionsRef.current.onResult(finalChunk)
             }
         }
+
         recognition.onerror = (ev) => {
-            options.onListeningChange(false)
+            startingRef.current = false
+            setListening(false)
+            recognitionRef.current = null
             if (ev.error !== 'aborted' && ev.error !== 'no-speech') {
-                options.onError?.(ev.error)
+                optionsRef.current.onError?.(ev.error)
             }
         }
+
         recognition.onend = () => {
-            options.onListeningChange(false)
+            startingRef.current = false
+            recognitionRef.current = null
+            setListening(false)
         }
 
         recognitionRef.current = recognition
-        options.onListeningChange(true)
-        try {
-            recognition.start()
-        } catch {
-            options.onListeningChange(false)
-            options.onError?.('start_failed')
-        }
-    }, [options])
+        setListening(true)
+
+        // Chrome can throw if start() follows abort() too quickly
+        window.setTimeout(() => {
+            if (recognitionRef.current !== recognition) return
+            try {
+                recognition.start()
+                startingRef.current = false
+            } catch {
+                startingRef.current = false
+                recognitionRef.current = null
+                setListening(false)
+                optionsRef.current.onError?.('start_failed')
+            }
+        }, 40)
+    }, [cleanupRecognition, setListening])
 
     const toggle = useCallback(() => {
-        if (recognitionRef.current) {
+        if (listeningRef.current || startingRef.current) {
             stop()
-        } else {
-            start()
+            cleanupRecognition()
+            setListening(false)
+            return
         }
-    }, [start, stop])
+        start()
+    }, [cleanupRecognition, setListening, start, stop])
 
     return { supported, start, stop, toggle }
 }
