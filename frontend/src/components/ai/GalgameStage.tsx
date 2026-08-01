@@ -83,12 +83,12 @@ export default function GalgameStage() {
     startedIntroRef.current = true
     // Let smoke play a beat, then intro line
     const delay = galSmokePlaying ? 520 : 80
-    const t = window.setTimeout(() => {
-      playLine(language.startsWith('zh') ? t('chat.galIntro') : t('chat.galIntro'))
+    const timer = window.setTimeout(() => {
+      playLine(t('chat.galIntro'))
       setIntroDone(true)
     }, delay)
-    return () => window.clearTimeout(t)
-  }, [galSmokePlaying, language, playLine, t])
+    return () => window.clearTimeout(timer)
+  }, [galSmokePlaying, playLine, t])
 
   useEffect(() => () => stopTypewriter(), [stopTypewriter])
 
