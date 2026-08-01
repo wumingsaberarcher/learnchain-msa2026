@@ -99,21 +99,21 @@ public class AiAssistantService
             var choice = completion["choices"]?[0]?["message"] as JsonObject
                 ?? throw new InvalidOperationException("LLM returned an empty response.");
 
-            messages.Add(choice.DeepClone());
+            messages.Add(SanitizeAssistantMessage(choice));
 
             var toolCalls = choice["tool_calls"] as JsonArray;
             if (toolCalls == null || toolCalls.Count == 0)
             {
-                finalReply = choice["content"]?.GetValue<string>()?.Trim();
+                finalReply = ReadMessageContent(choice["content"])?.Trim();
                 break;
             }
 
             foreach (var callNode in toolCalls)
             {
                 if (callNode is not JsonObject call) continue;
-                var id = call["id"]?.GetValue<string>() ?? Guid.NewGuid().ToString("N");
-                var name = call["function"]?["name"]?.GetValue<string>() ?? "";
-                var argsJson = call["function"]?["arguments"]?.GetValue<string>() ?? "{}";
+                var id = ReadStringNode(call["id"]) ?? Guid.NewGuid().ToString("N");
+                var name = ReadStringNode(call["function"]?["name"]) ?? "";
+                var argsJson = ReadToolArguments(call["function"]?["arguments"]);
 
                 var (resultText, action) = await ExecuteToolAsync(user, name, argsJson, zh, ct);
                 if (action != null) actions.Add(action);
@@ -136,12 +136,19 @@ public class AiAssistantService
                 ["temperature"] = 0.4
             };
             var completion = await CallChatCompletionsAsync(baseUrl, apiKey, body, ct);
-            finalReply = completion["choices"]?[0]?["message"]?["content"]?.GetValue<string>()?.Trim()
+            finalReply = ReadMessageContent(completion["choices"]?[0]?["message"]?["content"])?.Trim()
                 ?? (zh ? "我已经处理完相关操作，还有什么可以帮你的吗？" : "Done. Anything else I can help with?");
         }
 
         await _memory.AppendMessageAsync(session, "assistant", finalReply!, ct);
-        await _memory.MaybeSummarizeAsync(session, user, apiKey, baseUrl, model, zh, ct);
+        try
+        {
+            await _memory.MaybeSummarizeAsync(session, user, apiKey, baseUrl, model, zh, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Companion summarize failed after chat; continuing with reply");
+        }
 
         return new ChatResponse
         {
@@ -174,7 +181,9 @@ public class AiAssistantService
             Naturally weave in game progress (streaks, XP, levels, badges, chain continuity) when helpful — keep it encouraging, not robotic.
 
             You help users understand their account, what they should do today, and create/rename/delete habits via tools.
-            When creating a habit, ask clarifying questions (name, type: Daily|EveryOtherDay|Weekly|OneTime, difficulty 1-3, due date for OneTime/Weekly if needed) until you have enough info — then call create_habit.
+            When creating a habit: if the user already said the essentials OR told you to decide freely (e.g. 随便 / any name / any XP), call create_habit immediately — pick a clear Daily name and difficulty 1–3. Do not keep asking clarifying questions when they said to choose for them.
+            XP is determined by difficulty only (1→10 XP, 2→20 XP, 3→30 XP). If they ask for a specific XP, pick the closest difficulty. There is no free-form XP field.
+            Otherwise ask briefly for missing name/type/difficulty, then call create_habit.
             When renaming or deleting, confirm the habit id/name first if ambiguous.
             You may read all account and habit data via tools or the context below.
             You cannot mark check-ins for the user; tell them to use the dashboard.
@@ -196,14 +205,15 @@ public class AiAssistantService
         Tool("get_account_overview", "Get account profile plus habit/today summary.", new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }),
         Tool("get_today_status", "List habits due today and check-in status.", new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }),
         Tool("list_habits", "List all active habits with ids and metadata.", new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }),
-        Tool("create_habit", "Create a new habit after gathering details.", new JsonObject
+        Tool("create_habit", "Create a new habit. Prefer calling this when the user wants you to invent name/XP. XP maps from difficulty: 1=10, 2=20, 3=30.", new JsonObject
         {
             ["type"] = "object",
             ["properties"] = new JsonObject
             {
-                ["name"] = new JsonObject { ["type"] = "string" },
-                ["habitType"] = new JsonObject { ["type"] = "string", ["description"] = "Daily | EveryOtherDay | Weekly | OneTime" },
+                ["name"] = new JsonObject { ["type"] = "string", ["description"] = "Habit name (invent one if user said any/随便)" },
+                ["habitType"] = new JsonObject { ["type"] = "string", ["description"] = "Daily | EveryOtherDay | Weekly | OneTime (default Daily)" },
                 ["difficulty"] = new JsonObject { ["type"] = "integer", ["description"] = "1, 2, or 3" },
+                ["xp"] = new JsonObject { ["type"] = "integer", ["description"] = "Optional requested XP; mapped to nearest difficulty" },
                 ["dueDate"] = new JsonObject { ["type"] = "string", ["description"] = "ISO date optional, for Weekly/OneTime" }
             },
             ["required"] = new JsonArray("name")
@@ -301,29 +311,31 @@ public class AiAssistantService
                 }
                 case "create_habit":
                 {
-                    var habitName = args["name"]?.GetValue<string>()?.Trim();
+                    var habitName = ReadStringArg(args, "name")?.Trim();
                     if (string.IsNullOrWhiteSpace(habitName))
-                        return (zh ? "缺少习惯名称" : "Missing habit name", null);
-
-                    var habitType = args["habitType"]?.GetValue<string>()?.Trim() ?? "Daily";
-                    if (habitType is not ("Daily" or "EveryOtherDay" or "Weekly" or "OneTime"))
-                        habitType = "Daily";
-
-                    var difficulty = 1;
-                    if (args["difficulty"] != null)
                     {
-                        difficulty = args["difficulty"]!.GetValue<int>();
-                        if (difficulty is < 1 or > 3) difficulty = 1;
+                        habitName = zh ? $"每日小目标 {DateTime.UtcNow:MMddHHmm}" : $"Daily habit {DateTime.UtcNow:MMddHHmm}";
                     }
 
+                    var habitTypeRaw = ReadStringArg(args, "habitType")?.Trim() ?? "Daily";
+                    var habitType = NormalizeHabitType(habitTypeRaw);
+
+                    var difficulty = ParseDifficulty(args["difficulty"]);
+                    var xpHint = ParsePositiveInt(args["xp"]) ?? ParsePositiveInt(args["baseXp"]);
+                    if (xpHint.HasValue)
+                        difficulty = DifficultyFromXp(xpHint.Value);
+
                     DateTime? dueDate = null;
-                    if (args["dueDate"] != null && DateTime.TryParse(args["dueDate"]!.ToString(), out var parsed))
+                    var dueRaw = ReadStringArg(args, "dueDate");
+                    if (!string.IsNullOrWhiteSpace(dueRaw) && DateTime.TryParse(dueRaw, out var parsed))
                         dueDate = parsed.Date;
 
                     var exists = await _context.Habits.AnyAsync(h =>
                         h.UserId == user.Id && h.IsActive && h.Name.ToLower() == habitName.ToLower(), ct);
                     if (exists)
-                        return (zh ? "已存在同名活跃习惯" : "An active habit with that name already exists", null);
+                    {
+                        habitName = $"{habitName} {DateTime.UtcNow:HHmmss}";
+                    }
 
                     var habit = new Habit
                     {
@@ -345,15 +357,17 @@ public class AiAssistantService
                     var action = new ChatActionResult
                     {
                         Type = "habit_created",
-                        Summary = zh ? $"已创建习惯「{habit.Name}」" : $"Created habit \"{habit.Name}\"",
+                        Summary = zh
+                            ? $"已创建习惯「{habit.Name}」（{habit.HabitType}，+{habit.BaseXP} XP）"
+                            : $"Created habit \"{habit.Name}\" ({habit.HabitType}, +{habit.BaseXP} XP)",
                         HabitId = habit.Id
                     };
-                    return (JsonSerializer.Serialize(new { ok = true, habit.Id, habit.Name, habit.HabitType, habit.Difficulty }, JsonOpts), action);
+                    return (JsonSerializer.Serialize(new { ok = true, habit.Id, habit.Name, habit.HabitType, habit.Difficulty, habit.BaseXP }, JsonOpts), action);
                 }
                 case "rename_habit":
                 {
-                    var habitId = args["habitId"]?.GetValue<int>() ?? 0;
-                    var newName = args["newName"]?.GetValue<string>()?.Trim();
+                    var habitId = ParsePositiveInt(args["habitId"]) ?? 0;
+                    var newName = ReadStringArg(args, "newName")?.Trim();
                     if (habitId <= 0 || string.IsNullOrWhiteSpace(newName))
                         return (zh ? "需要 habitId 和新名称" : "habitId and newName required", null);
 
@@ -380,7 +394,7 @@ public class AiAssistantService
                 }
                 case "delete_habit":
                 {
-                    var habitId = args["habitId"]?.GetValue<int>() ?? 0;
+                    var habitId = ParsePositiveInt(args["habitId"]) ?? 0;
                     var habit = await _context.Habits.FirstOrDefaultAsync(h => h.Id == habitId && h.UserId == user.Id && h.IsActive, ct);
                     if (habit == null)
                         return (zh ? "习惯不存在" : "Habit not found", null);
@@ -432,4 +446,118 @@ public class AiAssistantService
 
     private static string Truncate(string s, int max) =>
         s.Length <= max ? s : s[..max] + "…";
+
+    /// <summary>Strip null content from assistant tool-call messages — some providers reject Json null content.</summary>
+    private static JsonObject SanitizeAssistantMessage(JsonObject choice)
+    {
+        var clone = choice.DeepClone()!.AsObject();
+        if (clone.TryGetPropertyValue("content", out var content) &&
+            (content is null || content.GetValueKind() == JsonValueKind.Null))
+        {
+            clone.Remove("content");
+        }
+        return clone;
+    }
+
+    private static string? ReadMessageContent(JsonNode? contentNode)
+    {
+        if (contentNode is null || contentNode.GetValueKind() == JsonValueKind.Null)
+            return null;
+
+        if (contentNode is JsonValue jv)
+        {
+            if (jv.TryGetValue<string>(out var s)) return s;
+            return contentNode.ToString();
+        }
+
+        if (contentNode is JsonArray arr)
+        {
+            var parts = new List<string>();
+            foreach (var part in arr)
+            {
+                if (part is JsonObject o)
+                {
+                    var text = ReadStringNode(o["text"]);
+                    if (!string.IsNullOrEmpty(text)) parts.Add(text);
+                }
+                else if (part is JsonValue pv && pv.TryGetValue<string>(out var t) && !string.IsNullOrEmpty(t))
+                {
+                    parts.Add(t);
+                }
+            }
+            return parts.Count == 0 ? null : string.Concat(parts);
+        }
+
+        return contentNode.ToString();
+    }
+
+    private static string? ReadStringNode(JsonNode? node)
+    {
+        if (node is null || node.GetValueKind() == JsonValueKind.Null) return null;
+        if (node is JsonValue jv && jv.TryGetValue<string>(out var s)) return s;
+        return node.ToString()?.Trim('"');
+    }
+
+    private static string ReadToolArguments(JsonNode? node)
+    {
+        if (node is null || node.GetValueKind() == JsonValueKind.Null) return "{}";
+        if (node is JsonObject or JsonArray) return node.ToJsonString();
+        if (node is JsonValue jv && jv.TryGetValue<string>(out var s))
+            return string.IsNullOrWhiteSpace(s) ? "{}" : s;
+        return node.ToString() ?? "{}";
+    }
+
+    private static string? ReadStringArg(JsonObject args, string key)
+    {
+        if (!args.TryGetPropertyValue(key, out var node) || node is null || node is JsonObject)
+            return null;
+        return ReadStringNode(node);
+    }
+
+    private static int? ParsePositiveInt(JsonNode? node)
+    {
+        if (node is null || node.GetValueKind() == JsonValueKind.Null) return null;
+        try
+        {
+            if (node is JsonValue jv)
+            {
+                if (jv.TryGetValue<int>(out var i)) return i;
+                if (jv.TryGetValue<long>(out var l)) return (int)l;
+                if (jv.TryGetValue<double>(out var d)) return (int)Math.Round(d);
+                if (jv.TryGetValue<string>(out var s) && int.TryParse(s.Trim(), out var p)) return p;
+            }
+            if (int.TryParse(node.ToString(), out var parsed)) return parsed;
+        }
+        catch
+        {
+            /* ignore */
+        }
+        return null;
+    }
+
+    private static int ParseDifficulty(JsonNode? node)
+    {
+        var n = ParsePositiveInt(node);
+        if (n is >= 1 and <= 3) return n.Value;
+        return 1;
+    }
+
+    private static int DifficultyFromXp(int xp) => xp switch
+    {
+        <= 14 => 1,
+        <= 24 => 2,
+        _ => 3
+    };
+
+    private static string NormalizeHabitType(string raw)
+    {
+        var t = raw.Trim();
+        if (t is "Daily" or "EveryOtherDay" or "Weekly" or "OneTime") return t;
+        var lower = t.ToLowerInvariant();
+        if (lower is "daily" or "每天" or "每日") return "Daily";
+        if (lower is "everyotherday" or "every_other_day" or "隔天" or "每两天") return "EveryOtherDay";
+        if (lower is "weekly" or "每周") return "Weekly";
+        if (lower is "onetime" or "one_time" or "一次性") return "OneTime";
+        return "Daily";
+    }
 }

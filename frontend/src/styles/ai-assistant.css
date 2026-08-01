@@ -196,13 +196,9 @@
 }
 
 .ai-icon-btn.listening {
-	background: color-mix(in srgb, var(--accent, #ff6b6b) 55%, transparent);
-	animation: ai-pulse 1.2s ease infinite;
-}
-
-@keyframes ai-pulse {
-	0%, 100% { transform: scale(1); }
-	50% { transform: scale(1.08); }
+	background: color-mix(in srgb, #22d3ee 40%, rgba(255, 255, 255, 0.08));
+	color: #7df9ff;
+	box-shadow: 0 0 0 1px color-mix(in srgb, #22d3ee 55%, transparent);
 }
 
 .ai-chat-banner,

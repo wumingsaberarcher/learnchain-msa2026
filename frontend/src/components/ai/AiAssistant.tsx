@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ImagePlus, Mail, Mic, MicOff, Send, Trash2, X } from 'lucide-react'
+import { ImagePlus, Mail, Mic, Send, Trash2, X } from 'lucide-react'
 import { sendTodayReminder } from '../../api/chatApi'
 import { useChatStore } from '../../stores/chatStore'
 import { useAiSettingsStore } from '../../stores/aiSettingsStore'
@@ -9,6 +9,7 @@ import { useHabitStore } from '../../stores/habitStore'
 import { useTranslation } from '../../stores/settingsStore'
 import CanalAvatar from '../character/CanalAvatar'
 import { useSpeechInput } from './useSpeechInput'
+import VoiceVolumeIcon from './VoiceVolumeIcon'
 
 export default function AiAssistant() {
     const { isLoggedIn, currentUser, fetchHabits, fetchTodayCheckedHabits } = useHabitStore()
@@ -261,11 +262,14 @@ export default function AiAssistant() {
                         <button
                             type="button"
                             className={`ai-icon-btn ${isListening ? 'listening' : ''}`}
-                            title={speech.supported ? t('chat.voice') : t('chat.voiceUnsupported')}
+                            title={speech.supported ? (isListening ? t('chat.voiceStop') : t('chat.voice')) : t('chat.voiceUnsupported')}
                             disabled={!speech.supported || isSending}
                             onClick={() => speech.toggle()}
+                            aria-pressed={isListening}
                         >
-                            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                            {isListening
+                                ? <VoiceVolumeIcon level={speech.volumeLevel} className="w-4 h-4" />
+                                : <Mic className="w-4 h-4" />}
                         </button>
                         <button
                             type="button"
