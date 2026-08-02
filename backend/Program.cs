@@ -72,7 +72,7 @@ try
             ValidAudience = jwtSettings["Audience"],
             ValidateLifetime = true,
             RoleClaimType = ClaimTypes.Role,
-            ClockSkew = TimeSpan.Zero
+            ClockSkew = TimeSpan.FromMinutes(2)
         };
     });
 

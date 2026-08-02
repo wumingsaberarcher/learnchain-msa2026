@@ -14,32 +14,38 @@ import eyebrowAngry from '../../../Canal/eyebrow/eyebrow_angry.png'
 import eyebrowSmile from '../../../Canal/eyebrow/eyebrow_smile.png'
 import eyebrowSorrow from '../../../Canal/eyebrow/eyebrow_sorrow.png'
 import eyebrowSurprise from '../../../Canal/eyebrow/eyebrow_surprise.png'
+import eyebrowFear from '../../../Canal/eyebrow/eyebrow_fear.png'
 
 import eyelash from '../../../Canal/eyelash/eyelash.png'
 import eyelashAngry from '../../../Canal/eyelash/eyelash_angry.png'
 import eyelashSmile from '../../../Canal/eyelash/eyelash_smile.png'
 import eyelashSorrow from '../../../Canal/eyelash/eyelash_sorrow.png'
 import eyelashSurprise from '../../../Canal/eyelash/eyelash_surprise.png'
+import eyelashFear from '../../../Canal/eyelash/eyelash_fear.png'
 
 import eyewhite from '../../../Canal/eyewhite/eyewhite.png'
 import eyewhiteAngry from '../../../Canal/eyewhite/eyewhite_angry.png'
 import eyewhiteSmile from '../../../Canal/eyewhite/eyewhite_smile.png'
 import eyewhiteSorrow from '../../../Canal/eyewhite/eyewhite_sorrow.png'
 import eyewhiteSurprise from '../../../Canal/eyewhite/eyewhite_surprise.png'
+import eyewhiteFear from '../../../Canal/eyewhite/eyewhite_fear.png'
 
 import irides from '../../../Canal/irides/irides.png'
 import iridesAngry from '../../../Canal/irides/irides_angry.png'
 import iridesSmile from '../../../Canal/irides/irides_smile.png'
 import iridesSorrow from '../../../Canal/irides/irides_sorrow.png'
 import iridesSurprise from '../../../Canal/irides/irides_surprise.png'
+import iridesFear from '../../../Canal/irides/irides_fear.png'
 
 import mouth from '../../../Canal/mouth/mouth.png'
 import mouthAngry from '../../../Canal/mouth/mouth_angry.png'
 import mouthSmile from '../../../Canal/mouth/mouth_smile.png'
 import mouthSorrow from '../../../Canal/mouth/mouth_sorrow.png'
 import mouthSurprise from '../../../Canal/mouth/mouth_surprise.png'
+import mouthFear from '../../../Canal/mouth/mouth_fear.png'
 
-export type Emotion = 'normal' | 'angry' | 'smile' | 'sorrow' | 'surprise'
+export type Emotion = 'normal' | 'angry' | 'smile' | 'sorrow' | 'surprise' | 'fear'
+
 
 export type EmotionPart = 'eyebrow' | 'eyelash' | 'eyewhite' | 'irides' | 'mouth'
 
@@ -82,6 +88,13 @@ export const emotionAssetPaths = {
     irides: 'irides/irides_surprise.png',
     mouth: 'mouth/mouth_surprise.png',
   },
+  fear: {
+    eyebrow: 'eyebrow/eyebrow_fear.png',
+    eyelash: 'eyelash/eyelash_fear.png',
+    eyewhite: 'eyewhite/eyewhite_fear.png',
+    irides: 'irides/irides_fear.png',
+    mouth: 'mouth/mouth_fear.png',
+  },
 } as const satisfies EmotionAssetMap
 
 /** Resolved Vite URLs — use this in the Character component. */
@@ -120,6 +133,13 @@ export const emotionAssets: EmotionAssetMap = {
     eyewhite: eyewhiteSurprise,
     irides: iridesSurprise,
     mouth: mouthSurprise,
+  },
+  fear: {
+    eyebrow: eyebrowFear,
+    eyelash: eyelashFear,
+    eyewhite: eyewhiteFear,
+    irides: iridesFear,
+    mouth: mouthFear,
   },
 }
 

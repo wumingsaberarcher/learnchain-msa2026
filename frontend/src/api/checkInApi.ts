@@ -1,4 +1,4 @@
-import { API_BASE } from '../config/api'
+import { apiFetch, authHeaders } from './http'
 
 export interface CheckInPayload {
     habitId: number
@@ -23,13 +23,9 @@ export interface CheckInResult {
 }
 
 export async function createCheckIn(payload: CheckInPayload): Promise<CheckInResult> {
-    const token = localStorage.getItem('token')
-    const headers: HeadersInit = { 'Content-Type': 'application/json' }
-    if (token) headers['Authorization'] = `Bearer ${token}`
-
-    const res = await fetch(`${API_BASE}/checkin`, {
+    const res = await apiFetch('/checkin', {
         method: 'POST',
-        headers,
+        headers: authHeaders(true),
         body: JSON.stringify(payload),
     })
     if (!res.ok) {
@@ -52,21 +48,13 @@ export async function createCheckIn(payload: CheckInPayload): Promise<CheckInRes
 }
 
 export async function getAllCheckIns() {
-    const token = localStorage.getItem('token')
-    const headers: HeadersInit = {}
-    if (token) headers['Authorization'] = `Bearer ${token}`
-
-    const res = await fetch(`${API_BASE}/checkin`, { headers })
+    const res = await apiFetch('/checkin')
     if (!res.ok) throw new Error('Failed to fetch check-ins')
     return res.json()
 }
 
 export async function getTodayCheckedHabitIds(): Promise<number[]> {
-    const token = localStorage.getItem('token')
-    const headers: HeadersInit = {}
-    if (token) headers['Authorization'] = `Bearer ${token}`
-
-    const res = await fetch(`${API_BASE}/checkin/today`, { headers })
+    const res = await apiFetch('/checkin/today')
     if (!res.ok) throw new Error('Failed to fetch today check-ins')
     return res.json()
 }

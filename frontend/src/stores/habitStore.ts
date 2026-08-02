@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Habit, CreateHabitPayload } from '../api/habitApi'
 import { getHabits, createHabit } from '../api/habitApi'
+import { apiFetch, authHeaders, isJwtExpired } from '../api/http'
 import { API_BASE } from '../config/api'
 
 interface HabitState {
@@ -32,8 +33,7 @@ interface HabitState {
 
 export const useHabitStore = create<HabitState>((set, get) => {
 
-    // ====================== 初始化登录状态（最终加强版） ======================
-    const token = localStorage.getItem('token')
+    let token = localStorage.getItem('token')
     const savedUser = localStorage.getItem('currentUser')
 
     let initialIsLoggedIn = false
@@ -41,22 +41,26 @@ export const useHabitStore = create<HabitState>((set, get) => {
     let initialHabits: Habit[] = []
     let initialTodayChecked: number[] = []
 
+    if (token && isJwtExpired(token)) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('currentUser')
+        token = null
+    }
+
     if (token && savedUser) {
         try {
             const user = JSON.parse(savedUser)
             initialIsLoggedIn = true
             initialCurrentUser = user
-        } catch (e) {
+        } catch {
             localStorage.removeItem('token')
             localStorage.removeItem('currentUser')
         }
     } else {
-        // 没有 token 时，强制清空所有旧数据
         localStorage.removeItem('currentUser')
         initialHabits = []
         initialTodayChecked = []
     }
-    // =====================================================================
 
     return {
         habits: initialHabits,
@@ -71,7 +75,7 @@ export const useHabitStore = create<HabitState>((set, get) => {
             try {
                 const data = await getHabits()
                 set({ habits: data, isLoading: false })
-            } catch (err) {
+            } catch {
                 set({ error: '获取习惯失败', isLoading: false })
             }
         },
@@ -89,19 +93,15 @@ export const useHabitStore = create<HabitState>((set, get) => {
                 return newHabit
             } catch (err) {
                 set({ error: '创建习惯失败' })
-                throw err   // ← 关键：重新抛出错误，让组件能捕获
+                throw err
             }
         },
 
         updateHabit: async (id, updatedHabit) => {
             try {
-                const token = localStorage.getItem('token')
-                const res = await fetch(`${API_BASE}/habit/${id}`, {
+                const res = await apiFetch(`/habit/${id}`, {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(token && { Authorization: `Bearer ${token}` }),
-                    },
+                    headers: authHeaders(true),
                     body: JSON.stringify(updatedHabit),
                 })
 
@@ -112,46 +112,27 @@ export const useHabitStore = create<HabitState>((set, get) => {
                         h.id === id ? { ...h, ...updatedHabit } : h
                     )
                 }))
-            } catch (err) {
+            } catch {
                 alert('更新习惯失败')
             }
         },
 
         deleteHabit: async (id) => {
             try {
-                const token = localStorage.getItem('token')
-                const res = await fetch(`${API_BASE}/habit/${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        ...(token && { Authorization: `Bearer ${token}` }),
-                    },
-                })
-
+                const res = await apiFetch(`/habit/${id}`, { method: 'DELETE' })
                 if (!res.ok) throw new Error('删除失败')
-
                 set((state) => ({
                     habits: state.habits.filter(h => h.id !== id)
                 }))
-            } catch (err) {
+            } catch {
                 alert('删除习惯失败')
             }
         },
 
         fetchTodayCheckedHabits: async () => {
             try {
-                const token = localStorage.getItem('token')
-
-                const headers: HeadersInit = {}
-                if (token) {
-                    headers['Authorization'] = `Bearer ${token}`
-                }
-
-                const res = await fetch(`${API_BASE}/checkin/today`, {
-                    headers,
-                })
-
+                const res = await apiFetch('/checkin/today')
                 if (!res.ok) throw new Error('Failed to fetch today check-ins')
-
                 const habitIds: number[] = await res.json()
                 set({ todayCheckedHabitIds: habitIds })
             } catch (err) {
@@ -185,19 +166,11 @@ export const useHabitStore = create<HabitState>((set, get) => {
 
         fetchCurrentUser: async () => {
             try {
-                const token = localStorage.getItem('token')
-                if (!token) return
-
-                const res = await fetch(`${API_BASE}/user/me`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                })
-
+                const res = await apiFetch('/user/me')
+                if (res.status === 401) return
                 if (!res.ok) throw new Error('获取用户信息失败')
 
                 const userData = await res.json()
-
                 const updatedUser = {
                     id: userData.id,
                     username: userData.username,
@@ -207,8 +180,7 @@ export const useHabitStore = create<HabitState>((set, get) => {
                 }
 
                 localStorage.setItem('currentUser', JSON.stringify(updatedUser))
-                set({ currentUser: updatedUser })
-
+                set({ currentUser: updatedUser, isLoggedIn: true })
             } catch (err) {
                 console.error('获取当前用户信息失败', err)
             }
@@ -267,7 +239,11 @@ export const useHabitStore = create<HabitState>((set, get) => {
 
                 return true
             } catch (err) {
-                alert('登录出错，请稍后重试')
+                if (err instanceof Error && err.message.includes('封禁')) {
+                    alert(err.message)
+                } else {
+                    alert('登录出错，请稍后重试')
+                }
                 return false
             }
         },

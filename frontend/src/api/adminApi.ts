@@ -1,12 +1,4 @@
-import { API_BASE } from '../config/api'
-
-function authHeaders(json = false): HeadersInit {
-    const token = localStorage.getItem('token')
-    const headers: HeadersInit = {}
-    if (token) headers['Authorization'] = `Bearer ${token}`
-    if (json) headers['Content-Type'] = 'application/json'
-    return headers
-}
+import { apiFetch, authHeaders } from './http'
 
 export function isStaffRole(role?: string | null) {
     return role === 'Admin' || role === 'SuperAdmin'
@@ -56,22 +48,22 @@ async function readError(res: Response) {
 }
 
 export async function listAdminUsers(q?: string): Promise<AdminUserSummary[]> {
-    const url = q?.trim()
-        ? `${API_BASE}/admin/users?q=${encodeURIComponent(q.trim())}`
-        : `${API_BASE}/admin/users`
-    const res = await fetch(url, { headers: authHeaders() })
+    const path = q?.trim()
+        ? `/admin/users?q=${encodeURIComponent(q.trim())}`
+        : '/admin/users'
+    const res = await apiFetch(path)
     if (!res.ok) throw new Error(await readError(res))
     return res.json()
 }
 
 export async function getAdminUser(id: number): Promise<AdminUserDetail> {
-    const res = await fetch(`${API_BASE}/admin/users/${id}`, { headers: authHeaders() })
+    const res = await apiFetch(`/admin/users/${id}`)
     if (!res.ok) throw new Error(await readError(res))
     return res.json()
 }
 
 export async function setUserXp(id: number, totalXP: number) {
-    const res = await fetch(`${API_BASE}/admin/users/${id}/xp`, {
+    const res = await apiFetch(`/admin/users/${id}/xp`, {
         method: 'PUT',
         headers: authHeaders(true),
         body: JSON.stringify({ totalXP }),
@@ -81,7 +73,7 @@ export async function setUserXp(id: number, totalXP: number) {
 }
 
 export async function grantBadge(id: number, badgeId: string) {
-    const res = await fetch(`${API_BASE}/admin/users/${id}/badges`, {
+    const res = await apiFetch(`/admin/users/${id}/badges`, {
         method: 'POST',
         headers: authHeaders(true),
         body: JSON.stringify({ badgeId }),
@@ -91,16 +83,15 @@ export async function grantBadge(id: number, badgeId: string) {
 }
 
 export async function revokeBadge(id: number, badgeId: string) {
-    const res = await fetch(`${API_BASE}/admin/users/${id}/badges/${encodeURIComponent(badgeId)}`, {
+    const res = await apiFetch(`/admin/users/${id}/badges/${encodeURIComponent(badgeId)}`, {
         method: 'DELETE',
-        headers: authHeaders(),
     })
     if (!res.ok) throw new Error(await readError(res))
     return res.json()
 }
 
 export async function banUser(id: number, hours: number) {
-    const res = await fetch(`${API_BASE}/admin/users/${id}/ban`, {
+    const res = await apiFetch(`/admin/users/${id}/ban`, {
         method: 'POST',
         headers: authHeaders(true),
         body: JSON.stringify({ hours }),
@@ -110,18 +101,16 @@ export async function banUser(id: number, hours: number) {
 }
 
 export async function unbanUser(id: number) {
-    const res = await fetch(`${API_BASE}/admin/users/${id}/unban`, {
+    const res = await apiFetch(`/admin/users/${id}/unban`, {
         method: 'POST',
-        headers: authHeaders(),
     })
     if (!res.ok) throw new Error(await readError(res))
     return res.json()
 }
 
 export async function deleteUser(id: number) {
-    const res = await fetch(`${API_BASE}/admin/users/${id}`, {
+    const res = await apiFetch(`/admin/users/${id}`, {
         method: 'DELETE',
-        headers: authHeaders(),
     })
     if (!res.ok) throw new Error(await readError(res))
     return res.json()
@@ -129,7 +118,7 @@ export async function deleteUser(id: number) {
 
 /** SuperAdmin: set role to Admin or User. */
 export async function setUserRole(id: number, role: 'Admin' | 'User') {
-    const res = await fetch(`${API_BASE}/admin/users/${id}/role`, {
+    const res = await apiFetch(`/admin/users/${id}/role`, {
         method: 'PUT',
         headers: authHeaders(true),
         body: JSON.stringify({ role }),
@@ -140,7 +129,7 @@ export async function setUserRole(id: number, role: 'Admin' | 'User') {
 
 /** SuperAdmin: set password and receive it back once. */
 export async function setUserPassword(id: number, password: string) {
-    const res = await fetch(`${API_BASE}/admin/users/${id}/password`, {
+    const res = await apiFetch(`/admin/users/${id}/password`, {
         method: 'PUT',
         headers: authHeaders(true),
         body: JSON.stringify({ password }),
@@ -150,7 +139,7 @@ export async function setUserPassword(id: number, password: string) {
 }
 
 export async function listBadgeIds(): Promise<string[]> {
-    const res = await fetch(`${API_BASE}/admin/badges`, { headers: authHeaders() })
+    const res = await apiFetch('/admin/badges')
     if (!res.ok) throw new Error(await readError(res))
     return res.json()
 }

@@ -93,15 +93,24 @@ After create:
 - **Dashboard calendar** — Large month view showing due check-ins per day; completed items strike through
 - **Profile & motivation** — Personal bio quotes scroll on the dashboard
 - **Themes** — Day / night mode + Chinese / English (4-corner toggle)
-- **AI Assistant** — Floating chat (text + voice) that can read account/habits, guide create/rename/delete habits, and email today’s reminder (user’s own OpenAI-compatible API key)
+- **AI companion (Canal)** — Layered 2D character with emotions (`normal` / `smile` / `angry` / `sorrow` / `surprise` / `fear`); floating chat (text + continuous voice) that can read account/habits, create/rename/delete habits, and email today’s reminder (user’s own OpenAI-compatible API key)
+- **Galgame-style dialogue** — Click Canal’s avatar for smoke transition → fullscreen left portrait + typewriter dialogue with per-clause emotion timeline
+- **Companion memory** — Short-term chat history, rolling summary, and long-term memories (managed in Profile)
+- **Focus Mode** — Timed lock-in from a habit with optional BGM and focus-bonus XP on successful check-in
+- **Music** — Built-in BGM (some tracks unlock with all badges) + local user uploads via IndexedDB
+- **Admin RBAC** — SuperAdmin / Admin user management (XP, badges, ban, roles)
 
 ---
 
-## AI Assistant & Email
+## AI Companion, Chat & Email
 
 1. **Profile → AI Assistant Settings** — paste your API key (defaults: OpenAI `https://api.openai.com/v1` + `gpt-4o-mini`). Key is stored in the browser only and sent with each chat request; the server does not persist it.
-2. Open the floating bot (bottom-right) after login to chat. Habit write tools: create / rename / soft-delete. Read tools cover account info and today’s due/check-in status.
-3. **Password reset / daily digest email** — requires email on the backend.
+2. Open the floating companion (bottom-right) after login:
+   - **Small panel** — text + mic (continuous listen until you stop; volume bars while speaking)
+   - **Fullscreen Galgame** — first hover on Canal’s avatar (once) shows surprise; click enters smoke → left half-body sprite + bottom dialogue. Hover/click the red **Exit** button for a farewell line, then leave.
+3. Habit **write** tools: `create_habit` / `rename_habit` / `delete_habit` (soft-delete). **Read** tools: account overview, today’s status, list habits. Email tool: `send_today_reminder`.
+4. The companion **cannot** check in for you or change difficulty after create (XP is difficulty tiers 10 / 20 / 30).
+5. **Password reset / daily digest email** — requires email on the backend.
 
 > **Important:** Render **free** web services [block outbound SMTP](https://render.com/changelog/free-web-services-will-no-longer-allow-outbound-traffic-to-smtp-ports) (`25` / `465` / `587`). Plain Gmail SMTP will **not** work. Use **Brevo HTTPS API** instead (free ≈ 300/day; verify one sender email, then send to **any** registered user address).
 
@@ -132,7 +141,16 @@ After create:
 
 > **Local Development:** if neither Brevo nor SMTP is set and `ASPNETCORE_ENVIRONMENT=Development`, forgot-password shows the code in the UI (no email).
 
-Chat / mail endpoints: `POST /api/chat`, `POST /api/chat/reminder`, `GET|PUT /api/chat/preferences`, `POST /api/user/forgot-password`.
+Chat / memory / mail endpoints: `POST /api/chat`, `GET /api/chat/history`, `DELETE /api/chat/session`, `GET|DELETE /api/chat/memories`, `POST /api/chat/reminder`, `GET|PUT /api/chat/preferences`, `POST /api/user/forgot-password`.
+
+---
+
+## Focus Mode & Music
+
+- **Focus Mode** — From Habits, start Focus on a due habit: estimate duration → fullscreen lock + timer → check-in with optional focus-bonus XP (requires staying long enough). Soft abandon is allowed. Companion may peek with dialogue during a long session.
+- **Idle rest** — After inactivity, Canal may lazily peek and drop an aside line into chat history (local only).
+- **Music page** (`/music`) — Play unlocked built-in AAC tracks (served from backend `/music/*`, proxied on Vercel). Upload personal audio (IndexedDB, device-local only). Collecting **all badges** unlocks hidden tracks.
+- **Sidebar** — Now-playing + links to Music and About (`/about`).
 
 ---
 
@@ -153,8 +171,11 @@ A few things markers may find interesting:
 
 - **4-corner theme + language toggle.** A single control in each screen corner switches both **day/night theme** and **English/Chinese** at once (bottom-left = 中文/夜间, top-right = English/day, etc.). Choice persists in `localStorage` and is applied via `data-theme` / `data-lang` attributes on `<html>` — see `frontend/src/components/ThemeLocaleToggle.tsx` and `frontend/src/stores/settingsStore.ts`.
 - **Fully bilingual UI** driven by a typed i18n dictionary (`frontend/src/i18n/translations.ts`), not just labels — including motivational content.
+- **Canal companion + Galgame stage.** Layered PSD-style PNGs (`frontend/Canal/`) compose a live face; emotions switch during typewriter dialogue via a clause-level timeline (`emotionTimeline.ts`). Assets and naming are author-provided.
 - **Server-authoritative achievements.** Badge unlocks are evaluated on the backend (`AchievementService`) on login and via an explicit sync endpoint, so they can't be spoofed from the client.
-- **Docker-first, resilient deploy.** SQLite connection-string parsing tolerates dashboard-mangled env vars, and the Dockerfile disables inotify file-watching to survive Render's shared-host limits.
+- **Focus Mode + BGM.** Habit check-in can be gated behind a timed focus session with soundtrack unlocks tied to badge completion.
+- **Docker-first, resilient deploy.** Connection-string parsing tolerates dashboard-mangled env vars; Dockerfile disables inotify file-watching for Render’s shared-host limits. Production prefers **PostgreSQL**; local/dev still uses SQLite.
+- **Session hygiene.** JWT lifetime is 7 days; the frontend central `apiFetch` clears sticky `localStorage` sessions on expiry / 401 so the UI does not look “logged in” while every API fails.
 
 ---
 
@@ -164,7 +185,7 @@ Per the MSA 2026 Phase 2 brief, the **three** advanced features chosen for marki
 
 | # | Advanced Feature (from official list) | Status | Where to verify |
 |---|---------------------------------------|--------|-----------------|
-| 1 | **State management library (Zustand)** | ✅ Done | `frontend/src/stores/` — `habitStore`, `settingsStore`, `achievementStore`, `languageStore` |
+| 1 | **State management library (Zustand)** | ✅ Done | `frontend/src/stores/` — `habitStore`, `settingsStore`, `achievementStore`, `chatStore`, `companionStore`, `bgmStore`, `focusModeStore`, … |
 | 2 | **Theme switching (light/dark mode)** | ✅ Done | `frontend/src/stores/settingsStore.ts`, `frontend/src/components/ThemeLocaleToggle.tsx` — day/night + EN/中文 |
 | 3 | **Dockerize the project using Docker** | ✅ Done | `backend/Dockerfile`, `frontend/Dockerfile`, `docker-compose.yml`, `render.yaml` |
 
@@ -177,12 +198,14 @@ Per the MSA 2026 Phase 2 brief, the **three** advanced features chosen for marki
 **How it's implemented:**
 
 - Multiple focused stores under `frontend/src/stores/`:
-  - `habitStore.ts` — habits, check-ins, streaks, and optimistic updates
+  - `habitStore.ts` — habits, auth session, check-in state
   - `settingsStore.ts` — theme + language + corner toggle
   - `achievementStore.ts` — unlocked badges and unlock popups
+  - `chatStore.ts` / `companionStore.ts` — AI chat UI + Canal emotion / Gal mode flags
+  - `bgmStore.ts` / `focusModeStore.ts` — music + focus session
   - `languageStore.ts` — kept as a backward-compatible alias of the settings store
 - Stores are created with `create<State>()` and selected with fine-grained selectors (e.g. `useSettingsStore(s => s.language)`) to minimise re-renders.
-- State that must survive reloads (theme/language corner) is persisted to `localStorage` inside the store actions.
+- State that must survive reloads (theme/language corner, BGM prefs, Gal first-hover flags) is persisted to `localStorage` inside the store actions.
 
 ### 2. Theme Switching (Light / Dark Mode)
 
@@ -279,9 +302,15 @@ cd frontend && npm test
 
 ```
 learnchain-msa2026/
-├── backend/              # .NET 10 Web API (SQLite, JWT)
+├── backend/              # .NET 10 Web API (SQLite local / Postgres prod, JWT)
 ├── backend.Tests/        # xUnit tests
 ├── frontend/             # React + Vite + Zustand + Tailwind
+│   ├── Canal/            # Layered Canal companion PNGs (emotions)
+│   └── src/
+│       ├── components/ai/        # Chat panel, Galgame stage, speech
+│       ├── components/character/ # Character / avatar / peek
+│       ├── companions/           # Lines + emotion timeline
+│       └── stores/               # Zustand stores
 ├── specs/                # Design docs, AI usage notes, decisions
 ├── docker-compose.yml
 ├── render.yaml           # Render deployment blueprint
@@ -304,9 +333,9 @@ See the [`specs/`](./specs/) folder:
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | React 19, Vite, Zustand, React Router, Tailwind CSS 4 |
-| Backend | ASP.NET Core 10, EF Core, SQLite, JWT Bearer |
-| Deploy | Vercel (frontend), Render (backend Docker + **PostgreSQL**) |
+| Frontend | React 19, Vite, Zustand, React Router, Tailwind CSS 4, Framer Motion |
+| Backend | ASP.NET Core 10, EF Core, SQLite / PostgreSQL, JWT Bearer |
+| Deploy | Vercel (frontend + `/api` & `/music` rewrites), Render (backend Docker + **PostgreSQL**) |
 | Database | PostgreSQL on Render (prod); SQLite locally |
 
 ---
@@ -315,12 +344,13 @@ See the [`specs/`](./specs/) folder:
 
 *If I were to do this project again, what would I do differently?*
 
-- **Persist data in a real database.** SQLite on Render's ephemeral disk means data can be lost on redeploy. Next time I'd use Postgres (or a Render persistent disk from day one) so user progress is durable — especially important for a habit app where losing streaks is a dealbreaker.
+- **Persist data in a real database.** Early versions used SQLite on Render’s ephemeral disk. Production now uses Postgres; I’d still design for durable storage from day one on any habit app.
 - **Design the API contract first.** Some DTOs and endpoints evolved reactively as the frontend needed them, which caused a few mismatches. Writing an OpenAPI-first contract before coding would have reduced rework and kept naming consistent between client and server.
-- **Add end-to-end tests earlier.** I have backend xUnit tests and some frontend store/component tests, but no full-flow (register → create habit → check in → unlock badge) coverage. Adding these earlier would have caught integration bugs that only surfaced during manual testing.
+- **Add end-to-end tests earlier.** Backend xUnit + some frontend store tests exist, but companion/Galgame/focus flows are still mostly manual.
 - **Move theme/language state into a persisted store middleware.** The current stores manually read/write `localStorage`. Using Zustand's `persist` middleware would remove that boilerplate and centralise hydration logic.
-- **Harden production config sooner.** Issues like the Render inotify limit and CORS/connection-string edge cases were fixed reactively. I'd bake a production checklist (env vars, health checks, file-watcher settings) into the deploy setup from the start.
-- **Improve accessibility.** The 4-corner toggle is a fun idea but isn't obvious to first-time users and lacks keyboard/ARIA affordances. I'd add clearer labels and separate, accessible controls for theme and language.
+- **Harden production config sooner.** Issues like the Render inotify limit, CORS, JWT sticky sessions, and Vercel→Render `/music` cold starts were fixed reactively.
+- **Improve accessibility.** The 4-corner toggle and Galgame stage are fun but need clearer keyboard/ARIA affordances for first-time users.
+- **Companion expressions.** Emotion inference is still keyword/heuristic-based; a model-tagged emotion channel would be more reliable than client-side text sniffing alone.
 
 ---
 

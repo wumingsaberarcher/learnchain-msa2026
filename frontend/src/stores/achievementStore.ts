@@ -1,6 +1,6 @@
 import { create } from 'zustand'
-import { API_BASE } from '../config/api'
 import { BADGE_MAP } from '../badges/badgeDefinitions'
+import { apiFetch, authHeaders, getAuthToken } from '../api/http'
 
 export interface AchievementRecord {
     badgeId: string
@@ -78,12 +78,9 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
     })),
 
     fetchProfile: async () => {
-        const token = localStorage.getItem('token')
-        if (!token) return
+        if (!getAuthToken()) return
 
-        const res = await fetch(`${API_BASE}/user/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })
+        const res = await apiFetch('/user/me')
         if (!res.ok) return
 
         const data = await res.json()
@@ -102,13 +99,9 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
     },
 
     syncAchievements: async () => {
-        const token = localStorage.getItem('token')
-        if (!token) return []
+        if (!getAuthToken()) return []
 
-        const res = await fetch(`${API_BASE}/user/achievements/sync`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token}` },
-        })
+        const res = await apiFetch('/user/achievements/sync', { method: 'POST' })
         if (!res.ok) return []
 
         const data = await res.json()
@@ -118,15 +111,11 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
     },
 
     updateBio: async (bio) => {
-        const token = localStorage.getItem('token')
-        if (!token) return false
+        if (!getAuthToken()) return false
 
-        const res = await fetch(`${API_BASE}/user/profile`, {
+        const res = await apiFetch('/user/profile', {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-            },
+            headers: authHeaders(true),
             body: JSON.stringify({ bio }),
         })
         if (!res.ok) return false
@@ -138,15 +127,11 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
     },
 
     changePassword: async (oldPassword, newPassword) => {
-        const token = localStorage.getItem('token')
-        if (!token) return '未登录'
+        if (!getAuthToken()) return '未登录'
 
-        const res = await fetch(`${API_BASE}/user/change-password`, {
+        const res = await apiFetch('/user/change-password', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-            },
+            headers: authHeaders(true),
             body: JSON.stringify({ oldPassword, newPassword }),
         })
         if (!res.ok) return await res.text() || '修改失败'

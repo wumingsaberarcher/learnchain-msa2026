@@ -1,22 +1,10 @@
 import type { CreateHabitPayload, Habit } from '../utils/habitHelpers'
-
-import { API_BASE } from '../config/api'
-
-function authHeaders(json = false): HeadersInit {
-    const token = localStorage.getItem('token')
-    const headers: HeadersInit = {}
-    if (token) headers['Authorization'] = `Bearer ${token}`
-    if (json) headers['Content-Type'] = 'application/json'
-    return headers
-}
+import { apiFetch, authHeaders } from './http'
 
 export type { Habit, CreateHabitPayload } from '../utils/habitHelpers'
 
 export async function getHabits(): Promise<Habit[]> {
-    const res = await fetch(`${API_BASE}/habit`, {
-        method: 'GET',
-        headers: authHeaders(),
-    })
+    const res = await apiFetch('/habit', { method: 'GET' })
 
     if (!res.ok) {
         const errorText = await res.text()
@@ -27,11 +15,8 @@ export async function getHabits(): Promise<Habit[]> {
 }
 
 export async function getAllHabits(includeInactive = false): Promise<Habit[]> {
-    const url = includeInactive
-        ? `${API_BASE}/habit?includeInactive=true`
-        : `${API_BASE}/habit`
-
-    const res = await fetch(url, { headers: authHeaders() })
+    const path = includeInactive ? '/habit?includeInactive=true' : '/habit'
+    const res = await apiFetch(path)
     if (!res.ok) throw new Error('Failed to fetch habits')
     return res.json()
 }
@@ -39,15 +24,18 @@ export async function getAllHabits(includeInactive = false): Promise<Habit[]> {
 export async function createHabit(payload: CreateHabitPayload): Promise<{ habit: Habit; newlyUnlocked?: string[] }> {
     let res: Response
     try {
-        res = await fetch(`${API_BASE}/habit`, {
+        res = await apiFetch('/habit', {
             method: 'POST',
             headers: authHeaders(true),
             body: JSON.stringify(payload),
         })
-    } catch {
-        throw new Error(
-            '无法连接服务器（Failed to fetch）。请确认后端已唤醒，或在 Vercel 设置 VITE_API_BASE=https://learnchain-msa2026.onrender.com/api',
-        )
+    } catch (err) {
+        if (err instanceof TypeError) {
+            throw new Error(
+                '无法连接服务器（Failed to fetch）。请确认后端已唤醒，或在 Vercel 设置 VITE_API_BASE=https://learnchain-msa2026.onrender.com/api',
+            )
+        }
+        throw err
     }
 
     if (!res.ok) {
@@ -60,7 +48,7 @@ export async function createHabit(payload: CreateHabitPayload): Promise<{ habit:
 }
 
 export async function updateHabit(id: number, data: Partial<Habit>): Promise<void> {
-    const res = await fetch(`${API_BASE}/habit/${id}`, {
+    const res = await apiFetch(`/habit/${id}`, {
         method: 'PUT',
         headers: authHeaders(true),
         body: JSON.stringify(data),
@@ -69,9 +57,6 @@ export async function updateHabit(id: number, data: Partial<Habit>): Promise<voi
 }
 
 export async function deleteHabit(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/habit/${id}`, {
-        method: 'DELETE',
-        headers: authHeaders(),
-    })
+    const res = await apiFetch(`/habit/${id}`, { method: 'DELETE' })
     if (!res.ok) throw new Error('删除失败')
 }

@@ -1,14 +1,7 @@
-import { API_BASE } from '../config/api'
-
-function authHeaders(json = false): HeadersInit {
-    const token = localStorage.getItem('token')
-    const headers: HeadersInit = {}
-    if (token) headers['Authorization'] = `Bearer ${token}`
-    if (json) headers['Content-Type'] = 'application/json'
-    return headers
-}
+import { apiFetch, authHeaders } from './http'
 
 export type ChatRole = 'user' | 'assistant' | 'system'
+
 
 export interface ChatMessagePayload {
     role: ChatRole
@@ -58,7 +51,7 @@ export async function sendChat(
     language: 'zh' | 'en',
     provider: AiProviderSettings,
 ): Promise<ChatResponse> {
-    const res = await fetch(`${API_BASE}/chat`, {
+    const res = await apiFetch('/chat', {
         method: 'POST',
         headers: authHeaders(true),
         body: JSON.stringify({
@@ -90,7 +83,7 @@ export async function sendChat(
 }
 
 export async function getChatHistory(): Promise<ChatHistoryResponse> {
-    const res = await fetch(`${API_BASE}/chat/history`, { headers: authHeaders() })
+    const res = await apiFetch('/chat/history')
     if (!res.ok) throw new Error('Failed to load chat history')
     const data = await res.json()
     const messages = (data.messages ?? data.Messages ?? []) as Array<Record<string, unknown>>
@@ -106,15 +99,14 @@ export async function getChatHistory(): Promise<ChatHistoryResponse> {
 
 /** Reset conversation (messages + rolling summary). Keeps long-term memories. */
 export async function resetChatSession(): Promise<void> {
-    const res = await fetch(`${API_BASE}/chat/session`, {
+    const res = await apiFetch('/chat/session', {
         method: 'DELETE',
-        headers: authHeaders(),
     })
     if (!res.ok) throw new Error('Failed to reset conversation')
 }
 
 export async function listUserMemories(): Promise<UserMemoryItem[]> {
-    const res = await fetch(`${API_BASE}/chat/memories`, { headers: authHeaders() })
+    const res = await apiFetch('/chat/memories')
     if (!res.ok) throw new Error('Failed to load memories')
     const data = await res.json()
     const list = (Array.isArray(data) ? data : []) as Array<Record<string, unknown>>
@@ -129,26 +121,23 @@ export async function listUserMemories(): Promise<UserMemoryItem[]> {
 }
 
 export async function deleteUserMemory(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE}/chat/memories/${id}`, {
+    const res = await apiFetch(`/chat/memories/${id}`, {
         method: 'DELETE',
-        headers: authHeaders(),
     })
     if (!res.ok) throw new Error('Failed to delete memory')
 }
 
 /** Clear conversation + long-term memories. Game data untouched. */
 export async function resetAllCompanionMemory(): Promise<void> {
-    const res = await fetch(`${API_BASE}/chat/memories`, {
+    const res = await apiFetch('/chat/memories', {
         method: 'DELETE',
-        headers: authHeaders(),
     })
     if (!res.ok) throw new Error('Failed to reset memories')
 }
 
 export async function sendTodayReminder(language: 'zh' | 'en'): Promise<{ sent: boolean; message: string }> {
-    const res = await fetch(`${API_BASE}/chat/reminder?language=${language}`, {
+    const res = await apiFetch(`/chat/reminder?language=${language}`, {
         method: 'POST',
-        headers: authHeaders(),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -158,14 +147,14 @@ export async function sendTodayReminder(language: 'zh' | 'en'): Promise<{ sent: 
 }
 
 export async function getChatPreferences(): Promise<{ dailyDigestEnabled: boolean }> {
-    const res = await fetch(`${API_BASE}/chat/preferences`, { headers: authHeaders() })
+    const res = await apiFetch('/chat/preferences')
     if (!res.ok) throw new Error('Failed to load preferences')
     const data = await res.json()
     return { dailyDigestEnabled: data.dailyDigestEnabled ?? data.DailyDigestEnabled ?? false }
 }
 
 export async function updateChatPreferences(dailyDigestEnabled: boolean): Promise<{ dailyDigestEnabled: boolean }> {
-    const res = await fetch(`${API_BASE}/chat/preferences`, {
+    const res = await apiFetch('/chat/preferences', {
         method: 'PUT',
         headers: authHeaders(true),
         body: JSON.stringify({ dailyDigestEnabled }),

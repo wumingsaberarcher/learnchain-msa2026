@@ -103,6 +103,8 @@ function persistSlice(s: PersistedBgm) {
 
 const initial = loadPersisted()
 const objectUrls = new Map<string, string>()
+let hydrateGeneration = 0
+let hydrateInFlight: Promise<void> | null = null
 
 function revokeUrl(id: string) {
     const url = objectUrls.get(id)
@@ -194,34 +196,53 @@ export const useBgmStore = create<BgmState>((set, get) => ({
     },
 
     hydrateUserLibrary: async () => {
-        try {
-            const rows = await idbListTracks()
-            for (const url of objectUrls.values()) URL.revokeObjectURL(url)
-            objectUrls.clear()
+        if (hydrateInFlight) return hydrateInFlight
 
-            const userTracks: BgmTrack[] = rows
-                .sort((a, b) => a.createdAt - b.createdAt)
-                .map(row => {
-                    const objectUrl = URL.createObjectURL(row.blob)
-                    objectUrls.set(row.id, objectUrl)
-                    return {
-                        id: row.id,
-                        title: row.title,
-                        kind: 'user' as const,
-                        defaultUnlocked: true,
-                        objectUrl,
-                    }
-                })
+        hydrateInFlight = (async () => {
+            const gen = ++hydrateGeneration
+            try {
+                const rows = await idbListTracks()
+                if (gen !== hydrateGeneration) return
 
-            set({ userTracks, libraryReady: true })
+                const nextIds = new Set(rows.map(r => r.id))
+                for (const id of [...objectUrls.keys()]) {
+                    if (!nextIds.has(id)) revokeUrl(id)
+                }
 
-            const { trackId } = get()
-            if (!get().getTrack(trackId)) {
-                get().selectTrack('ceta', false)
+                const userTracks: BgmTrack[] = rows
+                    .sort((a, b) => a.createdAt - b.createdAt)
+                    .map(row => {
+                        let objectUrl = objectUrls.get(row.id)
+                        if (!objectUrl) {
+                            objectUrl = URL.createObjectURL(row.blob)
+                            objectUrls.set(row.id, objectUrl)
+                        }
+                        return {
+                            id: row.id,
+                            title: row.title,
+                            kind: 'user' as const,
+                            defaultUnlocked: true,
+                            objectUrl,
+                        }
+                    })
+
+                if (gen !== hydrateGeneration) return
+                set({ userTracks, libraryReady: true })
+
+                const { trackId } = get()
+                if (!get().getTrack(trackId)) {
+                    get().selectTrack('ceta', false)
+                }
+            } catch {
+                if (gen === hydrateGeneration) {
+                    set({ userTracks: [], libraryReady: true })
+                }
+            } finally {
+                if (gen === hydrateGeneration) hydrateInFlight = null
             }
-        } catch {
-            set({ userTracks: [], libraryReady: true })
-        }
+        })()
+
+        return hydrateInFlight
     },
 
     addUserTrack: async (file, title) => {

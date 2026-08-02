@@ -10,6 +10,7 @@ export interface EmotionCue {
 }
 
 const STRONG_ANGRY = /生气|愤怒|讨厌|烦死|怒|可恶|混蛋|angry|hate|furious/i
+const STRONG_FEAR = /害怕|恐惧|吓死|慌了|紧张|怕怕|fear|scared|afraid|terrified|anxious/i
 const STRONG_SORROW = /难过|伤心|哭|抱歉|对不起|失望|孤独|sorrow|sad|sorry|lonely|cry/i
 const STRONG_SURPRISE = /天哪|哇+|惊喜|不敢相信|震惊|surprise|wow+|omg|!{2,}|\uFF01{2,}/i
 const STRONG_SMILE = /哈哈+|太好了|真棒|开心|喜欢|爱你|great|happy|love|awesome|yay/i
@@ -38,6 +39,9 @@ function scoreClause(clause: string): { emotion: Emotion; intensity: number } {
   if (STRONG_ANGRY.test(clause)) {
     emotion = 'angry'
     intensity = 0.95
+  } else if (STRONG_FEAR.test(clause)) {
+    emotion = 'fear'
+    intensity = 0.9
   } else if (STRONG_SORROW.test(clause)) {
     emotion = 'sorrow'
     intensity = 0.85
@@ -50,7 +54,7 @@ function scoreClause(clause: string): { emotion: Emotion; intensity: number } {
   } else if (base === 'smile') {
     emotion = 'smile'
     intensity = 0.4
-  } else if (base === 'angry' || base === 'sorrow' || base === 'surprise') {
+  } else if (base === 'angry' || base === 'sorrow' || base === 'surprise' || base === 'fear') {
     // Soft match from inferEmotion — keep but dampen
     emotion = base
     intensity = 0.45

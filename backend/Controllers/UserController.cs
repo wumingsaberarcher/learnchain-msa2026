@@ -319,7 +319,10 @@ public class UserController : ControllerBase
     private string GenerateJwtToken(User user)
     {
         var jwtSettings = _configuration.GetSection("Jwt");
-        var key = Encoding.ASCII.GetBytes(jwtSettings["Key"]!);
+        var jwtKey = jwtSettings["Key"]
+            ?? Environment.GetEnvironmentVariable("JWT_KEY")
+            ?? throw new InvalidOperationException("JWT Key is not configured.");
+        var key = Encoding.ASCII.GetBytes(jwtKey);
 
         var tokenHandler = new JwtSecurityTokenHandler();
         var tokenDescriptor = new SecurityTokenDescriptor
@@ -331,7 +334,7 @@ public class UserController : ControllerBase
                 new Claim(ClaimTypes.Email, user.Email),
                 new Claim(ClaimTypes.Role, string.IsNullOrWhiteSpace(user.Role) ? AppRoles.User : user.Role)
             }),
-            Expires = DateTime.UtcNow.AddMinutes(double.Parse(jwtSettings["DurationInMinutes"]!)),
+            Expires = DateTime.UtcNow.AddMinutes(double.Parse(jwtSettings["DurationInMinutes"] ?? "10080")),
             Issuer = jwtSettings["Issuer"],
             Audience = jwtSettings["Audience"],
             SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
