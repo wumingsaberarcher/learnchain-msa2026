@@ -27,11 +27,13 @@ public class CheckInController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly AchievementService _achievements;
+    private readonly CompanionAffectionService _affection;
 
-    public CheckInController(AppDbContext context, AchievementService achievements)
+    public CheckInController(AppDbContext context, AchievementService achievements, CompanionAffectionService affection)
     {
         _context = context;
         _achievements = achievements;
+        _affection = affection;
     }
 
     private int GetCurrentUserId()
@@ -210,6 +212,10 @@ public class CheckInController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        AffectionAwardResult? affection = null;
+        if (user != null)
+            affection = await _affection.AwardCheckInAsync(user, request.FromFocusMode);
+
         var newlyUnlocked = await _achievements.EvaluateAndUnlockAsync(currentUserId);
 
         return CreatedAtAction(nameof(GetCheckIns), new { habitId = checkIn.HabitId }, new
@@ -223,7 +229,12 @@ public class CheckInController : ControllerBase
             focusBonusXp,
             checkIn.Notes,
             checkIn.MilestoneId,
-            newlyUnlocked
+            newlyUnlocked,
+            affectionAwarded = affection?.Awarded ?? 0,
+            affectionPoints = affection?.Points ?? user?.CompanionAffection ?? 0,
+            affectionTierKey = affection?.TierKey,
+            affectionGainedToday = affection?.GainedToday,
+            affectionDailyCap = affection?.DailyCap,
         });
     }
 }

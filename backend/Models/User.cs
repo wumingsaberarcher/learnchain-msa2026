@@ -52,4 +52,13 @@ public class User
     public DateTime? BannedUntil { get; set; }
 
     public bool IsBanned => BannedUntil.HasValue && BannedUntil.Value > DateTime.UtcNow;
+
+    /// <summary>Real Canal affection points (slow grind, per-user). Cap 3000.</summary>
+    public int CompanionAffection { get; set; }
+
+    /// <summary>UTC calendar day for CompanionAffectionGainedToday reset.</summary>
+    public DateTime? CompanionAffectionDayUtc { get; set; }
+
+    /// <summary>Points already gained today toward the daily affection cap.</summary>
+    public int CompanionAffectionGainedToday { get; set; }
 }

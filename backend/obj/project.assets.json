@@ -1219,7 +1219,7 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f1ca052afadf0ce7867eae141bef1b84\\nuget": {},
+    "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\ebc2c54c299fd1249e93e2bc2df3af04\\nuget": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
@@ -1228,7 +1228,7 @@
       "projectUniqueName": "D:\\learnchain-msa2026\\backend\\backend.csproj",
       "projectName": "backend",
       "projectPath": "D:\\learnchain-msa2026\\backend\\backend.csproj",
-      "packagesPath": "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f1ca052afadf0ce7867eae141bef1b84\\nuget",
+      "packagesPath": "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\ebc2c54c299fd1249e93e2bc2df3af04\\nuget",
       "outputPath": "D:\\learnchain-msa2026\\backend\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [

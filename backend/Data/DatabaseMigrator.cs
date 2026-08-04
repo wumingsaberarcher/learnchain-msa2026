@@ -37,6 +37,9 @@ public static class DatabaseMigrator
             EnsureSqliteColumn(connection, "Users", "Role", "TEXT NOT NULL DEFAULT 'User'");
             EnsureSqliteColumn(connection, "Users", "BannedUntil", "TEXT NULL");
             EnsureSqliteColumn(connection, "Users", "PasswordVault", "TEXT NULL");
+            EnsureSqliteColumn(connection, "Users", "CompanionAffection", "INTEGER NOT NULL DEFAULT 0");
+            EnsureSqliteColumn(connection, "Users", "CompanionAffectionDayUtc", "TEXT NULL");
+            EnsureSqliteColumn(connection, "Users", "CompanionAffectionGainedToday", "INTEGER NOT NULL DEFAULT 0");
 
             using var achievementCmd = connection.CreateCommand();
             achievementCmd.CommandText = """
@@ -131,6 +134,9 @@ public static class DatabaseMigrator
             EnsurePostgresColumn(connection, "Users", "Role", "text NOT NULL DEFAULT 'User'");
             EnsurePostgresColumn(connection, "Users", "BannedUntil", "timestamp with time zone NULL");
             EnsurePostgresColumn(connection, "Users", "PasswordVault", "text NULL");
+            EnsurePostgresColumn(connection, "Users", "CompanionAffection", "integer NOT NULL DEFAULT 0");
+            EnsurePostgresColumn(connection, "Users", "CompanionAffectionDayUtc", "timestamp with time zone NULL");
+            EnsurePostgresColumn(connection, "Users", "CompanionAffectionGainedToday", "integer NOT NULL DEFAULT 0");
             EnsurePostgresColumn(connection, "Habits", "HabitType", "text NOT NULL DEFAULT 'Daily'");
             EnsurePostgresColumn(connection, "Habits", "Difficulty", "integer NOT NULL DEFAULT 1");
             EnsurePostgresColumn(connection, "Habits", "DueDate", "timestamp with time zone NULL");

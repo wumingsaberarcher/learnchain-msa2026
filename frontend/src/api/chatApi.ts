@@ -18,6 +18,9 @@ export interface ChatResponse {
     reply: string
     actionsExecuted: ChatActionResult[]
     summaryUpdated?: boolean
+    affectionAwarded?: number
+    affectionPoints?: number
+    affectionTierKey?: string
 }
 
 export interface ChatHistoryMessage {
@@ -79,6 +82,9 @@ export async function sendChat(
         reply: data.reply,
         actionsExecuted: data.actionsExecuted ?? data.ActionsExecuted ?? [],
         summaryUpdated: data.summaryUpdated ?? data.SummaryUpdated ?? false,
+        affectionAwarded: data.affectionAwarded ?? data.AffectionAwarded,
+        affectionPoints: data.affectionPoints ?? data.AffectionPoints,
+        affectionTierKey: data.affectionTierKey ?? data.AffectionTierKey,
     }
 }
 

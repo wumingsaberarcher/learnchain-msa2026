@@ -252,6 +252,8 @@ public class UserController : ControllerBase
         if (user == null)
             return NotFound("用户不存在");
 
+        var affection = CompanionAffectionService.Snapshot(user);
+        await _context.SaveChangesAsync();
         return Ok(new
         {
             user.Id,
@@ -264,6 +266,12 @@ public class UserController : ControllerBase
             user.Role,
             user.BannedUntil,
             isBanned = user.IsBanned,
+            companionAffection = affection.Points,
+            companionAffectionMax = affection.MaxPoints,
+            companionAffectionTierKey = affection.TierKey,
+            companionAffectionGainedToday = affection.GainedToday,
+            companionAffectionDailyCap = affection.DailyCap,
+            companionAffectionToNext = affection.ToNextTier,
             achievements = await _achievements.GetAchievementStatusAsync(userId)
         });
     }

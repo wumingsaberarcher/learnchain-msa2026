@@ -431,6 +431,34 @@
 	margin-bottom: 1.5rem;
 }
 
+.profile-affection-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 1rem;
+	margin-bottom: 0.45rem;
+	font-size: 0.95rem;
+}
+
+.profile-affection-bar {
+	height: 10px;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.08);
+	overflow: hidden;
+	margin-bottom: 0.45rem;
+}
+
+.profile-affection-bar > i {
+	display: block;
+	height: 100%;
+	border-radius: inherit;
+	background: linear-gradient(90deg, #7ec8e3, #f0a6ca);
+}
+
+.app-shell.theme-day .profile-affection-bar {
+	background: rgba(0, 0, 0, 0.08);
+}
+
 .profile-section > label {
 	display: block;
 	font-weight: 600;

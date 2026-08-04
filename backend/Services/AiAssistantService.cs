@@ -67,7 +67,8 @@ public class AiAssistantService
         var recent = await _memory.GetRecentActiveMessagesAsync(
             session.Id, CompanionMemoryService.ShortTermMessageLimit, ct);
 
-        var systemPrompt = BuildSystemPrompt(zh, contextJson, session.Summary, memories);
+        var affection = CompanionAffectionService.Snapshot(user);
+        var systemPrompt = BuildSystemPrompt(zh, contextJson, session.Summary, memories, affection);
 
         var messages = new JsonArray
         {
@@ -178,7 +179,8 @@ public class AiAssistantService
         bool zh,
         string contextJson,
         string rollingSummary,
-        IReadOnlyList<UserMemory> memories)
+        IReadOnlyList<UserMemory> memories,
+        AffectionSnapshot affection)
     {
         var lang = zh ? "Simplified Chinese" : "English";
         var memoryBlock = memories.Count == 0
@@ -190,11 +192,16 @@ public class AiAssistantService
             ? "(none yet — early in the relationship)"
             : rollingSummary;
 
+        var bondLine = zh
+            ? $"与用户的真实好感度：{affection.Points}/{affection.MaxPoints}（阶段 {affection.TierKey}，今日已获 {affection.GainedToday}/{affection.DailyCap}）。语气随羁绊自然亲近一些，但不要报出精确数字，除非用户问起。"
+            : $"Real affection with the user: {affection.Points}/{affection.MaxPoints} (tier {affection.TierKey}, today {affection.GainedToday}/{affection.DailyCap}). Sound a bit closer as the bond grows; do not recite exact numbers unless asked.";
+
         return $"""
             You are LearnChain's friendly habit coach companion — not just a tool.
             Always reply in {lang}.
             You remember the user across sessions via long-term memories and a rolling conversation summary.
             Naturally weave in game progress (streaks, XP, levels, badges, chain continuity) when helpful — keep it encouraging, not robotic.
+            {bondLine}
 
             You help users understand their account, what they should do today, and create/rename/delete habits via tools.
             When creating a habit: if the user already said the essentials OR told you to decide freely (e.g. 随便 / any name / any XP), call create_habit immediately — pick a clear Daily name and difficulty 1–3. Do not keep asking clarifying questions when they said to choose for them.

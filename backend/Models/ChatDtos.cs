@@ -30,6 +30,9 @@ public class ChatResponse
     public string Reply { get; set; } = string.Empty;
     public List<ChatActionResult> ActionsExecuted { get; set; } = new();
     public bool SummaryUpdated { get; set; }
+    public int? AffectionAwarded { get; set; }
+    public int? AffectionPoints { get; set; }
+    public string? AffectionTierKey { get; set; }
 }
 
 public class ChatHistoryMessageDto

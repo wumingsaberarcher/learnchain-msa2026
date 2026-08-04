@@ -81,6 +81,7 @@ try
     builder.Services.AddScoped<HabitContextBuilder>();
     builder.Services.AddScoped<CompanionMemoryService>();
     builder.Services.AddScoped<AiAssistantService>();
+    builder.Services.AddScoped<CompanionAffectionService>();
     builder.Services.AddSingleton<EmailService>();
     builder.Services.AddHttpClient("OpenAiCompatible", client =>
     {

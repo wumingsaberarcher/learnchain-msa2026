@@ -2,21 +2,23 @@ import { create } from 'zustand'
 import type { Emotion } from '../components/character/emotionAssets'
 import { inferEmotionFromText } from '../companions/companionLines'
 
-const AVATAR_KEY = 'learnchain-user-avatar-v1'
-const HOVER_KEY = 'learnchain-canal-hover-surprised-v1'
-const ENTERED_GAL_KEY = 'learnchain-canal-entered-gal-v1'
 const MAX_AVATAR_BYTES = 450_000
 
-function loadFlag(key: string): boolean {
+function scopedKey(userId: number, name: string) {
+  return `learnchain-canal-${name}-u:${userId}`
+}
+
+function loadFlag(userId: number, name: string): boolean {
   try {
-    return localStorage.getItem(key) === '1'
+    return localStorage.getItem(scopedKey(userId, name)) === '1'
   } catch {
     return false
   }
 }
 
-function saveFlag(key: string, value: boolean) {
+function saveFlag(userId: number, name: string, value: boolean) {
   try {
+    const key = scopedKey(userId, name)
     if (value) localStorage.setItem(key, '1')
     else localStorage.removeItem(key)
   } catch {
@@ -24,9 +26,9 @@ function saveFlag(key: string, value: boolean) {
   }
 }
 
-function loadAvatar(): string | null {
+function loadAvatar(userId: number): string | null {
   try {
-    const raw = localStorage.getItem(AVATAR_KEY)
+    const raw = localStorage.getItem(scopedKey(userId, 'avatar'))
     return raw && raw.startsWith('data:') ? raw : null
   } catch {
     return null
@@ -68,14 +70,15 @@ function compressImage(file: File, maxSide = 256, quality = 0.82): Promise<strin
 }
 
 interface CompanionState {
+  userId: number | null
   emotion: Emotion
   isTalking: boolean
   userAvatarUrl: string | null
   hasAvatarHoverSurprised: boolean
   hasEnteredGalMode: boolean
   galModeOpen: boolean
-  /** True while smoke burst plays on enter */
   galSmokePlaying: boolean
+  hydrateForUser: (userId: number | null) => void
   setEmotion: (emotion: Emotion, talking?: boolean) => void
   reactToText: (text: string, talking?: boolean) => void
   tryHoverSurprise: () => void
@@ -87,13 +90,40 @@ interface CompanionState {
 }
 
 export const useCompanionStore = create<CompanionState>((set, get) => ({
+  userId: null,
   emotion: 'normal',
   isTalking: false,
-  userAvatarUrl: loadAvatar(),
-  hasAvatarHoverSurprised: loadFlag(HOVER_KEY),
-  hasEnteredGalMode: loadFlag(ENTERED_GAL_KEY),
+  userAvatarUrl: null,
+  hasAvatarHoverSurprised: false,
+  hasEnteredGalMode: false,
   galModeOpen: false,
   galSmokePlaying: false,
+
+  hydrateForUser: (userId) => {
+    if (userId == null) {
+      set({
+        userId: null,
+        emotion: 'normal',
+        isTalking: false,
+        userAvatarUrl: null,
+        hasAvatarHoverSurprised: false,
+        hasEnteredGalMode: false,
+        galModeOpen: false,
+        galSmokePlaying: false,
+      })
+      return
+    }
+    set({
+      userId,
+      emotion: 'normal',
+      isTalking: false,
+      userAvatarUrl: loadAvatar(userId),
+      hasAvatarHoverSurprised: loadFlag(userId, 'hover'),
+      hasEnteredGalMode: loadFlag(userId, 'gal'),
+      galModeOpen: false,
+      galSmokePlaying: false,
+    })
+  },
 
   setEmotion: (emotion, talking = false) => set({ emotion, isTalking: talking }),
 
@@ -102,9 +132,9 @@ export const useCompanionStore = create<CompanionState>((set, get) => ({
   },
 
   tryHoverSurprise: () => {
-    const { hasAvatarHoverSurprised, hasEnteredGalMode } = get()
-    if (hasAvatarHoverSurprised || hasEnteredGalMode) return
-    saveFlag(HOVER_KEY, true)
+    const { userId, hasAvatarHoverSurprised, hasEnteredGalMode } = get()
+    if (userId == null || hasAvatarHoverSurprised || hasEnteredGalMode) return
+    saveFlag(userId, 'hover', true)
     set({
       hasAvatarHoverSurprised: true,
       emotion: 'surprise',
@@ -113,7 +143,8 @@ export const useCompanionStore = create<CompanionState>((set, get) => ({
   },
 
   enterGalMode: () => {
-    saveFlag(ENTERED_GAL_KEY, true)
+    const { userId } = get()
+    if (userId != null) saveFlag(userId, 'gal', true)
     set({
       hasEnteredGalMode: true,
       galModeOpen: true,
@@ -135,14 +166,17 @@ export const useCompanionStore = create<CompanionState>((set, get) => ({
   clearGalSmoke: () => set({ galSmokePlaying: false }),
 
   setUserAvatarFromFile: async (file) => {
+    const { userId } = get()
+    if (userId == null) throw new Error('not_logged_in')
     if (!file.type.startsWith('image/')) throw new Error('not_image')
     const dataUrl = await compressImage(file)
-    localStorage.setItem(AVATAR_KEY, dataUrl)
+    localStorage.setItem(scopedKey(userId, 'avatar'), dataUrl)
     set({ userAvatarUrl: dataUrl })
   },
 
   clearUserAvatar: () => {
-    localStorage.removeItem(AVATAR_KEY)
+    const { userId } = get()
+    if (userId != null) localStorage.removeItem(scopedKey(userId, 'avatar'))
     set({ userAvatarUrl: null })
   },
 }))

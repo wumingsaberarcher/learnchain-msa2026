@@ -18,9 +18,12 @@ import IdleRestOverlay from './components/IdleRestOverlay'
 import FocusModeOverlay from './components/FocusModeOverlay'
 import AppSidebar from './components/AppSidebar'
 import BgmPlayer from './components/BgmPlayer'
+import CompanionTeaseOverlay from './components/CompanionTeaseOverlay'
 import { useHabitStore } from './stores/habitStore'
 import { useAchievementStore } from './stores/achievementStore'
 import { useAiSettingsStore } from './stores/aiSettingsStore'
+import { useAffectionStore } from './stores/affectionStore'
+import { useCompanionStore } from './stores/companionStore'
 import { useIdleRestStore } from './stores/idleRestStore'
 import { useFocusModeStore } from './stores/focusModeStore'
 import { useBgmStore } from './stores/bgmStore'
@@ -32,14 +35,21 @@ function App() {
     const { isLoggedIn, currentUser, fetchHabits, fetchTodayCheckedHabits, fetchCurrentUser, markHabitCheckedToday } = useHabitStore()
     const { fetchProfile, syncAchievements, handleNewUnlocks } = useAchievementStore()
     const hydrateAiSettings = useAiSettingsStore(s => s.hydrateForUser)
+    const hydrateCompanion = useCompanionStore(s => s.hydrateForUser)
+    const hydrateAffection = useAffectionStore(s => s.hydrate)
+    const clearAffection = useAffectionStore(s => s.clear)
     const { t, theme } = useTranslation()
     const isResting = useIdleRestStore(s => s.isResting)
     const isFocusing = useFocusModeStore(s => s.isActive)
     const toggleSidebar = useBgmStore(s => s.toggleSidebar)
 
     useEffect(() => {
-        hydrateAiSettings(isLoggedIn && currentUser ? currentUser.id : null)
-    }, [isLoggedIn, currentUser?.id, hydrateAiSettings])
+        const uid = isLoggedIn && currentUser ? currentUser.id : null
+        hydrateAiSettings(uid)
+        hydrateCompanion(uid)
+        if (uid) void hydrateAffection()
+        else clearAffection()
+    }, [isLoggedIn, currentUser?.id, hydrateAiSettings, hydrateCompanion, hydrateAffection, clearAffection])
 
     useEffect(() => {
         if (isLoggedIn) {
@@ -137,6 +147,7 @@ function App() {
                     </div>
                 )}
                 {!isResting && !isFocusing && <AiAssistant />}
+                {!isResting && !isFocusing && <CompanionTeaseOverlay />}
                 <IdleRestOverlay pauseIdle={isLoginModalOpen || isFocusing} />
                 <FocusModeOverlay
                     onCompleted={async (result) => {

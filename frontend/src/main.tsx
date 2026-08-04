@@ -12,6 +12,7 @@ import './styles/app-sidebar.css'
 import './styles/focus-mode.css'
 import './styles/about.css'
 import './styles/music.css'
+import './components/CompanionTease.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

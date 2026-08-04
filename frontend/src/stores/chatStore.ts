@@ -197,6 +197,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 lastActions: res.actionsExecuted,
             })
             saveLocalMessages(get().userId, withAssistant)
+            if (res.affectionPoints != null) {
+                const { useAffectionStore } = await import('./affectionStore')
+                useAffectionStore.getState().applyAward({
+                    awarded: res.affectionAwarded,
+                    points: res.affectionPoints,
+                    tierKey: res.affectionTierKey,
+                })
+            }
             // Gal mode drives face via emotion timeline typewriter — skip one-shot react
             if (!useCompanionStore.getState().galModeOpen) {
                 useCompanionStore.getState().reactToText(res.reply, true)

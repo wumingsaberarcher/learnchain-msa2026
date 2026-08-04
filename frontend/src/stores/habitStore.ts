@@ -260,6 +260,12 @@ export const useHabitStore = create<HabitState>((set, get) => {
             import('./aiSettingsStore').then(({ useAiSettingsStore }) => {
                 useAiSettingsStore.getState().hydrateForUser(null)
             })
+            import('./companionStore').then(({ useCompanionStore }) => {
+                useCompanionStore.getState().hydrateForUser(null)
+            })
+            import('./affectionStore').then(({ useAffectionStore }) => {
+                useAffectionStore.getState().clear()
+            })
             set({
                 isLoggedIn: false,
                 currentUser: null,

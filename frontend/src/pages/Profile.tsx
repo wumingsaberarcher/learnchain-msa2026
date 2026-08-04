@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAchievementStore } from '../stores/achievementStore'
+import { useAffectionStore } from '../stores/affectionStore'
 import { useAiSettingsStore } from '../stores/aiSettingsStore'
 import { useTranslation } from '../stores/settingsStore'
 import {
@@ -18,6 +19,7 @@ export default function ProfilePage() {
     const { profile, fetchProfile, updateBio, changePassword } = useAchievementStore()
     const { t } = useTranslation()
     const aiSettings = useAiSettingsStore()
+    const affection = useAffectionStore()
     const clearChatHistory = useChatStore(s => s.clearHistory)
     const [bio, setBio] = useState('')
     const [oldPwd, setOldPwd] = useState('')
@@ -38,6 +40,7 @@ export default function ProfilePage() {
 
     useEffect(() => { fetchProfile() }, [fetchProfile])
     useEffect(() => { if (profile) setBio(profile.bio) }, [profile])
+    useEffect(() => { void affection.hydrate() }, [affection.hydrate])
     useEffect(() => {
         setAiKey(aiSettings.apiKey)
         setAiBase(aiSettings.baseUrl)
@@ -152,6 +155,29 @@ export default function ProfilePage() {
                         <label>{t('profile.level')}</label>
                         <div className="profile-readonly">Lv.{profile.level} · {profile.totalXP} XP</div>
                     </div>
+                </div>
+
+                <div className="profile-section profile-affection">
+                    <label>{t('profile.affectionTitle')}</label>
+                    <p className="profile-hint">{t('profile.affectionHint')}</p>
+                    <div className="profile-affection-row">
+                        <strong>
+                            {['stranger', 'familiar', 'friend', 'trust', 'bond', 'heart'].includes(affection.tierKey)
+                                ? t(`profile.affectionTier.${affection.tierKey}` as 'profile.affectionTier.stranger')
+                                : affection.tierKey}
+                        </strong>
+                        <span>{affection.points} / {affection.maxPoints}</span>
+                    </div>
+                    <div className="profile-affection-bar" aria-hidden>
+                        <i style={{ width: `${Math.min(100, (affection.points / Math.max(1, affection.maxPoints)) * 100)}%` }} />
+                    </div>
+                    <p className="profile-hint">
+                        {t('profile.affectionToday', {
+                            n: affection.gainedToday,
+                            cap: affection.dailyCap,
+                            next: affection.toNextTier,
+                        })}
+                    </p>
                 </div>
 
                 <div className="profile-section">

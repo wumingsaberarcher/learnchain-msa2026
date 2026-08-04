@@ -17,6 +17,7 @@ public class ChatController : ControllerBase
     private readonly AiAssistantService _assistant;
     private readonly HabitContextBuilder _habitContext;
     private readonly CompanionMemoryService _memory;
+    private readonly CompanionAffectionService _affection;
     private readonly EmailService _email;
 
     public ChatController(
@@ -24,12 +25,14 @@ public class ChatController : ControllerBase
         AiAssistantService assistant,
         HabitContextBuilder habitContext,
         CompanionMemoryService memory,
+        CompanionAffectionService affection,
         EmailService email)
     {
         _context = context;
         _assistant = assistant;
         _habitContext = habitContext;
         _memory = memory;
+        _affection = affection;
         _email = email;
     }
 
@@ -53,6 +56,10 @@ public class ChatController : ControllerBase
         try
         {
             var result = await _assistant.ChatAsync(user, request, ct);
+            var affection = await _affection.AwardChatAsync(user, ct);
+            result.AffectionAwarded = affection.Awarded;
+            result.AffectionPoints = affection.Points;
+            result.AffectionTierKey = affection.TierKey;
             return Ok(result);
         }
         catch (InvalidOperationException ex)
@@ -187,5 +194,25 @@ public class ChatController : ControllerBase
         if (user == null) return Unauthorized();
         await _memory.ResetAllMemoryAsync(user.Id, ct);
         return Ok(new { message = "All companion memories cleared" });
+    }
+
+    /// <summary>Real Canal affection (per-user, slow grind).</summary>
+    [HttpGet("affection")]
+    public async Task<ActionResult<object>> GetAffection(CancellationToken ct)
+    {
+        var user = await GetCurrentUserAsync();
+        if (user == null) return Unauthorized();
+        var snap = CompanionAffectionService.Snapshot(user);
+        await _context.SaveChangesAsync(ct);
+        return Ok(new
+        {
+            points = snap.Points,
+            maxPoints = snap.MaxPoints,
+            tier = snap.Tier,
+            tierKey = snap.TierKey,
+            gainedToday = snap.GainedToday,
+            dailyCap = snap.DailyCap,
+            toNextTier = snap.ToNextTier,
+        });
     }
 }

@@ -1,0 +1,86 @@
+.companion-tease {
+	position: fixed;
+	right: 1.1rem;
+	bottom: 6.5rem;
+	z-index: 95;
+	display: flex;
+	align-items: flex-end;
+	gap: 0.55rem;
+	max-width: min(420px, calc(100vw - 1.5rem));
+	pointer-events: none;
+}
+
+.companion-tease-figure {
+	width: 110px;
+	flex-shrink: 0;
+	filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.4));
+}
+
+.companion-tease-character {
+	max-width: none;
+	width: 100%;
+}
+
+.companion-tease-bubble {
+	position: relative;
+	padding: 0.75rem 0.9rem 0.65rem;
+	border-radius: 14px;
+	background: rgba(12, 16, 28, 0.92);
+	border: 1px solid rgba(125, 211, 252, 0.35);
+	box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+	color: #eef4ff;
+	backdrop-filter: blur(10px);
+}
+
+.companion-tease-delta {
+	display: inline-block;
+	margin-bottom: 0.35rem;
+	padding: 0.12rem 0.55rem;
+	border-radius: 999px;
+	font-size: 0.78rem;
+	font-weight: 800;
+	letter-spacing: 0.02em;
+}
+
+.companion-tease-delta.plus {
+	background: rgba(34, 197, 94, 0.22);
+	color: #86efac;
+	border: 1px solid rgba(74, 222, 128, 0.45);
+}
+
+.companion-tease-delta.minus {
+	background: rgba(239, 68, 68, 0.22);
+	color: #fca5a5;
+	border: 1px solid rgba(248, 113, 113, 0.45);
+}
+
+.companion-tease-bubble p {
+	margin: 0;
+	font-size: 0.9rem;
+	line-height: 1.45;
+}
+
+.companion-tease-fake {
+	display: block;
+	margin-top: 0.4rem;
+	font-size: 0.68rem;
+	opacity: 0.55;
+	font-style: normal;
+}
+
+.app-shell.theme-day .companion-tease-bubble {
+	background: rgba(255, 255, 255, 0.94);
+	color: #1a2233;
+	border-color: rgba(56, 120, 180, 0.3);
+}
+
+@media (max-width: 640px) {
+	.companion-tease {
+		right: 0.6rem;
+		bottom: 5.5rem;
+	}
+
+	.companion-tease-figure {
+		width: 84px;
+	}
+}

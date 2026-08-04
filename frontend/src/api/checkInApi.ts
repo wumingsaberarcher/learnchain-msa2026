@@ -20,6 +20,11 @@ export interface CheckInResult {
     notes?: string
     milestoneId?: number
     newlyUnlocked?: string[]
+    affectionAwarded?: number
+    affectionPoints?: number
+    affectionTierKey?: string
+    affectionGainedToday?: number
+    affectionDailyCap?: number
 }
 
 export async function createCheckIn(payload: CheckInPayload): Promise<CheckInResult> {
@@ -33,7 +38,7 @@ export async function createCheckIn(payload: CheckInPayload): Promise<CheckInRes
         throw new Error(errorText || 'Failed to check in')
     }
     const data = await res.json()
-    return {
+    const result: CheckInResult = {
         id: data.id ?? data.Id,
         habitId: data.habitId ?? data.HabitId,
         userId: data.userId ?? data.UserId,
@@ -44,7 +49,23 @@ export async function createCheckIn(payload: CheckInPayload): Promise<CheckInRes
         notes: data.notes ?? data.Notes,
         milestoneId: data.milestoneId ?? data.MilestoneId,
         newlyUnlocked: data.newlyUnlocked ?? data.NewlyUnlocked ?? [],
+        affectionAwarded: data.affectionAwarded ?? data.AffectionAwarded,
+        affectionPoints: data.affectionPoints ?? data.AffectionPoints,
+        affectionTierKey: data.affectionTierKey ?? data.AffectionTierKey,
+        affectionGainedToday: data.affectionGainedToday ?? data.AffectionGainedToday,
+        affectionDailyCap: data.affectionDailyCap ?? data.AffectionDailyCap,
     }
+    if (result.affectionPoints != null) {
+        const { useAffectionStore } = await import('../stores/affectionStore')
+        useAffectionStore.getState().applyAward({
+            awarded: result.affectionAwarded,
+            points: result.affectionPoints,
+            tierKey: result.affectionTierKey,
+            gainedToday: result.affectionGainedToday,
+            dailyCap: result.affectionDailyCap,
+        })
+    }
+    return result
 }
 
 export async function getAllCheckIns() {
