@@ -227,6 +227,9 @@ export const useHabitStore = create<HabitState>((set, get) => {
                     currentUser: userInfo,
                 })
 
+                const { useAiSettingsStore } = await import('./aiSettingsStore')
+                useAiSettingsStore.getState().hydrateForUser(userInfo.id)
+
                 const { useAchievementStore } = await import('./achievementStore')
                 const achStore = useAchievementStore.getState()
                 await achStore.fetchProfile()
@@ -253,6 +256,9 @@ export const useHabitStore = create<HabitState>((set, get) => {
             localStorage.removeItem('currentUser')
             import('./achievementStore').then(({ useAchievementStore }) => {
                 useAchievementStore.getState().clear()
+            })
+            import('./aiSettingsStore').then(({ useAiSettingsStore }) => {
+                useAiSettingsStore.getState().hydrateForUser(null)
             })
             set({
                 isLoggedIn: false,

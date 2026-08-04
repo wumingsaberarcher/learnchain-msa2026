@@ -39,6 +39,11 @@ export default function ProfilePage() {
     useEffect(() => { fetchProfile() }, [fetchProfile])
     useEffect(() => { if (profile) setBio(profile.bio) }, [profile])
     useEffect(() => {
+        setAiKey(aiSettings.apiKey)
+        setAiBase(aiSettings.baseUrl)
+        setAiModel(aiSettings.model)
+    }, [aiSettings.userId, aiSettings.apiKey, aiSettings.baseUrl, aiSettings.model])
+    useEffect(() => {
         getChatPreferences()
             .then(p => setDigestEnabled(p.dailyDigestEnabled))
             .catch(() => { /* ignore when logged out edge */ })

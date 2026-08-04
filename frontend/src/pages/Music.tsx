@@ -64,17 +64,7 @@ export default function MusicPage() {
 
     return (
         <div className="music-page">
-            <header className="music-page-hero">
-                <div className="music-page-hero-icon" aria-hidden>
-                    <Music2 className="w-6 h-6" />
-                </div>
-                <div>
-                    <h1>{t('music.title')}</h1>
-                    <p>{t('music.subtitle')}</p>
-                </div>
-            </header>
-
-            <section className="music-card music-now">
+            <section className="music-card music-now" aria-label={t('music.title')}>
                 <div className="music-now-left">
                     <span className={`music-eq${isPlaying ? ' on' : ''}`} aria-hidden>
                         <i /><i /><i />
