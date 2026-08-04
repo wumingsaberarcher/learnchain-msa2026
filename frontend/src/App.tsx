@@ -20,6 +20,7 @@ import AppSidebar from './components/AppSidebar'
 import BgmPlayer from './components/BgmPlayer'
 import { useHabitStore } from './stores/habitStore'
 import { useAchievementStore } from './stores/achievementStore'
+import { useAiSettingsStore } from './stores/aiSettingsStore'
 import { useIdleRestStore } from './stores/idleRestStore'
 import { useFocusModeStore } from './stores/focusModeStore'
 import { useBgmStore } from './stores/bgmStore'
@@ -30,10 +31,15 @@ function App() {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
     const { isLoggedIn, currentUser, fetchHabits, fetchTodayCheckedHabits, fetchCurrentUser, markHabitCheckedToday } = useHabitStore()
     const { fetchProfile, syncAchievements, handleNewUnlocks } = useAchievementStore()
+    const hydrateAiSettings = useAiSettingsStore(s => s.hydrateForUser)
     const { t, theme } = useTranslation()
     const isResting = useIdleRestStore(s => s.isResting)
     const isFocusing = useFocusModeStore(s => s.isActive)
     const toggleSidebar = useBgmStore(s => s.toggleSidebar)
+
+    useEffect(() => {
+        hydrateAiSettings(isLoggedIn && currentUser ? currentUser.id : null)
+    }, [isLoggedIn, currentUser?.id, hydrateAiSettings])
 
     useEffect(() => {
         if (isLoggedIn) {
