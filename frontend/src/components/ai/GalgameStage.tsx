@@ -8,7 +8,7 @@ import {
   emotionAt,
   type EmotionCue,
 } from '../../companions/emotionTimeline'
-import Character from '../character/Character'
+import Live2DCanal from '../live2d/Live2DCanal'
 import type { Emotion } from '../character/emotionAssets'
 import SmokeBurst from './SmokeBurst'
 import { useSpeechInput } from './useSpeechInput'
@@ -193,11 +193,10 @@ export default function GalgameStage() {
       <div className="gal-stage-bg" />
 
       <div className="gal-character-wrap">
-        <Character
+        <Live2DCanal
           emotion={emotion}
           isTalking={isTalking || typing || isSending}
-          animate
-          className="gal-character"
+          className="gal-live2d"
         />
       </div>
 

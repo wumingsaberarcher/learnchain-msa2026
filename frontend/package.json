@@ -17,6 +17,8 @@
     "@tailwindcss/postcss": "^4.3.2",
     "framer-motion": "^12.43.0",
     "lucide-react": "^1.24.0",
+    "pixi-live2d-display": "^0.4.0",
+    "pixi.js": "^6.5.10",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1",
