@@ -20,6 +20,7 @@ export interface Live2DCanalHandle {
   setHeadAngle: (x: number, y: number) => void
   startBreathing: () => void
   stopBreathing: () => void
+  playBlockGesture: () => void
 }
 
 export interface Live2DCanalProps {
@@ -75,6 +76,7 @@ const Live2DCanal = forwardRef<Live2DCanalHandle, Live2DCanalProps>(function Liv
     setHeadAngle: (x, y) => controllerRef.current.setHeadAngle(x, y),
     startBreathing: () => controllerRef.current.startBreathing(),
     stopBreathing: () => controllerRef.current.stopBreathing(),
+    playBlockGesture: () => controllerRef.current.playBlockGesture(),
   }))
 
   useEffect(() => {

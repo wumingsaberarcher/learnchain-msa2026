@@ -77,6 +77,10 @@
 	gap: 0.55rem;
 }
 
+.gal-dialog-stack.is-blocked .gal-dialog-box {
+	animation: gal-dialog-push 0.55s cubic-bezier(0.22, 1.4, 0.36, 1);
+}
+
 .gal-dialog-box {
 	position: relative;
 	padding: 1.1rem 1.35rem 1.25rem;
@@ -90,10 +94,21 @@
 	box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
 	min-height: 7.5rem;
 	backdrop-filter: blur(12px);
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+}
+
+.gal-dialog-box.is-hand-blocked {
+	border-color: rgba(244, 114, 182, 0.55);
+	box-shadow:
+		0 16px 48px rgba(0, 0, 0, 0.4),
+		0 -6px 24px rgba(244, 114, 182, 0.22);
 }
 
 .gal-dialog-name {
 	display: inline-block;
+	flex: 0 0 auto;
 	margin-bottom: 0.55rem;
 	padding: 0.15rem 0.65rem;
 	border-radius: 6px;
@@ -108,6 +123,101 @@
 	margin: 0;
 	font-size: clamp(1rem, 2.2vw, 1.2rem);
 	line-height: 1.65;
+	overflow-y: auto;
+	flex: 1 1 auto;
+	min-height: 0;
+	padding-right: 0.2rem;
+}
+
+.gal-block-mutter {
+	align-self: flex-start;
+	margin-left: 0.35rem;
+	padding: 0.35rem 0.75rem;
+	border-radius: 999px;
+	font-size: 0.82rem;
+	font-weight: 600;
+	color: #ffe4f1;
+	background: rgba(190, 60, 110, 0.55);
+	border: 1px solid rgba(251, 113, 133, 0.45);
+	animation: gal-mutter-pop 0.35s ease-out;
+	pointer-events: none;
+}
+
+.gal-hand-block {
+	position: absolute;
+	left: 12%;
+	top: -18px;
+	z-index: 4;
+	width: 88px;
+	height: 54px;
+	pointer-events: none;
+	animation: gal-hand-swipe 0.85s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+	filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
+}
+
+.gal-hand-sleeve {
+	position: absolute;
+	left: 0;
+	top: 10px;
+	width: 58px;
+	height: 28px;
+	border-radius: 18px 22px 16px 14px;
+	background: linear-gradient(120deg, #f9a8d4 0%, #fb7185 55%, #e11d48 100%);
+	transform: rotate(-18deg);
+}
+
+.gal-hand-palm {
+	position: absolute;
+	right: 4px;
+	top: 4px;
+	width: 34px;
+	height: 34px;
+	border-radius: 46% 42% 48% 40%;
+	background: linear-gradient(160deg, #ffe4e6, #fda4af);
+	box-shadow: inset 0 -3px 6px rgba(190, 24, 93, 0.18);
+}
+
+@keyframes gal-hand-swipe {
+	0% {
+		opacity: 0;
+		transform: translate(-48px, 28px) rotate(-28deg) scale(0.85);
+	}
+	35% {
+		opacity: 1;
+		transform: translate(0, 0) rotate(-8deg) scale(1);
+	}
+	70% {
+		opacity: 1;
+		transform: translate(6px, 4px) rotate(-4deg);
+	}
+	100% {
+		opacity: 0;
+		transform: translate(-12px, 10px) rotate(-16deg) scale(0.95);
+	}
+}
+
+@keyframes gal-dialog-push {
+	0% {
+		transform: translateY(-18px);
+	}
+	55% {
+		transform: translateY(6px);
+	}
+	100% {
+		transform: translateY(0);
+	}
+}
+
+@keyframes gal-mutter-pop {
+	from {
+		opacity: 0;
+		transform: translateY(8px) scale(0.92);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
 	white-space: pre-wrap;
 	word-break: break-word;
 	min-height: 3.2em;

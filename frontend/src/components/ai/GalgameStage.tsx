@@ -8,7 +8,7 @@ import {
   emotionAt,
   type EmotionCue,
 } from '../../companions/emotionTimeline'
-import Live2DCanal from '../live2d/Live2DCanal'
+import Live2DCanal, { type Live2DCanalHandle } from '../live2d/Live2DCanal'
 import Character from '../character/Character'
 import type { Emotion } from '../character/emotionAssets'
 import SmokeBurst from './SmokeBurst'
@@ -36,6 +36,9 @@ export default function GalgameStage() {
   const [typing, setTyping] = useState(false)
   const [introDone, setIntroDone] = useState(false)
   const [live2dFailed, setLive2dFailed] = useState(false)
+  const [dialogMaxHeight, setDialogMaxHeight] = useState<number | null>(null)
+  const [handBlocking, setHandBlocking] = useState(false)
+  const [blockMutter, setBlockMutter] = useState(false)
 
   const timelineRef = useRef<EmotionCue[]>([])
   const typeTimerRef = useRef<number | null>(null)
@@ -44,6 +47,12 @@ export default function GalgameStage() {
   const forceEmotionRef = useRef<Emotion | null>(null)
   const exitAfterFarewellRef = useRef(false)
   const farewellHoverLockRef = useRef(false)
+  const live2dRef = useRef<Live2DCanalHandle>(null)
+  const dialogStackRef = useRef<HTMLDivElement>(null)
+  const dialogBoxRef = useRef<HTMLDivElement>(null)
+  const inputRowRef = useRef<HTMLDivElement>(null)
+  const blockCooldownRef = useRef(0)
+  const wasOverFaceRef = useRef(false)
 
   const stopTypewriter = useCallback(() => {
     if (typeTimerRef.current != null) {
@@ -104,6 +113,57 @@ export default function GalgameStage() {
   }, [galSmokePlaying, playLine, t])
 
   useEffect(() => () => stopTypewriter(), [stopTypewriter])
+
+  /** Keep dialog below Canal's face; she "pushes" it down when it climbs too high. */
+  useEffect(() => {
+    const stack = dialogStackRef.current
+    const box = dialogBoxRef.current
+    if (!stack || !box) return
+
+    const FACE_LINE_RATIO = 0.36
+    const MIN_BOX = 120
+
+    const measure = () => {
+      const vh = window.innerHeight
+      const faceLine = vh * FACE_LINE_RATIO
+      const stackBottom = stack.getBoundingClientRect().bottom
+      const inputH = inputRowRef.current?.offsetHeight ?? 56
+      const gap = 12
+      const maxH = Math.max(MIN_BOX, stackBottom - faceLine - inputH - gap)
+      setDialogMaxHeight(maxH)
+
+      // Natural height without cap (temporarily clear maxHeight via scrollHeight of content).
+      const textEl = box.querySelector('.gal-dialog-text') as HTMLElement | null
+      const natural =
+        (textEl?.scrollHeight ?? 0) +
+        (box.querySelector('.gal-dialog-name')?.clientHeight ?? 0) +
+        (box.querySelector('.gal-dialog-hint')?.clientHeight ?? 0) +
+        48 // padding fudge
+      const overFace = natural > maxH + 8
+
+      if (overFace && !wasOverFaceRef.current && Date.now() > blockCooldownRef.current) {
+        wasOverFaceRef.current = true
+        blockCooldownRef.current = Date.now() + 4200
+        setHandBlocking(true)
+        setBlockMutter(true)
+        live2dRef.current?.playBlockGesture()
+        window.setTimeout(() => setHandBlocking(false), 1100)
+        window.setTimeout(() => setBlockMutter(false), 2200)
+      } else if (!overFace) {
+        wasOverFaceRef.current = false
+      }
+    }
+
+    measure()
+    const ro = new ResizeObserver(() => measure())
+    ro.observe(box)
+    ro.observe(stack)
+    window.addEventListener('resize', measure)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [displayText, typing, fullText])
 
   const speech = useSpeechInput({
     language,
@@ -204,6 +264,7 @@ export default function GalgameStage() {
           />
         ) : (
           <Live2DCanal
+            ref={live2dRef}
             emotion={emotion}
             isTalking={isTalking || typing || isSending}
             className="gal-live2d"
@@ -212,8 +273,23 @@ export default function GalgameStage() {
         )}
       </div>
 
-      <div className="gal-dialog-stack">
-        <div className="gal-dialog-box">
+      <div className={`gal-dialog-stack ${handBlocking ? 'is-blocked' : ''}`} ref={dialogStackRef}>
+        {blockMutter && (
+          <div className="gal-block-mutter" role="status">
+            {t('chat.galBlockFace')}
+          </div>
+        )}
+        <div
+          className={`gal-dialog-box ${handBlocking ? 'is-hand-blocked' : ''}`}
+          ref={dialogBoxRef}
+          style={dialogMaxHeight != null ? { maxHeight: dialogMaxHeight } : undefined}
+        >
+          {handBlocking && (
+            <div className="gal-hand-block" aria-hidden>
+              <span className="gal-hand-sleeve" />
+              <span className="gal-hand-palm" />
+            </div>
+          )}
           <div className="gal-dialog-name">Canal</div>
           <p className="gal-dialog-text" aria-live="polite">
             {displayText || (isSending ? t('chat.thinking') : introDone ? '' : '…')}
@@ -224,7 +300,7 @@ export default function GalgameStage() {
           )}
         </div>
 
-        <div className="gal-input-row">
+        <div className="gal-input-row" ref={inputRowRef}>
           <textarea
             className="gal-input"
             rows={1}

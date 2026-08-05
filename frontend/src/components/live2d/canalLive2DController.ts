@@ -58,6 +58,13 @@ export class CanalLive2DController {
   private glanceHeadX = 0
   private glanceHeadY = 0
 
+  /** Temporary "stop covering my face" gesture offsets. */
+  private blockTimer = 0
+  private blockBodyX = 0
+  private blockAngleZ = 0
+  private blockHeadX = 0
+  private savedExpression: ExpressionName | null = null
+
   attach(model: Live2DModel) {
     this.model = model
     const internal = model.internalModel as CubismInternal
@@ -119,6 +126,13 @@ export class CanalLive2DController {
     this.setParam(CanalParams.breath, 0)
   }
 
+  /** Canal waves / leans to push the rising dialog away from her face. */
+  playBlockGesture() {
+    this.blockTimer = 1.35
+    if (!this.savedExpression) this.savedExpression = this.expressionName
+    this.setExpression('angry')
+  }
+
   tick(dtMs: number) {
     if (!this.model) return
     const dt = dtMs / 1000
@@ -129,18 +143,52 @@ export class CanalLive2DController {
       const breath = 0.5 + Math.sin(this.breathPhase) * 0.32
       this.setParam(CanalParams.breath, breath)
       const bodyY = Math.sin(this.breathPhase) * 0.9
-      this.setParam(CanalParams.bodyAngleY, bodyY)
+      // Don't fight the block lean on body Y too hard.
+      if (this.blockTimer <= 0) {
+        this.setParam(CanalParams.bodyAngleY, bodyY)
+      }
       const sway = Math.sin(this.breathPhase * 1.05) * 0.1
       this.setParam(CanalParams.hairFront, sway)
       this.setParam(CanalParams.hairSide, sway * 0.75)
       this.setParam(CanalParams.hairBack, sway * 0.55)
     }
 
+    this.updateBlockGesture(dt)
     this.updateLook(dt)
     this.updateBlink(dt)
     this.updateExpression(dt)
     this.updateMouth(dt)
     this.applyStaticParams()
+  }
+
+  private updateBlockGesture(dt: number) {
+    if (this.blockTimer > 0) {
+      this.blockTimer -= dt
+      const t = 1 - Math.max(0, this.blockTimer) / 1.35
+      // Wave-like lean toward the dialog (center-right of stage).
+      const wave = Math.sin(t * Math.PI * 2.2) * (1 - t * 0.35)
+      this.blockBodyX = wave * 7
+      this.blockAngleZ = wave * -8
+      this.blockHeadX = wave * 10
+      this.setParam(CanalParams.bodyAngleX, this.blockBodyX)
+      this.setParam(CanalParams.angleZ, this.blockAngleZ)
+
+      if (this.blockTimer <= 0) {
+        this.blockBodyX = 0
+        this.blockAngleZ = 0
+        this.blockHeadX = 0
+        this.setParam(CanalParams.bodyAngleX, 0)
+        this.setParam(CanalParams.angleZ, 0)
+        if (this.savedExpression) {
+          this.setExpression(this.savedExpression)
+          this.savedExpression = null
+        }
+      }
+      return
+    }
+    this.blockBodyX = 0
+    this.blockAngleZ = 0
+    this.blockHeadX = 0
   }
 
   private updateLook(dt: number) {
@@ -228,7 +276,7 @@ export class CanalLive2DController {
   private applyStaticParams() {
     this.setParam(
       CanalParams.angleX,
-      clampParam(CanalParams.angleX, this.headX + this.glanceHeadX),
+      clampParam(CanalParams.angleX, this.headX + this.glanceHeadX + this.blockHeadX),
     )
     this.setParam(
       CanalParams.angleY,
