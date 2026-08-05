@@ -10,6 +10,7 @@ import { CANAL_MODEL_URL } from './canalLive2DConfig'
 import type { ExpressionName } from './canalExpressions'
 import { CanalLive2DController } from './canalLive2DController'
 import { loadCubismCore } from './loadCubismCore'
+import { readMoc3Version } from './mocVersion'
 import './Live2DCanal.css'
 
 export interface Live2DCanalHandle {
@@ -27,6 +28,8 @@ export interface Live2DCanalProps {
   emotion?: Emotion
   /** Lip-sync style mouth motion while speaking. */
   isTalking?: boolean
+  /** Called when Live2D cannot load (e.g. moc3 too new for Core). */
+  onError?: (message: string) => void
 }
 
 type Live2DModelInstance = import('pixi-live2d-display/cubism4').Live2DModel
@@ -41,14 +44,27 @@ function layoutModel(model: Live2DModelInstance, width: number, height: number) 
   model.position.set(width / 2, height * 0.98)
 }
 
+function friendlyLoadError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err)
+  if (/moc3 ver|unsupport later than moc3|Unknown error/i.test(raw)) {
+    return (
+      'Canal.moc3 is Cubism 5.3 (moc3 v6), but current Cubism Core only supports up to moc3 v5. ' +
+      'Re-export the model for SDK 5.0/4.x, or replace public/lib/live2dcubismcore.min.js with Cubism 5 SDK R5+ Core (06.x).'
+    )
+  }
+  return raw || 'Live2D load failed'
+}
+
 const Live2DCanal = forwardRef<Live2DCanalHandle, Live2DCanalProps>(function Live2DCanal(
-  { className, emotion = 'normal', isTalking = false },
+  { className, emotion = 'normal', isTalking = false, onError },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement>(null)
   const controllerRef = useRef(new CanalLive2DController())
   const appRef = useRef<import('pixi.js').Application | null>(null)
   const modelRef = useRef<Live2DModelInstance | null>(null)
+  const onErrorRef = useRef(onError)
+  onErrorRef.current = onError
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [errorText, setErrorText] = useState('')
 
@@ -77,10 +93,25 @@ const Live2DCanal = forwardRef<Live2DCanalHandle, Live2DCanalProps>(function Liv
     let resizeObserver: ResizeObserver | null = null
     let canvasEl: HTMLCanvasElement | null = null
 
+    const fail = (message: string) => {
+      if (disposed) return
+      setErrorText(message)
+      setStatus('error')
+      console.error('[Live2DCanal]', message)
+      onErrorRef.current?.(message)
+    }
+
     const init = async () => {
       try {
         setStatus('loading')
         setErrorText('')
+
+        const mocUrl = CANAL_MODEL_URL.replace(/\.model3\.json$/i, '.moc3')
+        const mocVer = await readMoc3Version(mocUrl)
+        if (mocVer != null && mocVer >= 6) {
+          fail(friendlyLoadError(new Error(`moc3 ver is [${mocVer}]`)))
+          return
+        }
 
         // Must resolve BEFORE importing cubism4 — that module throws on evaluate if Core is missing.
         await loadCubismCore()
@@ -132,11 +163,7 @@ const Live2DCanal = forwardRef<Live2DCanalHandle, Live2DCanalProps>(function Liv
 
         setStatus('ready')
       } catch (err) {
-        if (disposed) return
-        const message = err instanceof Error ? err.message : 'Live2D load failed'
-        setErrorText(message)
-        setStatus('error')
-        console.error('[Live2DCanal]', err)
+        fail(friendlyLoadError(err))
       }
     }
 

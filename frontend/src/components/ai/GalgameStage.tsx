@@ -9,6 +9,7 @@ import {
   type EmotionCue,
 } from '../../companions/emotionTimeline'
 import Live2DCanal from '../live2d/Live2DCanal'
+import Character from '../character/Character'
 import type { Emotion } from '../character/emotionAssets'
 import SmokeBurst from './SmokeBurst'
 import { useSpeechInput } from './useSpeechInput'
@@ -34,6 +35,7 @@ export default function GalgameStage() {
   const [fullText, setFullText] = useState('')
   const [typing, setTyping] = useState(false)
   const [introDone, setIntroDone] = useState(false)
+  const [live2dFailed, setLive2dFailed] = useState(false)
 
   const timelineRef = useRef<EmotionCue[]>([])
   const typeTimerRef = useRef<number | null>(null)
@@ -193,11 +195,21 @@ export default function GalgameStage() {
       <div className="gal-stage-bg" />
 
       <div className="gal-character-wrap">
-        <Live2DCanal
-          emotion={emotion}
-          isTalking={isTalking || typing || isSending}
-          className="gal-live2d"
-        />
+        {live2dFailed ? (
+          <Character
+            emotion={emotion}
+            isTalking={isTalking || typing || isSending}
+            animate
+            className="gal-character"
+          />
+        ) : (
+          <Live2DCanal
+            emotion={emotion}
+            isTalking={isTalking || typing || isSending}
+            className="gal-live2d"
+            onError={() => setLive2dFailed(true)}
+          />
+        )}
       </div>
 
       <div className="gal-dialog-stack">
