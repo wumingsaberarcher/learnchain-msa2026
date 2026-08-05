@@ -25,6 +25,10 @@ function mergeExpressionPreset(name: ExpressionName): Record<string, number> {
   return out
 }
 
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t
+}
+
 export class CanalLive2DController {
   private model: Live2DModel | null = null
   private breathing = true
@@ -41,6 +45,18 @@ export class CanalLive2DController {
   private expressionTarget: Record<string, number> = {}
   private talking = false
   private talkPhase = 0
+
+  /** Pointer in -1..1 relative to canvas (x right, y up). */
+  private pointerX = 0
+  private pointerY = 0
+  private lookCooldown = 1.2
+  private lookHold = 0
+  private lookTargetX = 0
+  private lookTargetY = 0
+  private eyeBallX = 0
+  private eyeBallY = 0
+  private glanceHeadX = 0
+  private glanceHeadY = 0
 
   attach(model: Live2DModel) {
     this.model = model
@@ -83,6 +99,12 @@ export class CanalLive2DController {
     this.headY = clampParam(CanalParams.angleY, y)
   }
 
+  /** Update cursor focus. nx/ny in roughly -1..1 (screen-relative). */
+  setPointerFocus(nx: number, ny: number) {
+    this.pointerX = Math.max(-1, Math.min(1, nx))
+    this.pointerY = Math.max(-1, Math.min(1, ny))
+  }
+
   setTalking(active: boolean) {
     this.talking = active
     if (!active) this.mouthOpen = 0
@@ -102,20 +124,57 @@ export class CanalLive2DController {
     const dt = dtMs / 1000
 
     if (this.breathing) {
-      this.breathPhase += dt * 0.85
-      const breath = 0.5 + Math.sin(this.breathPhase) * 0.22
+      this.breathPhase += dt * 0.72
+      // Clearer chest breathe — still within natural range.
+      const breath = 0.5 + Math.sin(this.breathPhase) * 0.32
       this.setParam(CanalParams.breath, breath)
-      // Subtle hair sway tied to breath — keep amplitude low.
-      const sway = Math.sin(this.breathPhase * 1.1) * 0.08
+      const bodyY = Math.sin(this.breathPhase) * 0.9
+      this.setParam(CanalParams.bodyAngleY, bodyY)
+      const sway = Math.sin(this.breathPhase * 1.05) * 0.1
       this.setParam(CanalParams.hairFront, sway)
-      this.setParam(CanalParams.hairSide, sway * 0.7)
-      this.setParam(CanalParams.hairBack, sway * 0.5)
+      this.setParam(CanalParams.hairSide, sway * 0.75)
+      this.setParam(CanalParams.hairBack, sway * 0.55)
     }
 
+    this.updateLook(dt)
     this.updateBlink(dt)
     this.updateExpression(dt)
     this.updateMouth(dt)
     this.applyStaticParams()
+  }
+
+  private updateLook(dt: number) {
+    if (this.lookHold > 0) {
+      this.lookHold -= dt
+      this.lookTargetX = this.pointerX * 0.75
+      this.lookTargetY = this.pointerY * 0.55
+      if (this.lookHold <= 0) {
+        this.lookTargetX = 0
+        this.lookTargetY = 0
+        // Rest a few seconds before considering another glance.
+        this.lookCooldown = 2.8 + Math.random() * 4.5
+      }
+    } else {
+      this.lookCooldown -= dt
+      if (this.lookCooldown <= 0) {
+        // Occasional glance — not every cooldown fires a look.
+        if (Math.random() < 0.42) {
+          this.lookHold = 0.7 + Math.random() * 1.4
+        } else {
+          this.lookCooldown = 1.6 + Math.random() * 2.8
+        }
+      }
+    }
+
+    const ease = 1 - Math.exp(-3.2 * dt)
+    this.eyeBallX = lerp(this.eyeBallX, this.lookTargetX, ease)
+    this.eyeBallY = lerp(this.eyeBallY, this.lookTargetY, ease)
+    // Soft head follow while glancing — keep tiny so it never looks broken.
+    this.glanceHeadX = lerp(this.glanceHeadX, this.lookTargetX * 6, ease * 0.7)
+    this.glanceHeadY = lerp(this.glanceHeadY, this.lookTargetY * 4, ease * 0.7)
+
+    this.setParam(CanalParams.eyeBallX, this.eyeBallX)
+    this.setParam(CanalParams.eyeBallY, this.eyeBallY)
   }
 
   private updateBlink(dt: number) {
@@ -167,8 +226,14 @@ export class CanalLive2DController {
   }
 
   private applyStaticParams() {
-    this.setParam(CanalParams.angleX, this.headX)
-    this.setParam(CanalParams.angleY, this.headY)
+    this.setParam(
+      CanalParams.angleX,
+      clampParam(CanalParams.angleX, this.headX + this.glanceHeadX),
+    )
+    this.setParam(
+      CanalParams.angleY,
+      clampParam(CanalParams.angleY, this.headY + this.glanceHeadY),
+    )
     if (!this.blinking) {
       this.setParam(CanalParams.eyeLOpen, this.eyeOpen)
       this.setParam(CanalParams.eyeROpen, this.eyeOpen)

@@ -43,6 +43,8 @@ export const PARAM_LIMITS: Partial<Record<CanalParamId, readonly [number, number
   [CanalParams.mouthForm]: [-1, 1],
   [CanalParams.eyeLOpen]: [0, 1.2],
   [CanalParams.eyeROpen]: [0, 1.2],
+  [CanalParams.eyeBallX]: [-0.85, 0.85],
+  [CanalParams.eyeBallY]: [-0.7, 0.7],
   [CanalParams.breath]: [0, 1],
   [CanalParams.hairFront]: [-1, 1],
   [CanalParams.hairSide]: [-1, 1],

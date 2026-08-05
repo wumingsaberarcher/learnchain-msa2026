@@ -36,12 +36,14 @@ type Live2DModelInstance = import('pixi-live2d-display/cubism4').Live2DModel
 
 function layoutModel(model: Live2DModelInstance, width: number, height: number) {
   const bounds = model.getLocalBounds()
-  const modelW = bounds.width || model.width || 1
-  const modelH = bounds.height || model.height || 1
-  const scale = Math.min(width / modelW, height / modelH) * 0.95
+  const modelW = Math.max(1, bounds.width || model.width || 1)
+  const modelH = Math.max(1, bounds.height || model.height || 1)
+  // Half-body portrait: zoom in so legs crop below the frame.
+  const scale = Math.max(width / modelW, height / modelH) * 1.55
   model.scale.set(scale)
   model.anchor.set(0.5, 1)
-  model.position.set(width / 2, height * 0.98)
+  // Push downward so waist/hips sit near the bottom edge.
+  model.position.set(width * 0.52, height * 1.22)
 }
 
 function friendlyLoadError(err: unknown): string {
@@ -92,6 +94,7 @@ const Live2DCanal = forwardRef<Live2DCanalHandle, Live2DCanalProps>(function Liv
     let disposed = false
     let resizeObserver: ResizeObserver | null = null
     let canvasEl: HTMLCanvasElement | null = null
+    let removePointer: (() => void) | null = null
 
     const fail = (message: string) => {
       if (disposed) return
@@ -150,6 +153,19 @@ const Live2DCanal = forwardRef<Live2DCanalHandle, Live2DCanalProps>(function Liv
         controllerRef.current.attach(model)
         controllerRef.current.startBreathing()
 
+        const onPointerMove = (ev: PointerEvent) => {
+          const rect = host.getBoundingClientRect()
+          if (rect.width <= 0 || rect.height <= 0) return
+          // Face sits in upper-middle of the half-body crop.
+          const faceX = rect.left + rect.width * 0.52
+          const faceY = rect.top + rect.height * 0.28
+          const nx = (ev.clientX - faceX) / (rect.width * 0.55)
+          const ny = (faceY - ev.clientY) / (rect.height * 0.45)
+          controllerRef.current.setPointerFocus(nx, ny)
+        }
+        window.addEventListener('pointermove', onPointerMove, { passive: true })
+        removePointer = () => window.removeEventListener('pointermove', onPointerMove)
+
         app.ticker.add(() => {
           controllerRef.current.tick(app.ticker.deltaMS)
         })
@@ -171,6 +187,7 @@ const Live2DCanal = forwardRef<Live2DCanalHandle, Live2DCanalProps>(function Liv
 
     return () => {
       disposed = true
+      removePointer?.()
       resizeObserver?.disconnect()
       controllerRef.current.detach()
       modelRef.current?.destroy()
