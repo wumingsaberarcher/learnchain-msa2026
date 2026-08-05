@@ -37,12 +37,11 @@ type Live2DModelInstance = import('pixi-live2d-display/cubism4').Live2DModel
 function layoutModel(model: Live2DModelInstance, width: number, height: number) {
   const bounds = model.getLocalBounds()
   const modelH = Math.max(1, bounds.height || model.height || 1)
-  // Half-body: scale from height only (avoid width-cover blowing up tall models),
-  // anchor at top so the head stays in frame and legs crop below.
-  const scale = (height / modelH) * 1.85
+  // Half-body: head near top of stage, crop around upper thighs at screen bottom.
+  const scale = (height / modelH) * 1.78
   model.scale.set(scale)
   model.anchor.set(0.5, 0)
-  model.position.set(width * 0.5, height * 0.04)
+  model.position.set(width * 0.5, height * 0.02)
 }
 
 function friendlyLoadError(err: unknown): string {

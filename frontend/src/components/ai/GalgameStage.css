@@ -43,10 +43,11 @@
 .gal-character-wrap {
 	position: absolute;
 	left: clamp(-4%, 0vw, 2%);
-	bottom: clamp(140px, 22vh, 220px);
+	top: 3.25rem;
+	bottom: 0;
 	width: min(720px, 68vw);
-	height: min(88vh, 820px);
 	max-width: 780px;
+	height: auto;
 	z-index: 2;
 	pointer-events: none;
 	filter: drop-shadow(0 18px 40px rgba(0, 0, 0, 0.45));
@@ -240,8 +241,8 @@
 @media (max-width: 720px) {
 	.gal-character-wrap {
 		width: min(520px, 96vw);
-		height: min(78vh, 700px);
-		bottom: clamp(180px, 30vh, 260px);
+		top: 3rem;
+		bottom: 0;
 		left: 50%;
 		transform: translateX(-50%);
 	}
