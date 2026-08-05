@@ -127,6 +127,9 @@
 	flex: 1 1 auto;
 	min-height: 0;
 	padding-right: 0.2rem;
+	white-space: pre-wrap;
+	word-break: break-word;
+	color: rgba(242, 246, 255, 0.95);
 }
 
 .gal-block-mutter {
@@ -217,11 +220,6 @@
 		opacity: 1;
 		transform: translateY(0) scale(1);
 	}
-}
-	white-space: pre-wrap;
-	word-break: break-word;
-	min-height: 3.2em;
-	color: rgba(242, 246, 255, 0.95);
 }
 
 .gal-caret {
