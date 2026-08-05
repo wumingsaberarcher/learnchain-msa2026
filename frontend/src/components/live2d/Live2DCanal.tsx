@@ -38,12 +38,12 @@ function layoutModel(model: Live2DModelInstance, width: number, height: number) 
   const bounds = model.getLocalBounds()
   const modelW = Math.max(1, bounds.width || model.width || 1)
   const modelH = Math.max(1, bounds.height || model.height || 1)
-  // Half-body portrait: zoom in so legs crop below the frame.
-  const scale = Math.max(width / modelW, height / modelH) * 1.55
+  // Half-body: scale from height only (avoid width-cover blowing up tall models),
+  // anchor at top so the head stays in frame and legs crop below.
+  const scale = (height / modelH) * 1.85
   model.scale.set(scale)
-  model.anchor.set(0.5, 1)
-  // Push downward so waist/hips sit near the bottom edge.
-  model.position.set(width * 0.52, height * 1.22)
+  model.anchor.set(0.5, 0)
+  model.position.set(width * 0.5, height * 0.04)
 }
 
 function friendlyLoadError(err: unknown): string {
@@ -156,11 +156,11 @@ const Live2DCanal = forwardRef<Live2DCanalHandle, Live2DCanalProps>(function Liv
         const onPointerMove = (ev: PointerEvent) => {
           const rect = host.getBoundingClientRect()
           if (rect.width <= 0 || rect.height <= 0) return
-          // Face sits in upper-middle of the half-body crop.
-          const faceX = rect.left + rect.width * 0.52
-          const faceY = rect.top + rect.height * 0.28
+          // Face sits near the top of the half-body crop.
+          const faceX = rect.left + rect.width * 0.5
+          const faceY = rect.top + rect.height * 0.22
           const nx = (ev.clientX - faceX) / (rect.width * 0.55)
-          const ny = (faceY - ev.clientY) / (rect.height * 0.45)
+          const ny = (faceY - ev.clientY) / (rect.height * 0.4)
           controllerRef.current.setPointerFocus(nx, ny)
         }
         window.addEventListener('pointermove', onPointerMove, { passive: true })
