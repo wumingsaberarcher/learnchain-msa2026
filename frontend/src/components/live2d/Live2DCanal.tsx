@@ -1,0 +1,171 @@
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
+import type { Emotion } from '../character/emotionAssets'
+import { CANAL_MODEL_URL } from './canalLive2DConfig'
+import type { ExpressionName } from './canalExpressions'
+import { CanalLive2DController } from './canalLive2DController'
+import { loadCubismCore } from './loadCubismCore'
+import './Live2DCanal.css'
+
+export interface Live2DCanalHandle {
+  setExpression: (name: ExpressionName) => void
+  setMouthOpen: (value: number) => void
+  setEyeOpen: (value: number) => void
+  setHeadAngle: (x: number, y: number) => void
+  startBreathing: () => void
+  stopBreathing: () => void
+}
+
+export interface Live2DCanalProps {
+  className?: string
+  /** Synced from companion / chat emotion — drives expression preset. */
+  emotion?: Emotion
+  /** Lip-sync style mouth motion while speaking. */
+  isTalking?: boolean
+}
+
+type Live2DModelInstance = import('pixi-live2d-display/cubism4').Live2DModel
+
+function layoutModel(model: Live2DModelInstance, width: number, height: number) {
+  const bounds = model.getLocalBounds()
+  const modelW = bounds.width || model.width || 1
+  const modelH = bounds.height || model.height || 1
+  const scale = Math.min(width / modelW, height / modelH) * 0.95
+  model.scale.set(scale)
+  model.anchor.set(0.5, 1)
+  model.position.set(width / 2, height * 0.98)
+}
+
+const Live2DCanal = forwardRef<Live2DCanalHandle, Live2DCanalProps>(function Live2DCanal(
+  { className, emotion = 'normal', isTalking = false },
+  ref,
+) {
+  const hostRef = useRef<HTMLDivElement>(null)
+  const controllerRef = useRef(new CanalLive2DController())
+  const appRef = useRef<import('pixi.js').Application | null>(null)
+  const modelRef = useRef<Live2DModelInstance | null>(null)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [errorText, setErrorText] = useState('')
+
+  useImperativeHandle(ref, () => ({
+    setExpression: (name) => controllerRef.current.setExpression(name),
+    setMouthOpen: (value) => controllerRef.current.setMouthOpen(value),
+    setEyeOpen: (value) => controllerRef.current.setEyeOpen(value),
+    setHeadAngle: (x, y) => controllerRef.current.setHeadAngle(x, y),
+    startBreathing: () => controllerRef.current.startBreathing(),
+    stopBreathing: () => controllerRef.current.stopBreathing(),
+  }))
+
+  useEffect(() => {
+    controllerRef.current.setExpression(emotion)
+  }, [emotion])
+
+  useEffect(() => {
+    controllerRef.current.setTalking(isTalking)
+  }, [isTalking])
+
+  useEffect(() => {
+    const host = hostRef.current
+    if (!host) return
+
+    let disposed = false
+    let resizeObserver: ResizeObserver | null = null
+    let canvasEl: HTMLCanvasElement | null = null
+
+    const init = async () => {
+      try {
+        setStatus('loading')
+        setErrorText('')
+
+        // Must resolve BEFORE importing cubism4 — that module throws on evaluate if Core is missing.
+        await loadCubismCore()
+        if (disposed) return
+
+        const PIXI = await import('pixi.js')
+        const { Live2DModel } = await import('pixi-live2d-display/cubism4')
+        Live2DModel.registerTicker(PIXI.Ticker)
+
+        if (disposed) return
+
+        const app = new PIXI.Application({
+          backgroundAlpha: 0,
+          antialias: true,
+          resizeTo: host,
+          powerPreference: 'high-performance',
+        })
+        appRef.current = app
+        canvasEl = app.view as HTMLCanvasElement
+        host.appendChild(canvasEl)
+
+        const model = await Live2DModel.from(CANAL_MODEL_URL, {
+          autoInteract: false,
+          autoUpdate: true,
+        })
+
+        if (disposed) {
+          model.destroy()
+          app.destroy(true, { children: true, texture: true, baseTexture: true })
+          return
+        }
+
+        modelRef.current = model
+        app.stage.addChild(model)
+        layoutModel(model, host.clientWidth || 400, host.clientHeight || 500)
+        controllerRef.current.attach(model)
+        controllerRef.current.startBreathing()
+
+        app.ticker.add(() => {
+          controllerRef.current.tick(app.ticker.deltaMS)
+        })
+
+        const onResize = () => {
+          if (!modelRef.current) return
+          layoutModel(modelRef.current, host.clientWidth, host.clientHeight)
+        }
+        resizeObserver = new ResizeObserver(onResize)
+        resizeObserver.observe(host)
+
+        setStatus('ready')
+      } catch (err) {
+        if (disposed) return
+        const message = err instanceof Error ? err.message : 'Live2D load failed'
+        setErrorText(message)
+        setStatus('error')
+        console.error('[Live2DCanal]', err)
+      }
+    }
+
+    void init()
+
+    return () => {
+      disposed = true
+      resizeObserver?.disconnect()
+      controllerRef.current.detach()
+      modelRef.current?.destroy()
+      modelRef.current = null
+      if (appRef.current) {
+        appRef.current.destroy(true, { children: true, texture: true, baseTexture: true })
+        appRef.current = null
+      }
+      if (canvasEl?.parentNode === host) host.removeChild(canvasEl)
+    }
+  }, [])
+
+  return (
+    <div className={`live2d-canal ${className ?? ''}`.trim()} ref={hostRef}>
+      {status === 'loading' && <div className="live2d-canal-status">Loading Canal…</div>}
+      {status === 'error' && (
+        <div className="live2d-canal-status live2d-canal-error" role="alert">
+          {errorText || 'Live2D failed'}
+        </div>
+      )}
+    </div>
+  )
+})
+
+export default Live2DCanal
