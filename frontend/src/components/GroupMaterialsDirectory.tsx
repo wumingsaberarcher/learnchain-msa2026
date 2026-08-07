@@ -1,12 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
-import { Loader2, Pencil, Trash2, Upload, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { CloudOff, Loader2, Pencil, Trash2, Upload, X } from 'lucide-react'
 import {
   deleteGroupMaterial,
   listGroupMaterials,
   renameGroupMaterial,
-  uploadGroupMaterial,
   type HabitGroupMaterialDto,
 } from '../api/habitGroupApi'
+import {
+  localDeleteGroupFile,
+  localListGroupFiles,
+  localPutGroupFile,
+  localRenameGroupFile,
+  type LocalGroupMaterial,
+} from '../utils/groupMaterialsLocal'
 import { useTranslation } from '../stores/languageStore'
 
 type Props = {
@@ -16,97 +22,171 @@ type Props = {
   onClose: () => void
 }
 
+type DirItem = {
+  key: string
+  source: 'local' | 'remote'
+  localId?: string
+  remoteId?: number
+  fileName: string
+  size: number
+  hasText: boolean
+  textLength: number
+  pending?: boolean
+}
+
+function remoteToItem(m: HabitGroupMaterialDto): DirItem {
+  return {
+    key: `r-${m.id}`,
+    source: 'remote',
+    remoteId: m.id,
+    fileName: m.fileName,
+    size: m.size,
+    hasText: m.hasText,
+    textLength: m.textLength,
+  }
+}
+
+function localToItem(m: LocalGroupMaterial): DirItem {
+  return {
+    key: m.id,
+    source: 'local',
+    localId: m.id,
+    fileName: m.fileName,
+    size: m.size,
+    hasText: false,
+    textLength: 0,
+    pending: true,
+  }
+}
+
 export default function GroupMaterialsDirectory({ groupId, groupName, onCountChange, onClose }: Props) {
   const { t } = useTranslation()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [items, setItems] = useState<HabitGroupMaterialDto[]>([])
+  const [items, setItems] = useState<DirItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [uploading, setUploading] = useState(false)
+  const [adding, setAdding] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
-  const [busyId, setBusyId] = useState<number | null>(null)
+  const [busyKey, setBusyKey] = useState<string | null>(null)
 
-  const refresh = async () => {
+  const mergeLists = useCallback((local: LocalGroupMaterial[], remote: HabitGroupMaterialDto[]) => {
+    const remoteItems = remote.map(remoteToItem)
+    const localItems = local.map(localToItem)
+    // Prefer showing locals first (just added), then remote; dedupe by fileName+size soft match not needed
+    setItems([...localItems, ...remoteItems])
+  }, [])
+
+  const refresh = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      setItems(await listGroupMaterials(groupId))
+      const local = await localListGroupFiles(groupId)
+      let remote: HabitGroupMaterialDto[] = []
+      try {
+        remote = await listGroupMaterials(groupId)
+      } catch {
+        // Backend may be cold — local files still show.
+      }
+      mergeLists(local, remote)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'load failed')
     } finally {
       setLoading(false)
     }
-  }
+  }, [groupId, mergeLists])
 
   useEffect(() => {
     void refresh()
-  }, [groupId])
+  }, [refresh])
 
+  /** Instant local save — no backend wait. */
   const handleUpload = async (files: FileList | File[]) => {
     const list = Array.from(files)
     if (!list.length) return
-    setUploading(true)
+    setAdding(true)
     setError(null)
+    setStatus(t('groups.savedLocally'))
     try {
-      for (let i = 0; i < list.length; i++) {
-        const f = list[i]!
-        setStatus(
-          list.length > 1
-            ? t('assess.uploadingProgress', { current: i + 1, total: list.length })
-            : `${t('assess.upload')}… ${f.name}`,
-        )
-        const dto = await uploadGroupMaterial(groupId, f, setStatus)
-        if (dto.warning) setError(dto.warning)
+      for (const f of list) {
+        if (f.size <= 0) continue
+        if (f.size > 8 * 1024 * 1024) {
+          setError(t('groups.fileTooLarge', { name: f.name }))
+          continue
+        }
+        await localPutGroupFile(groupId, f)
       }
-      setItems(await listGroupMaterials(groupId))
+      const local = await localListGroupFiles(groupId)
+      setItems((prev) => {
+        const remoteOnly = prev.filter((x) => x.source === 'remote')
+        return [...local.map(localToItem), ...remoteOnly]
+      })
       onCountChange?.()
-      setStatus(null)
+      setStatus(t('groups.savedLocalHint'))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'upload failed')
+      setError(e instanceof Error ? e.message : 'save failed')
       setStatus(null)
     } finally {
-      setUploading(false)
+      setAdding(false)
     }
   }
 
-  const startRename = (m: HabitGroupMaterialDto) => {
-    setEditingId(m.id)
-    setEditName(m.fileName)
+  const startRename = (item: DirItem) => {
+    setEditingKey(item.key)
+    setEditName(item.fileName)
   }
 
-  const saveRename = async (materialId: number) => {
+  const saveRename = async (item: DirItem) => {
     const name = editName.trim()
     if (!name) {
-      setEditingId(null)
+      setEditingKey(null)
       return
     }
-    setBusyId(materialId)
+    setBusyKey(item.key)
     setError(null)
     try {
-      const updated = await renameGroupMaterial(groupId, materialId, name)
-      setItems((prev) => prev.map((x) => (x.id === materialId ? { ...x, ...updated } : x)))
-      setEditingId(null)
+      if (item.source === 'local' && item.localId) {
+        await localRenameGroupFile(item.localId, name)
+        setItems((prev) => prev.map((x) => (x.key === item.key ? { ...x, fileName: name } : x)))
+      } else if (item.remoteId != null) {
+        try {
+          const updated = await renameGroupMaterial(groupId, item.remoteId, name)
+          setItems((prev) =>
+            prev.map((x) =>
+              x.key === item.key
+                ? { ...x, fileName: updated.fileName, hasText: updated.hasText, textLength: updated.textLength }
+                : x,
+            ),
+          )
+        } catch (e) {
+          setError(e instanceof Error ? e.message : 'rename failed')
+        }
+      }
+      setEditingKey(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'rename failed')
     } finally {
-      setBusyId(null)
+      setBusyKey(null)
     }
   }
 
-  const handleDelete = async (materialId: number, fileName: string) => {
-    if (!confirm(t('groups.deleteFileConfirm', { name: fileName }))) return
-    setBusyId(materialId)
+  const handleDelete = async (item: DirItem) => {
+    if (!confirm(t('groups.deleteFileConfirm', { name: item.fileName }))) return
+    setBusyKey(item.key)
     setError(null)
     try {
-      await deleteGroupMaterial(groupId, materialId)
-      setItems((prev) => prev.filter((x) => x.id !== materialId))
+      if (item.source === 'local' && item.localId) {
+        await localDeleteGroupFile(item.localId)
+      } else if (item.remoteId != null) {
+        await deleteGroupMaterial(groupId, item.remoteId)
+      }
+      setItems((prev) => prev.filter((x) => x.key !== item.key))
       onCountChange?.()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'delete failed')
     } finally {
-      setBusyId(null)
+      setBusyKey(null)
     }
   }
 
@@ -118,15 +198,42 @@ export default function GroupMaterialsDirectory({ groupId, groupName, onCountCha
   return (
     <div className="habits-mat-dir">
       <div className="habits-mat-dir-head">
-        <div>
-          <div className="habits-mat-dir-title">{t('groups.materialsDir')}</div>
-          <div className="habits-mat-dir-sub">
-            {groupName} · {t('groups.materialsHint')}
+        <div className="habits-mat-dir-head-main">
+          <div className="habits-mat-dir-title-row">
+            <div className="habits-mat-dir-title">{t('groups.materialsDir')}</div>
+            <span className="habits-mat-dir-badge">
+              <CloudOff className="w-3 h-3" />
+              {t('groups.localFirst')}
+            </span>
           </div>
+          <div className="habits-mat-dir-sub">{groupName}</div>
         </div>
-        <button type="button" className="habits-group-icon-btn" onClick={onClose} title={t('assess.close')}>
-          <X className="w-4 h-4" />
-        </button>
+        <div className="habits-mat-dir-head-actions">
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            hidden
+            accept=".pdf,.docx,.doc,.wps,.md,.txt,application/pdf"
+            onChange={(e) => {
+              const files = e.target.files
+              e.target.value = ''
+              if (files?.length) void handleUpload(files)
+            }}
+          />
+          <button
+            type="button"
+            className="btn-habit btn-habit-checkin habits-mat-upload-btn"
+            disabled={adding}
+            onClick={() => fileRef.current?.click()}
+          >
+            {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            {t('assess.upload')}
+          </button>
+          <button type="button" className="habits-group-icon-btn" onClick={onClose} title={t('assess.close')}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -134,34 +241,7 @@ export default function GroupMaterialsDirectory({ groupId, groupName, onCountCha
           {error}
         </div>
       )}
-      {status && <p className="habits-wizard-hint">{status}</p>}
-
-      <div className="habits-mat-dir-toolbar">
-        <input
-          ref={fileRef}
-          type="file"
-          multiple
-          hidden
-          accept=".pdf,.docx,.doc,.wps,.md,.txt,application/pdf"
-          onChange={(e) => {
-            const files = e.target.files
-            e.target.value = ''
-            if (files?.length) void handleUpload(files)
-          }}
-        />
-        <button
-          type="button"
-          className="btn-habit btn-habit-checkin"
-          disabled={uploading}
-          onClick={() => fileRef.current?.click()}
-        >
-          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-          {t('assess.upload')}
-        </button>
-        <button type="button" className="btn-habit btn-habit-ghost" disabled={loading || uploading} onClick={() => void refresh()}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : t('groups.refreshFiles')}
-        </button>
-      </div>
+      {status && <p className="habits-mat-dir-status">{status}</p>}
 
       <div className="habits-mat-dir-list" role="list">
         {loading && items.length === 0 ? (
@@ -169,24 +249,24 @@ export default function GroupMaterialsDirectory({ groupId, groupName, onCountCha
             <Loader2 className="w-4 h-4 animate-spin inline" /> {t('groups.loadingFiles')}
           </div>
         ) : items.length === 0 ? (
-          <div className="habits-empty-hint">{t('groups.noFiles')}</div>
+          <div className="habits-empty-hint">{t('groups.noFilesLocal')}</div>
         ) : (
           items.map((m) => (
-            <div key={m.id} className="habits-mat-dir-row" role="listitem">
+            <div key={m.key} className="habits-mat-dir-row" role="listitem">
               <span className="habits-mat-ext">{extBadge(m.fileName)}</span>
               <div className="habits-mat-dir-main">
-                {editingId === m.id ? (
+                {editingKey === m.key ? (
                   <input
                     className="habit-edit-input habits-mat-rename-input"
                     value={editName}
                     autoFocus
                     onChange={(e) => setEditName(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') void saveRename(m.id)
-                      if (e.key === 'Escape') setEditingId(null)
+                      if (e.key === 'Enter') void saveRename(m)
+                      if (e.key === 'Escape') setEditingKey(null)
                     }}
-                    onBlur={() => void saveRename(m.id)}
-                    disabled={busyId === m.id}
+                    onBlur={() => void saveRename(m)}
+                    disabled={busyKey === m.key}
                   />
                 ) : (
                   <button type="button" className="habits-mat-name-btn" onClick={() => startRename(m)}>
@@ -195,7 +275,11 @@ export default function GroupMaterialsDirectory({ groupId, groupName, onCountCha
                 )}
                 <small>
                   {(m.size / 1024).toFixed(1)} KB
-                  {m.hasText ? ` · ${m.textLength} chars` : ` · ${t('assess.noText')}`}
+                  {m.pending
+                    ? ` · ${t('groups.localOnly')}`
+                    : m.hasText
+                      ? ` · ${m.textLength} chars`
+                      : ` · ${t('assess.noText')}`}
                 </small>
               </div>
               <div className="habits-mat-dir-actions">
@@ -203,21 +287,17 @@ export default function GroupMaterialsDirectory({ groupId, groupName, onCountCha
                   type="button"
                   className="habits-group-icon-btn"
                   title={t('groups.renameFile')}
-                  disabled={busyId === m.id}
+                  disabled={busyKey === m.key}
                   onClick={() => startRename(m)}
                 >
-                  {busyId === m.id && editingId === m.id ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Pencil className="w-3.5 h-3.5" />
-                  )}
+                  <Pencil className="w-3.5 h-3.5" />
                 </button>
                 <button
                   type="button"
                   className="habits-group-icon-btn danger"
                   title={t('assess.delete')}
-                  disabled={busyId === m.id}
-                  onClick={() => void handleDelete(m.id, m.fileName)}
+                  disabled={busyKey === m.key}
+                  onClick={() => void handleDelete(m)}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>

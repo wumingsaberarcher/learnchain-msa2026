@@ -21,6 +21,7 @@ import {
   updateHabitGroup,
 } from '../api/habitGroupApi'
 import GroupMaterialsDirectory from './GroupMaterialsDirectory'
+import { localCountGroupFiles } from '../utils/groupMaterialsLocal'
 import { triggerGroupPractice } from '../stores/assessmentStore'
 import { useHabitStore } from '../stores/habitStore'
 import { useTranslation } from '../stores/languageStore'
@@ -93,8 +94,8 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
   }, [habits])
 
   const openMaterialsDir = (groupId: number) => {
+    // Keep habits compact; only toggle the materials directory panel.
     setMaterialsFor((cur) => (cur === groupId ? null : groupId))
-    setExpanded((e) => ({ ...e, [groupId]: true }))
   }
 
   const handleCreate = async () => {
@@ -347,7 +348,17 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
                     groupId={g.id}
                     groupName={g.name || t('groups.unnamed')}
                     onClose={() => setMaterialsFor(null)}
-                    onCountChange={() => void refreshGroups(true)}
+                    onCountChange={() => {
+                      void localCountGroupFiles(g.id).then((n) => {
+                        setGroups((gs) =>
+                          gs.map((x) =>
+                            x.id === g.id
+                              ? { ...x, materialCount: Math.max(x.materialCount, n) }
+                              : x,
+                          ),
+                        )
+                      })
+                    }}
                   />
                 )}
               </>,
