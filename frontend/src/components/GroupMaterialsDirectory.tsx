@@ -291,10 +291,12 @@ export default function GroupMaterialsDirectory({ groupId, groupName, onCountCha
             hidden
             accept=".pdf,.docx,.doc,.wps,.md,.txt,application/pdf"
             onChange={(e) => {
-              const files = e.target.files
-              pushLog(`file-input change: ${files?.length ?? 0} file(s)`)
+              // FileList is a live reference — copy BEFORE clearing value,
+              // otherwise length becomes 0 and upload looks "cancelled".
+              const list = e.target.files ? Array.from(e.target.files) : []
               e.target.value = ''
-              if (files?.length) void handleUpload(files)
+              pushLog(`file-input change: ${list.length} file(s)`)
+              if (list.length) void handleUpload(list)
               else pushLog(`✗ ${t('groups.stagePickEmpty')}`, false)
             }}
           />
