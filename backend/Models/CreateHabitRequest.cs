@@ -10,6 +10,8 @@ public class CreateHabitRequest
     public bool AssessmentEnabled { get; set; }
     /// <summary>easy | medium | hard</summary>
     public string AssessmentDifficulty { get; set; } = "easy";
+    /// <summary>Optional group to place the new habit into.</summary>
+    public int? GroupId { get; set; }
 }
 
 public class CreateMilestoneRequest
@@ -25,4 +27,7 @@ public class UpdateHabitRequest
     public string? Name { get; set; }
     public bool? AssessmentEnabled { get; set; }
     public string? AssessmentDifficulty { get; set; }
+    /// <summary>When true, apply <see cref="GroupId"/> (null = leave group).</summary>
+    public bool? SetGroupId { get; set; }
+    public int? GroupId { get; set; }
 }

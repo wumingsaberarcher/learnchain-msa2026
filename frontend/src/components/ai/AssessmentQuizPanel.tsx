@@ -8,6 +8,7 @@ import {
   type AssessmentGradeResult,
   type AssessmentQuestion,
 } from '../../api/assessmentApi'
+import { deleteGroupMaterial, uploadGroupMaterial } from '../../api/habitGroupApi'
 import { useAiSettingsStore } from '../../stores/aiSettingsStore'
 import { useAffectionStore } from '../../stores/affectionStore'
 import { useAssessmentStore } from '../../stores/assessmentStore'
@@ -92,11 +93,17 @@ function buildWrongReviewPrompt(
     : `I just finished a habit assessment. Here are my misses. Please explain each in Canal's voice:\n1) why my choice/answer was wrong;\n2) the correct reasoning;\n3) the key knowledge point (tied to the materials; keep it clear with short lists).\nOnly cover the misses.\n\n${blocks.join('\n\n')}`
 }
 
+function materialKey(m: { id: number; source?: string }) {
+  return m.source === 'group' ? `g:${m.id}` : `h:${m.id}`
+}
+
 export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (line: string) => void }) {
   const { t, language } = useTranslation()
   const {
     active,
+    practice,
     habitId,
+    groupId,
     habitName,
     difficulty,
     phase,
@@ -125,7 +132,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<string | null>(null)
-  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const [shortDraft, setShortDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [explaining, setExplaining] = useState(false)
@@ -142,17 +149,17 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
   const question: AssessmentQuestion | undefined = questions[currentIndex]
   const usableMaterials = useMemo(() => materials.filter((m) => m.hasText), [materials])
   const selectedUsable = useMemo(
-    () => usableMaterials.filter((m) => selectedIds.includes(m.id)),
-    [usableMaterials, selectedIds],
+    () => usableMaterials.filter((m) => selectedKeys.includes(materialKey(m))),
+    [usableMaterials, selectedKeys],
   )
 
   useEffect(() => {
-    setSelectedIds((prev) => {
-      const usableIds = usableMaterials.map((m) => m.id)
-      if (usableIds.length === 0) return []
-      if (prev.length === 0) return usableIds
-      const kept = prev.filter((id) => usableIds.includes(id))
-      const added = usableIds.filter((id) => !prev.includes(id))
+    setSelectedKeys((prev) => {
+      const usable = usableMaterials.map(materialKey)
+      if (usable.length === 0) return []
+      if (prev.length === 0) return usable
+      const kept = prev.filter((k) => usable.includes(k))
+      const added = usable.filter((k) => !prev.includes(k))
       return [...kept, ...added]
     })
   }, [usableMaterials])
@@ -205,19 +212,27 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
     if (gradeResult.critique) onCanalSpeak?.(gradeResult.critique)
   }, [phase, gradeResult, habitId, onCanalSpeak])
 
-  if (!active || habitId == null) return null
+  if (!active) return null
+  if (!practice && habitId == null) return null
+  if (practice && groupId == null) return null
 
-  const toggleMaterial = (id: number, hasText: boolean) => {
-    if (!hasText) return
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  const toggleMaterial = (m: { id: number; source?: string; hasText: boolean }) => {
+    if (!m.hasText) return
+    const key = materialKey(m)
+    setSelectedKeys((prev) => (prev.includes(key) ? prev.filter((x) => x !== key) : [...prev, key]))
   }
 
-  const selectAllUsable = () => setSelectedIds(usableMaterials.map((m) => m.id))
-  const clearSelection = () => setSelectedIds([])
+  const selectAllUsable = () => setSelectedKeys(usableMaterials.map(materialKey))
+  const clearSelection = () => setSelectedKeys([])
 
   const onUpload = async (files: FileList | File[]) => {
     const list = Array.from(files)
-    if (list.length === 0 || habitId == null) return
+    if (list.length === 0) return
+    if (practice) {
+      if (groupId == null) return
+    } else if (habitId == null) {
+      return
+    }
     setUploading(true)
     setError(null)
     const failures: string[] = []
@@ -227,9 +242,13 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
         const file = list[i]
         setUploadProgress(`${i + 1}/${list.length}`)
         try {
-          const dto = await uploadHabitMaterial(habitId, file, (msg) => {
-            setUploadProgress(`${i + 1}/${list.length} · ${msg}`)
-          })
+          const dto = practice
+            ? await uploadGroupMaterial(groupId!, file, (msg) => {
+                setUploadProgress(`${i + 1}/${list.length} · ${msg}`)
+              })
+            : await uploadHabitMaterial(habitId!, file, (msg) => {
+                setUploadProgress(`${i + 1}/${list.length} · ${msg}`)
+              })
           if (!dto.hasText || dto.warning) {
             warnings.push(`${file.name}: ${dto.warning || t('assess.noText')}`)
           }
@@ -259,11 +278,17 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
     }
   }
 
-  const onDeleteMaterial = async (mid: number) => {
+  const onDeleteMaterial = async (m: { id: number; source?: string }) => {
     try {
-      await deleteHabitMaterial(habitId, mid)
+      if (m.source === 'group') {
+        if (groupId == null) return
+        await deleteGroupMaterial(groupId, m.id)
+      } else {
+        if (habitId == null) return
+        await deleteHabitMaterial(habitId, m.id)
+      }
       await refreshMaterials()
-      setSelectedIds((prev) => prev.filter((id) => id !== mid))
+      setSelectedKeys((prev) => prev.filter((k) => k !== materialKey(m)))
     } catch {
       setError(t('assess.deleteFail'))
     }
@@ -282,19 +307,29 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
     setPhase('generating')
     setError(null)
     try {
+      const materialIds = selectedUsable.filter((m) => m.source !== 'group').map((m) => m.id)
+      const groupMaterialIds = selectedUsable.filter((m) => m.source === 'group').map((m) => m.id)
       const data = await generateAssessment({
-        habitId,
+        habitId: habitId ?? 0,
+        groupId: groupId ?? undefined,
+        practice,
+        difficulty,
         apiKey,
         baseUrl,
         model,
         language,
-        materialIds: selectedUsable.map((m) => m.id),
+        materialIds: materialIds.length ? materialIds : undefined,
+        groupMaterialIds: groupMaterialIds.length ? groupMaterialIds : undefined,
       })
       const normalized = data.questions.map((q) =>
         isShortQuestion(q) ? { ...q, type: 'short' } : { ...q, type: 'mcq' },
       )
       setQuestions(normalized)
-      onCanalSpeak?.(t('assess.startLine', { name: habitName }))
+      onCanalSpeak?.(
+        practice
+          ? t('assess.practiceStartLine', { name: habitName })
+          : t('assess.startLine', { name: habitName }),
+      )
     } catch (e) {
       setPhase('ready')
       setError(e instanceof Error ? e.message : t('assess.generateFail'))
@@ -340,7 +375,9 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
         }
       })
       const result = await gradeAssessment({
-        habitId,
+        habitId: habitId ?? 0,
+        groupId: groupId ?? undefined,
+        practice,
         difficulty,
         apiKey,
         baseUrl,
@@ -349,7 +386,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
         answers: payloadAnswers,
       })
       setGradeResult(result)
-      if (result.affection) {
+      if (result.affection && !practice) {
         useAffectionStore.getState().applyAward({
           awarded: result.affection.awarded,
           points: result.affection.points,
@@ -409,10 +446,11 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
     <div className="assess-panel" role="complementary" aria-label={t('assess.title')}>
       <div className="assess-panel-head">
         <div>
-          <div className="assess-eyebrow">{t('assess.eyebrow')}</div>
+          <div className="assess-eyebrow">{practice ? t('assess.practiceEyebrow') : t('assess.eyebrow')}</div>
           <h2 className="assess-title">{habitName}</h2>
           <p className="assess-sub">
-            {t(`assess.diff.${difficulty}` as 'assess.diff.easy')} · {t('assess.afterCheckin')}
+            {t(`assess.diff.${difficulty}` as 'assess.diff.easy')} ·{' '}
+            {practice ? t('assess.practiceMode') : t('assess.afterCheckin')}
           </p>
         </div>
         <button type="button" className="assess-close" onClick={close} title={t('assess.close')}>
@@ -462,13 +500,13 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
             {materials.length === 0 && <li className="assess-empty">{t('assess.noMaterials')}</li>}
             {materials.map((m) => {
               const kind = fileKind(m.fileName)
-              const selected = selectedIds.includes(m.id)
+              const selected = selectedKeys.includes(materialKey(m))
               return (
-                <li key={m.id}>
+                <li key={materialKey(m)}>
                   <button
                     type="button"
                     className={`assess-file${selected ? ' selected' : ''}${m.hasText ? '' : ' bad'}`}
-                    onClick={() => toggleMaterial(m.id, m.hasText)}
+                    onClick={() => toggleMaterial(m)}
                     disabled={!m.hasText}
                     aria-pressed={selected}
                     title={m.hasText ? `${m.fileName}\n${t('assess.toggleSelect')}` : t('assess.noText')}
@@ -477,7 +515,10 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
                       {kind === 'pdf' ? 'PDF' : kind.toUpperCase()}
                     </span>
                     <span className="assess-file-copy">
-                      <strong>{m.fileName}</strong>
+                      <strong>
+                        {m.source === 'group' ? `[${t('assess.groupTag')}] ` : ''}
+                        {m.fileName}
+                      </strong>
                       <small>
                         {(m.size / 1024).toFixed(1)} KB
                         {m.hasText ? ` · ${m.textLength} chars` : ` · ${t('assess.noText')}`}
@@ -491,7 +532,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
                     type="button"
                     className="assess-file-del"
                     title={t('assess.delete')}
-                    onClick={() => void onDeleteMaterial(m.id)}
+                    onClick={() => void onDeleteMaterial(m)}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -637,11 +678,12 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
             <div className={`assess-result ${gradeResult.passed ? 'pass' : 'fail'}`}>
               <h3>{gradeResult.passed ? t('assess.passed') : t('assess.failed')}</h3>
               <p>{gradeResult.summary}</p>
-              {gradeResult.affection?.awarded != null && gradeResult.affection.awarded !== 0 && (
+              {gradeResult.affection?.awarded != null && !practice && gradeResult.affection.awarded !== 0 && (
                 <p className="assess-affection">
                   {t('assess.affectionDelta', { delta: gradeResult.affection.awarded })}
                 </p>
               )}
+              {practice && <p className="assess-affection">{t('assess.practiceNoAffection')}</p>}
               <ul className="assess-result-list">
                 {gradeResult.results.map((r, i) => (
                   <li key={r.questionId} className={r.correct ? 'ok' : 'bad'}>

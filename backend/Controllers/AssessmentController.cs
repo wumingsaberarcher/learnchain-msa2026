@@ -38,12 +38,30 @@ public class AssessmentController : ControllerBase
         try
         {
             var questions = await _assessment.GenerateAsync(user, request, ct);
-            var habit = await _db.Habits.FirstAsync(h => h.Id == request.HabitId && h.UserId == user.Id, ct);
+            string habitName;
+            string difficulty;
+            if (request.Practice && request.GroupId is int gid && gid > 0 && request.HabitId <= 0)
+            {
+                var group = await _db.HabitGroups.FirstAsync(g => g.Id == gid && g.UserId == user.Id && g.IsActive, ct);
+                habitName = group.Name;
+                difficulty = string.IsNullOrWhiteSpace(request.Difficulty) ? "easy" : request.Difficulty;
+            }
+            else
+            {
+                var habit = await _db.Habits.FirstAsync(h => h.Id == request.HabitId && h.UserId == user.Id, ct);
+                habitName = habit.Name;
+                difficulty = string.IsNullOrWhiteSpace(request.Difficulty)
+                    ? (string.IsNullOrWhiteSpace(habit.AssessmentDifficulty) ? "easy" : habit.AssessmentDifficulty)
+                    : request.Difficulty;
+            }
+
             return Ok(new
             {
-                habitId = habit.Id,
-                habitName = habit.Name,
-                difficulty = string.IsNullOrWhiteSpace(habit.AssessmentDifficulty) ? "easy" : habit.AssessmentDifficulty,
+                habitId = request.HabitId,
+                groupId = request.GroupId,
+                practice = request.Practice,
+                habitName,
+                difficulty,
                 questions
             });
         }

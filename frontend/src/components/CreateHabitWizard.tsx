@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { X, ChevronLeft, ChevronRight, Plus, Trash2, Calendar, Target, Repeat, Clock, Zap } from 'lucide-react'
-import type { CreateHabitPayload, CreateMilestonePayload, HabitType } from '../utils/habitHelpers'
+import type { CreateHabitPayload, CreateMilestonePayload, HabitGroup, HabitType } from '../utils/habitHelpers'
 import { getDefaultMilestoneXP, getDifficultyXP, isDuplicateHabitName } from '../utils/habitHelpers'
+import { listHabitGroups } from '../api/habitGroupApi'
 import { useTranslation } from '../stores/languageStore'
 import type { TranslationKey } from '../i18n/translations'
 
@@ -44,6 +45,14 @@ export default function CreateHabitWizard({ onClose, onSubmit, existingNames }: 
     const [calendarMonth, setCalendarMonth] = useState(() => new Date())
     const [milestones, setMilestones] = useState<CreateMilestonePayload[]>([])
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [groups, setGroups] = useState<HabitGroup[]>([])
+    const [groupId, setGroupId] = useState<number | null>(null)
+
+    useEffect(() => {
+        void listHabitGroups()
+            .then(setGroups)
+            .catch(() => setGroups([]))
+    }, [])
 
     const totalSteps = habitType === 'OneTime' ? 4 : 3
     const milestoneXP = getDefaultMilestoneXP(difficulty)
@@ -101,6 +110,7 @@ export default function CreateHabitWizard({ onClose, onSubmit, existingNames }: 
                 difficulty,
                 assessmentEnabled,
                 assessmentDifficulty: assessmentEnabled ? assessmentDifficulty : 'easy',
+                groupId: groupId && groupId > 0 ? groupId : null,
             }
 
             if (habitType === 'OneTime') {
@@ -242,6 +252,22 @@ export default function CreateHabitWizard({ onClose, onSubmit, existingNames }: 
                                     ))}
                                 </div>
                             )}
+                        </div>
+                        <div className="habits-assessment-block" style={{ marginTop: '1rem' }}>
+                            <label className="habits-wizard-label">{t('wizard.addToGroup')}</label>
+                            <select
+                                className="habits-wizard-group-select"
+                                value={groupId ?? ''}
+                                onChange={(e) => {
+                                    const v = e.target.value
+                                    setGroupId(v ? Number(v) : null)
+                                }}
+                            >
+                                <option value="">{t('wizard.noGroup')}</option>
+                                {groups.map((g) => (
+                                    <option key={g.id} value={g.id}>{g.name}</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
                 )}

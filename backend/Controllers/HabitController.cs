@@ -128,6 +128,16 @@ public class HabitController : ControllerBase
         var habitType = string.IsNullOrWhiteSpace(request.HabitType) ? "Daily" : request.HabitType;
         var difficulty = request.Difficulty is >= 1 and <= 3 ? request.Difficulty : 1;
 
+        int? groupId = null;
+        if (request.GroupId is int gid && gid > 0)
+        {
+            var groupOk = await _context.HabitGroups.AnyAsync(g =>
+                g.Id == gid && g.UserId == currentUserId && g.IsActive);
+            if (!groupOk)
+                return BadRequest("指定的习惯组不存在");
+            groupId = gid;
+        }
+
         var habit = new Habit
         {
             UserId = currentUserId,
@@ -142,6 +152,7 @@ public class HabitController : ControllerBase
             IsCompleted = false,
             AssessmentEnabled = request.AssessmentEnabled,
             AssessmentDifficulty = NormalizeAssessmentDifficulty(request.AssessmentDifficulty),
+            GroupId = groupId,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -216,6 +227,22 @@ public class HabitController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(request.AssessmentDifficulty))
             existingHabit.AssessmentDifficulty = NormalizeAssessmentDifficulty(request.AssessmentDifficulty);
+
+        if (request.SetGroupId == true)
+        {
+            if (request.GroupId is int gid && gid > 0)
+            {
+                var groupOk = await _context.HabitGroups.AnyAsync(g =>
+                    g.Id == gid && g.UserId == currentUserId && g.IsActive);
+                if (!groupOk)
+                    return BadRequest("指定的习惯组不存在");
+                existingHabit.GroupId = gid;
+            }
+            else
+            {
+                existingHabit.GroupId = null;
+            }
+        }
 
         await _context.SaveChangesAsync();
         return NoContent();

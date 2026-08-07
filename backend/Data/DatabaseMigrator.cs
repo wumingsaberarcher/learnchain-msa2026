@@ -42,6 +42,7 @@ public static class DatabaseMigrator
             EnsureSqliteColumn(connection, "Users", "CompanionAffectionGainedToday", "INTEGER NOT NULL DEFAULT 0");
             EnsureSqliteColumn(connection, "Habits", "AssessmentEnabled", "INTEGER NOT NULL DEFAULT 0");
             EnsureSqliteColumn(connection, "Habits", "AssessmentDifficulty", "TEXT NOT NULL DEFAULT 'easy'");
+            EnsureSqliteColumn(connection, "Habits", "GroupId", "INTEGER NULL");
             EnsureSqliteColumn(connection, "ChatSessions", "ZoneType", "TEXT NOT NULL DEFAULT 'daily'");
             EnsureSqliteColumn(connection, "ChatSessions", "HabitId", "INTEGER NOT NULL DEFAULT 0");
             EnsureSqliteColumn(connection, "UserMemories", "ZoneType", "TEXT NOT NULL DEFAULT 'daily'");
@@ -88,6 +89,35 @@ public static class DatabaseMigrator
                 );
                 """;
             materialsCmd.ExecuteNonQuery();
+
+            using var groupsCmd = connection.CreateCommand();
+            groupsCmd.CommandText = """
+                CREATE TABLE IF NOT EXISTS HabitGroups (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    UserId INTEGER NOT NULL,
+                    Name TEXT NOT NULL,
+                    Description TEXT NULL,
+                    IsActive INTEGER NOT NULL DEFAULT 1,
+                    CreatedAt TEXT NOT NULL
+                );
+                """;
+            groupsCmd.ExecuteNonQuery();
+
+            using var groupMatsCmd = connection.CreateCommand();
+            groupMatsCmd.CommandText = """
+                CREATE TABLE IF NOT EXISTS HabitGroupMaterials (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    GroupId INTEGER NOT NULL,
+                    UserId INTEGER NOT NULL,
+                    FileName TEXT NOT NULL,
+                    ContentType TEXT NOT NULL DEFAULT '',
+                    Size INTEGER NOT NULL DEFAULT 0,
+                    StoredPath TEXT NOT NULL DEFAULT '',
+                    ExtractedText TEXT NOT NULL DEFAULT '',
+                    CreatedAt TEXT NOT NULL
+                );
+                """;
+            groupMatsCmd.ExecuteNonQuery();
 
             using var chatSessionCmd = connection.CreateCommand();
             chatSessionCmd.CommandText = """
@@ -166,6 +196,7 @@ public static class DatabaseMigrator
             EnsurePostgresColumn(connection, "CheckIns", "MilestoneId", "integer NULL");
             EnsurePostgresColumn(connection, "Habits", "AssessmentEnabled", "boolean NOT NULL DEFAULT false");
             EnsurePostgresColumn(connection, "Habits", "AssessmentDifficulty", "text NOT NULL DEFAULT 'easy'");
+            EnsurePostgresColumn(connection, "Habits", "GroupId", "integer NULL");
             EnsurePostgresColumn(connection, "ChatSessions", "ZoneType", "text NOT NULL DEFAULT 'daily'");
             EnsurePostgresColumn(connection, "ChatSessions", "HabitId", "integer NOT NULL DEFAULT 0");
             EnsurePostgresColumn(connection, "UserMemories", "ZoneType", "text NOT NULL DEFAULT 'daily'");
@@ -187,6 +218,39 @@ public static class DatabaseMigrator
                     );
                     """;
                 materialsCmd.ExecuteNonQuery();
+            }
+
+            using (var groupsCmd = connection.CreateCommand())
+            {
+                groupsCmd.CommandText = """
+                    CREATE TABLE IF NOT EXISTS "HabitGroups" (
+                        "Id" serial PRIMARY KEY,
+                        "UserId" integer NOT NULL,
+                        "Name" text NOT NULL,
+                        "Description" text NULL,
+                        "IsActive" boolean NOT NULL DEFAULT true,
+                        "CreatedAt" timestamp with time zone NOT NULL
+                    );
+                    """;
+                groupsCmd.ExecuteNonQuery();
+            }
+
+            using (var groupMatsCmd = connection.CreateCommand())
+            {
+                groupMatsCmd.CommandText = """
+                    CREATE TABLE IF NOT EXISTS "HabitGroupMaterials" (
+                        "Id" serial PRIMARY KEY,
+                        "GroupId" integer NOT NULL,
+                        "UserId" integer NOT NULL,
+                        "FileName" text NOT NULL,
+                        "ContentType" text NOT NULL DEFAULT '',
+                        "Size" bigint NOT NULL DEFAULT 0,
+                        "StoredPath" text NOT NULL DEFAULT '',
+                        "ExtractedText" text NOT NULL DEFAULT '',
+                        "CreatedAt" timestamp with time zone NOT NULL
+                    );
+                    """;
+                groupMatsCmd.ExecuteNonQuery();
             }
 
             using (var chatSessionCmd = connection.CreateCommand())

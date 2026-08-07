@@ -32,40 +32,109 @@ public class AssessmentService
         _logger = logger;
     }
 
+    public async Task<(string Title, string Difficulty, string MaterialText)> LoadQuizContextAsync(
+        int userId,
+        AssessmentGenerateRequest request,
+        CancellationToken ct)
+    {
+        // Practice from a group only
+        if (request.Practice && request.GroupId is int practiceGroupId && practiceGroupId > 0)
+        {
+            var group = await _db.HabitGroups.FirstOrDefaultAsync(
+                g => g.Id == practiceGroupId && g.UserId == userId && g.IsActive, ct)
+                ?? throw new InvalidOperationException("Group not found.");
+
+            var gQuery = _db.HabitGroupMaterials
+                .Where(m => m.GroupId == practiceGroupId && m.UserId == userId && m.ExtractedText != "");
+            if (request.GroupMaterialIds is { Count: > 0 })
+            {
+                var ids = request.GroupMaterialIds.Where(id => id > 0).Distinct().ToList();
+                if (ids.Count > 0)
+                    gQuery = gQuery.Where(m => ids.Contains(m.Id));
+            }
+            else if (request.MaterialIds is { Count: > 0 })
+            {
+                // Frontend may send group ids in MaterialIds during practice
+                var ids = request.MaterialIds.Where(id => id > 0).Distinct().ToList();
+                if (ids.Count > 0)
+                    gQuery = gQuery.Where(m => ids.Contains(m.Id));
+            }
+
+            var gMats = await gQuery.OrderByDescending(m => m.CreatedAt).ToListAsync(ct);
+            if (gMats.Count == 0)
+                throw new InvalidOperationException("No usable group materials. Upload or select files with extractable text.");
+
+            var gCombined = string.Join("\n\n---\n\n", gMats.Select(m => $"[{m.FileName}]\n{m.ExtractedText}"));
+            if (gCombined.Length > 28_000) gCombined = gCombined[..28_000];
+            var diff = NormalizeDifficulty(request.Difficulty ?? "easy");
+            return (group.Name, diff, gCombined);
+        }
+
+        var habit = await _db.Habits.FirstOrDefaultAsync(h => h.Id == request.HabitId && h.UserId == userId, ct)
+            ?? throw new InvalidOperationException("Habit not found.");
+
+        var chunks = new List<string>();
+
+        var habitQuery = _db.HabitMaterials
+            .Where(m => m.HabitId == request.HabitId && m.UserId == userId && m.ExtractedText != "");
+        if (request.MaterialIds is { Count: > 0 })
+        {
+            var idSet = request.MaterialIds.Where(id => id > 0).Distinct().ToList();
+            if (idSet.Count > 0)
+                habitQuery = habitQuery.Where(m => idSet.Contains(m.Id));
+        }
+        var habitMats = await habitQuery.OrderByDescending(m => m.CreatedAt).ToListAsync(ct);
+        chunks.AddRange(habitMats.Select(m => $"[{m.FileName}]\n{m.ExtractedText}"));
+
+        // Union group materials when habit belongs to a group
+        if (habit.GroupId is int gid && gid > 0)
+        {
+            var groupQuery = _db.HabitGroupMaterials
+                .Where(m => m.GroupId == gid && m.UserId == userId && m.ExtractedText != "");
+
+            if (request.GroupMaterialIds is { Count: > 0 })
+            {
+                var ids = request.GroupMaterialIds.Where(id => id > 0).Distinct().ToList();
+                groupQuery = groupQuery.Where(m => ids.Contains(m.Id));
+                var groupMats = await groupQuery.OrderByDescending(m => m.CreatedAt).ToListAsync(ct);
+                chunks.AddRange(groupMats.Select(m => $"[group:{m.FileName}]\n{m.ExtractedText}"));
+            }
+            else if (request.MaterialIds == null || request.MaterialIds.Count == 0)
+            {
+                // No selection → include all group materials with habit materials
+                var groupMats = await groupQuery.OrderByDescending(m => m.CreatedAt).ToListAsync(ct);
+                chunks.AddRange(groupMats.Select(m => $"[group:{m.FileName}]\n{m.ExtractedText}"));
+            }
+            // else: only habit MaterialIds selected → do not auto-add group mats
+        }
+
+        if (chunks.Count == 0)
+            throw new InvalidOperationException(
+                request.MaterialIds is { Count: > 0 } || request.GroupMaterialIds is { Count: > 0 }
+                    ? "No usable text in the selected materials. Select files with extractable text."
+                    : "No usable study materials. Upload at least one file with extractable text.");
+
+        var combined = string.Join("\n\n---\n\n", chunks);
+        if (combined.Length > 28_000)
+            combined = combined[..28_000];
+
+        return (habit.Name, NormalizeDifficulty(habit.AssessmentDifficulty), combined);
+    }
+
+    [Obsolete("Use LoadQuizContextAsync")]
     public async Task<(Habit Habit, string MaterialText)> LoadHabitContextAsync(
         int userId,
         int habitId,
         IReadOnlyList<int>? materialIds,
         CancellationToken ct)
     {
-        var habit = await _db.Habits.FirstOrDefaultAsync(h => h.Id == habitId && h.UserId == userId, ct)
-            ?? throw new InvalidOperationException("Habit not found.");
-
-        var query = _db.HabitMaterials
-            .Where(m => m.HabitId == habitId && m.UserId == userId && m.ExtractedText != "");
-
-        if (materialIds is { Count: > 0 })
+        var (title, _, text) = await LoadQuizContextAsync(userId, new AssessmentGenerateRequest
         {
-            var idSet = materialIds.Where(id => id > 0).Distinct().ToList();
-            if (idSet.Count > 0)
-                query = query.Where(m => idSet.Contains(m.Id));
-        }
-
-        var materials = await query
-            .OrderByDescending(m => m.CreatedAt)
-            .ToListAsync(ct);
-
-        if (materials.Count == 0)
-            throw new InvalidOperationException(
-                materialIds is { Count: > 0 }
-                    ? "No usable text in the selected materials. Select files with extractable text."
-                    : "No usable study materials. Upload at least one file with extractable text.");
-
-        var combined = string.Join("\n\n---\n\n", materials.Select(m => $"[{m.FileName}]\n{m.ExtractedText}"));
-        if (combined.Length > 28_000)
-            combined = combined[..28_000];
-
-        return (habit, combined);
+            HabitId = habitId,
+            MaterialIds = materialIds?.ToList()
+        }, ct);
+        var habit = await _db.Habits.FirstAsync(h => h.Id == habitId && h.UserId == userId, ct);
+        return (habit, text);
     }
 
     public async Task<List<AssessmentQuestionDto>> GenerateAsync(
@@ -77,8 +146,10 @@ public class AssessmentService
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new InvalidOperationException("missing_api_key");
 
-        var (habit, materialText) = await LoadHabitContextAsync(user.Id, request.HabitId, request.MaterialIds, ct);
-        var difficulty = NormalizeDifficulty(habit.AssessmentDifficulty);
+        var (title, difficulty, materialText) = await LoadQuizContextAsync(user.Id, request, ct);
+        if (!string.IsNullOrWhiteSpace(request.Difficulty))
+            difficulty = NormalizeDifficulty(request.Difficulty);
+
         var zh = (request.Language ?? "zh").StartsWith("zh", StringComparison.OrdinalIgnoreCase);
         var (count, allowShort) = difficulty switch
         {
@@ -103,9 +174,10 @@ public class AssessmentService
               short needs referenceAnswer and maxScore (suggest 5).
               """;
 
+        var modeLabel = request.Practice ? (zh ? "练习" : "practice") : (zh ? "考核" : "assessment");
         var userPrompt = zh
-            ? $"习惯：{habit.Name}\n难度：{difficulty}\n需要约 {count} 题。{(allowShort ? "可含问答题（short）。" : "以选择题（mcq）为主，至少 4 道 mcq。")}\n\n学习资料：\n{materialText}"
-            : $"Habit: {habit.Name}\nDifficulty: {difficulty}\nAbout {count} questions. {(allowShort ? "May include short answers." : "Mostly mcq (at least 4).")}\n\nMaterials:\n{materialText}";
+            ? $"主题：{title}\n模式：{modeLabel}\n难度：{difficulty}\n需要约 {count} 题。{(allowShort ? "可含问答题（short）。" : "以选择题（mcq）为主，至少 4 道 mcq。")}\n\n学习资料：\n{materialText}"
+            : $"Topic: {title}\nMode: {modeLabel}\nDifficulty: {difficulty}\nAbout {count} questions. {(allowShort ? "May include short answers." : "Mostly mcq (at least 4).")}\n\nMaterials:\n{materialText}";
 
         var raw = await CallJsonAsync(request.BaseUrl, apiKey, request.Model, system, userPrompt, ct);
         var questions = ParseQuestions(raw, count, allowShort);
@@ -121,11 +193,21 @@ public class AssessmentService
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new InvalidOperationException("missing_api_key");
 
-        var habit = await _db.Habits.FirstOrDefaultAsync(h => h.Id == request.HabitId && h.UserId == user.Id, ct)
-            ?? throw new InvalidOperationException("Habit not found.");
+        Habit? habit = null;
+        if (request.HabitId > 0)
+        {
+            habit = await _db.Habits.FirstOrDefaultAsync(h => h.Id == request.HabitId && h.UserId == user.Id, ct)
+                ?? throw new InvalidOperationException("Habit not found.");
+        }
+        else if (!request.Practice)
+        {
+            throw new InvalidOperationException("Habit not found.");
+        }
 
         var difficulty = NormalizeDifficulty(
-            string.IsNullOrWhiteSpace(request.Difficulty) ? habit.AssessmentDifficulty : request.Difficulty);
+            string.IsNullOrWhiteSpace(request.Difficulty)
+                ? (habit?.AssessmentDifficulty ?? "easy")
+                : request.Difficulty);
 
         var results = new List<AssessmentItemResultDto>();
         var zh = (request.Language ?? "zh").StartsWith("zh", StringComparison.OrdinalIgnoreCase);
@@ -186,7 +268,7 @@ public class AssessmentService
         var points = user.CompanionAffection;
         var gainedToday = user.CompanionAffectionGainedToday;
 
-        if (!passed)
+        if (!request.Practice && !passed)
         {
             var penalty = CompanionAffectionService.AssessmentFailPenalty(difficulty);
             var award = await _affection.PenaltyAsync(user, penalty, ct);
@@ -197,7 +279,7 @@ public class AssessmentService
         }
         else
         {
-            // Refresh snapshot without changing affection.
+            // Practice mode or pass: refresh snapshot without changing affection.
             points = user.CompanionAffection;
             gainedToday = user.CompanionAffectionGainedToday;
             var (_, tierKey, _) = CompanionAffectionService.ResolveTier(points);
@@ -205,24 +287,33 @@ public class AssessmentService
         }
 
         var summary = zh
-            ? (passed
-                ? $"考核通过！正确 {correctCount}/{total}。"
-                : $"考核未达标（{correctCount}/{total}）。好感度 {affectionDelta}。")
-            : (passed
-                ? $"Passed! {correctCount}/{total} correct."
-                : $"Did not pass ({correctCount}/{total}). Affection {affectionDelta}.");
+            ? (request.Practice
+                ? (passed ? $"练习完成！正确 {correctCount}/{total}。" : $"练习结束（{correctCount}/{total}）。不影响好感度。")
+                : (passed
+                    ? $"考核通过！正确 {correctCount}/{total}。"
+                    : $"考核未达标（{correctCount}/{total}）。好感度 {affectionDelta}。"))
+            : (request.Practice
+                ? (passed ? $"Practice done! {correctCount}/{total} correct." : $"Practice finished ({correctCount}/{total}). No affection change.")
+                : (passed
+                    ? $"Passed! {correctCount}/{total} correct."
+                    : $"Did not pass ({correctCount}/{total}). Affection {affectionDelta}."));
 
         var critique = zh
-            ? (passed
-                ? "不错嘛，看来资料你有认真看过。继续保持。"
-                : "嗯……这次不太行。打卡已经记下了，但好感度扣了。来，我把错的地方讲一遍。")
-            : (passed
-                ? "Not bad—you actually read the materials. Keep it up."
-                : "Hmm… that wasn’t great. Check-in still counts, but affection dropped. Let’s review the misses.");
+            ? (request.Practice
+                ? (passed ? "练习得不错，继续保持。" : "练习就是为了找漏洞——我们再对着资料过一遍。")
+                : (passed
+                    ? "不错嘛，看来资料你有认真看过。继续保持。"
+                    : "嗯……这次不太行。打卡已经记下了，但好感度扣了。来，我把错的地方讲一遍。"))
+            : (request.Practice
+                ? (passed ? "Solid practice—keep going." : "Practice is for finding gaps. Let’s review the materials.")
+                : (passed
+                    ? "Not bad—you actually read the materials. Keep it up."
+                    : "Hmm… that wasn’t great. Check-in still counts, but affection dropped. Let’s review the misses."));
 
         return new
         {
             passed,
+            practice = request.Practice,
             difficulty,
             correctCount,
             total,

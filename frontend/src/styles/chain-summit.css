@@ -3636,3 +3636,275 @@ footer p a:hover {
 	border-color: rgba(46, 125, 50, 0.4);
 	color: #2E7D32;
 }
+
+/* Habit groups board */
+.habits-groups-board {
+	display: flex;
+	flex-direction: column;
+	gap: 0.85rem;
+}
+
+.habits-groups-loading {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	opacity: 0.75;
+	padding: 1rem 0;
+}
+
+.habits-groups-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: center;
+}
+
+.habits-group-create {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	padding: 0.85rem;
+	border-radius: 12px;
+	border: 1px dashed rgba(255, 255, 255, 0.18);
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.habits-group-card {
+	border-radius: 14px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	background: rgba(12, 18, 28, 0.35);
+	overflow: visible;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.habits-group-card.drop-active {
+	border-color: rgba(110, 180, 255, 0.55);
+	box-shadow: 0 0 0 2px rgba(110, 180, 255, 0.2);
+}
+
+.habits-group-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	padding: 0.55rem 0.65rem;
+	flex-wrap: wrap;
+}
+
+.habits-group-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	background: transparent;
+	border: none;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	text-align: left;
+	min-width: 0;
+	flex: 1;
+}
+
+.habits-group-title {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 0.45rem;
+	flex-wrap: wrap;
+	font-weight: 600;
+}
+
+.habits-group-title small {
+	font-weight: 400;
+	opacity: 0.65;
+	font-size: 0.78em;
+}
+
+.habits-group-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.2rem;
+	flex-shrink: 0;
+}
+
+.habits-group-icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	border-radius: 8px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	background: rgba(255, 255, 255, 0.05);
+	color: inherit;
+	cursor: pointer;
+}
+
+.habits-group-icon-btn:hover {
+	background: rgba(255, 255, 255, 0.1);
+}
+
+.habits-group-icon-btn.danger:hover {
+	border-color: rgba(220, 80, 80, 0.45);
+	color: #f08080;
+}
+
+.habits-group-body {
+	padding: 0 0.55rem 0.65rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.55rem;
+}
+
+.habits-group-habit {
+	display: flex;
+	align-items: stretch;
+	gap: 0.35rem;
+	position: relative;
+}
+
+.habits-drag-handle {
+	display: inline-flex;
+	align-items: center;
+	opacity: 0.45;
+	cursor: grab;
+	padding: 0.35rem 0.1rem;
+	flex-shrink: 0;
+}
+
+.habits-group-habit-main {
+	flex: 1;
+	min-width: 0;
+}
+
+.habits-group-habit-main .habit-card {
+	margin: 0;
+}
+
+.habits-move-wrap {
+	position: relative;
+	flex-shrink: 0;
+	align-self: flex-start;
+	padding-top: 0.35rem;
+}
+
+.habits-move-menu {
+	position: absolute;
+	right: 0;
+	top: 100%;
+	z-index: 20;
+	min-width: 10rem;
+	padding: 0.35rem;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	background: rgba(18, 24, 36, 0.96);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+}
+
+.habits-move-menu button {
+	text-align: left;
+	background: transparent;
+	border: none;
+	color: inherit;
+	padding: 0.4rem 0.5rem;
+	border-radius: 6px;
+	cursor: pointer;
+	font: inherit;
+	font-size: 0.85rem;
+}
+
+.habits-move-menu button:hover {
+	background: rgba(255, 255, 255, 0.08);
+}
+
+.habits-empty-hint {
+	margin: 0;
+	opacity: 0.6;
+	font-size: 0.85rem;
+	padding: 0.35rem 0.15rem;
+}
+
+.habits-group-mat-list {
+	list-style: none;
+	margin: 0.75rem 0 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+}
+
+.habits-group-mat-list li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	padding: 0.45rem 0.55rem;
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.05);
+}
+
+.habits-group-mat-list small {
+	display: block;
+	opacity: 0.65;
+	font-size: 0.75rem;
+}
+
+.habits-wizard-group-select {
+	width: 100%;
+	margin-top: 0.35rem;
+	padding: 0.45rem 0.55rem;
+	border-radius: 8px;
+	border: 1px solid rgba(255, 255, 255, 0.18);
+	background: rgba(0, 0, 0, 0.2);
+	color: inherit;
+	font: inherit;
+}
+
+.app-shell.theme-day .habits-group-card {
+	background: rgba(255, 255, 255, 0.55);
+	border-color: rgba(76, 120, 68, 0.2);
+}
+
+.app-shell.theme-day .habits-group-card.drop-active {
+	border-color: rgba(46, 125, 50, 0.5);
+	box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.15);
+}
+
+.app-shell.theme-day .habits-move-menu {
+	background: #fff;
+	border-color: rgba(76, 120, 68, 0.25);
+}
+
+.app-shell.theme-day .habits-group-create {
+	border-color: rgba(76, 120, 68, 0.3);
+	background: rgba(255, 255, 255, 0.45);
+}
+
+.app-shell.theme-day .habits-wizard-group-select {
+	background: #fff;
+	border-color: rgba(76, 120, 68, 0.3);
+	color: #1a2e1a;
+}
+
+@media (max-width: 640px) {
+	.habits-group-habit {
+		flex-wrap: wrap;
+	}
+
+	.habits-drag-handle {
+		display: none;
+	}
+
+	.habits-move-wrap {
+		position: absolute;
+		right: 0.35rem;
+		top: 0.35rem;
+		z-index: 2;
+	}
+
+	.habits-group-habit-main {
+		width: 100%;
+	}
+}

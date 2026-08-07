@@ -617,7 +617,8 @@
 
 @media (max-width: 860px) {
 	.assess-panel {
-		top: 3.25rem;
+		/* Clear LearnChain site header + Gal topbar so ASSESSMENT title isn't clipped */
+		top: max(4.75rem, calc(env(safe-area-inset-top, 0px) + 4.25rem));
 		left: 0.5rem;
 		right: 0.5rem;
 		bottom: 0.5rem;

@@ -3,17 +3,26 @@ namespace backend.Models;
 public class AssessmentGenerateRequest
 {
     public int HabitId { get; set; }
+    /// <summary>Practice mode: quiz from group materials (HabitId may be 0).</summary>
+    public int? GroupId { get; set; }
+    public bool Practice { get; set; }
+    /// <summary>Override difficulty for practice (otherwise habit/group default easy).</summary>
+    public string? Difficulty { get; set; }
     public string? ApiKey { get; set; }
     public string? BaseUrl { get; set; }
     public string? Model { get; set; }
     public string Language { get; set; } = "zh";
-    /// <summary>Optional subset of HabitMaterial ids to quiz from. Empty = all usable materials.</summary>
+    /// <summary>HabitMaterial ids to include.</summary>
     public List<int>? MaterialIds { get; set; }
+    /// <summary>HabitGroupMaterial ids to include.</summary>
+    public List<int>? GroupMaterialIds { get; set; }
 }
 
 public class AssessmentGradeRequest
 {
     public int HabitId { get; set; }
+    public int? GroupId { get; set; }
+    public bool Practice { get; set; }
     public string Difficulty { get; set; } = "easy";
     public string? ApiKey { get; set; }
     public string? BaseUrl { get; set; }

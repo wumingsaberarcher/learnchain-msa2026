@@ -25,6 +25,9 @@ public class Habit
     /// <summary>easy | medium | hard</summary>
     public string AssessmentDifficulty { get; set; } = "easy";
 
+    /// <summary>Optional habit group membership; null = ungrouped.</summary>
+    public int? GroupId { get; set; }
+
     [NotMapped]
     public int CurrentStreak { get; set; }
 

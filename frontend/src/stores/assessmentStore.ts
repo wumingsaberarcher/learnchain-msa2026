@@ -6,6 +6,7 @@ import type {
   HabitMaterialDto,
 } from '../api/assessmentApi'
 import { listHabitMaterials } from '../api/assessmentApi'
+import { listGroupMaterials } from '../api/habitGroupApi'
 
 export type AssessmentPhase =
   | 'idle'
@@ -18,20 +19,31 @@ export type AssessmentPhase =
 
 interface AssessmentState {
   active: boolean
+  practice: boolean
   habitId: number | null
+  groupId: number | null
   habitName: string
   difficulty: AssessmentDifficulty
   phase: AssessmentPhase
   materials: HabitMaterialDto[]
   questions: AssessmentQuestion[]
   currentIndex: number
-  /** selected option id or text answer keyed by question id */
   answers: Record<string, { selectedOptionId?: string; textAnswer?: string }>
   lastReveal: { questionId: string; correct: boolean; correctOptionId?: string } | null
   gradeResult: AssessmentGradeResult | null
   canalLine: string | null
   error: string | null
-  start: (habitId: number, habitName: string, difficulty?: AssessmentDifficulty) => Promise<void>
+  start: (
+    habitId: number,
+    habitName: string,
+    difficulty?: AssessmentDifficulty,
+    opts?: { groupId?: number | null },
+  ) => Promise<void>
+  startPractice: (
+    groupId: number,
+    groupName: string,
+    difficulty?: AssessmentDifficulty,
+  ) => Promise<void>
   refreshMaterials: () => Promise<void>
   setPhase: (phase: AssessmentPhase) => void
   setQuestions: (questions: AssessmentQuestion[]) => void
@@ -46,7 +58,9 @@ interface AssessmentState {
 
 const empty = {
   active: false,
+  practice: false,
   habitId: null as number | null,
+  groupId: null as number | null,
   habitName: '',
   difficulty: 'easy' as AssessmentDifficulty,
   phase: 'idle' as AssessmentPhase,
@@ -60,30 +74,101 @@ const empty = {
   error: null as string | null,
 }
 
+async function loadUnionMaterials(habitId: number, groupId?: number | null): Promise<HabitMaterialDto[]> {
+  const habitMats = (await listHabitMaterials(habitId)).map((m) => ({
+    ...m,
+    source: 'habit' as const,
+  }))
+  if (!groupId) return habitMats
+  try {
+    const groupMats = (await listGroupMaterials(groupId)).map((m) => ({
+      id: m.id,
+      groupId: m.groupId,
+      fileName: m.fileName,
+      contentType: m.contentType,
+      size: m.size,
+      hasText: m.hasText,
+      textLength: m.textLength,
+      createdAt: m.createdAt,
+      source: 'group' as const,
+    }))
+    return [...groupMats, ...habitMats]
+  } catch {
+    return habitMats
+  }
+}
+
 export const useAssessmentStore = create<AssessmentState>((set, get) => ({
   ...empty,
 
-  start: async (habitId, habitName, difficulty = 'easy') => {
+  start: async (habitId, habitName, difficulty = 'easy', opts) => {
+    const groupId = opts?.groupId ?? null
     set({
       ...empty,
       active: true,
+      practice: false,
       habitId,
+      groupId,
       habitName,
       difficulty: difficulty === 'medium' || difficulty === 'hard' ? difficulty : 'easy',
       phase: 'ready',
     })
     try {
-      const materials = await listHabitMaterials(habitId)
+      const materials = await loadUnionMaterials(habitId, groupId)
       set({ materials })
     } catch (e) {
       set({ error: e instanceof Error ? e.message : 'materials_failed' })
     }
   },
 
+  startPractice: async (groupId, groupName, difficulty = 'easy') => {
+    set({
+      ...empty,
+      active: true,
+      practice: true,
+      habitId: null,
+      groupId,
+      habitName: groupName,
+      difficulty: difficulty === 'medium' || difficulty === 'hard' ? difficulty : 'easy',
+      phase: 'ready',
+    })
+    try {
+      const groupMats = (await listGroupMaterials(groupId)).map((m) => ({
+        id: m.id,
+        groupId: m.groupId,
+        fileName: m.fileName,
+        contentType: m.contentType,
+        size: m.size,
+        hasText: m.hasText,
+        textLength: m.textLength,
+        createdAt: m.createdAt,
+        source: 'group' as const,
+      }))
+      set({ materials: groupMats })
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : 'materials_failed' })
+    }
+  },
+
   refreshMaterials: async () => {
-    const id = get().habitId
-    if (id == null) return
-    const materials = await listHabitMaterials(id)
+    const { habitId, groupId, practice } = get()
+    if (practice && groupId != null) {
+      const groupMats = (await listGroupMaterials(groupId)).map((m) => ({
+        id: m.id,
+        groupId: m.groupId,
+        fileName: m.fileName,
+        contentType: m.contentType,
+        size: m.size,
+        hasText: m.hasText,
+        textLength: m.textLength,
+        createdAt: m.createdAt,
+        source: 'group' as const,
+      }))
+      set({ materials: groupMats })
+      return
+    }
+    if (habitId == null) return
+    const materials = await loadUnionMaterials(habitId, groupId)
     set({ materials })
   },
 
@@ -115,6 +200,7 @@ export async function triggerAssessmentAfterCheckIn(habit: {
   name: string
   assessmentEnabled?: boolean
   assessmentDifficulty?: string
+  groupId?: number | null
 }) {
   if (!habit.assessmentEnabled) return
   const difficulty =
@@ -122,6 +208,17 @@ export async function triggerAssessmentAfterCheckIn(habit: {
       ? habit.assessmentDifficulty
       : 'easy'
   const { useCompanionStore } = await import('./companionStore')
-  await useAssessmentStore.getState().start(habit.id, habit.name, difficulty)
+  await useAssessmentStore.getState().start(habit.id, habit.name, difficulty, {
+    groupId: habit.groupId,
+  })
   useCompanionStore.getState().enterGalMode({ zoneType: 'habit', habitId: habit.id })
+}
+
+export async function triggerGroupPractice(
+  group: { id: number; name: string },
+  difficulty: AssessmentDifficulty = 'easy',
+) {
+  const { useCompanionStore } = await import('./companionStore')
+  await useAssessmentStore.getState().startPractice(group.id, group.name, difficulty)
+  useCompanionStore.getState().enterGalMode({ zoneType: 'daily' })
 }

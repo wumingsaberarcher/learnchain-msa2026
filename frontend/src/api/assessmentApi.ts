@@ -4,7 +4,8 @@ import type { AssessmentDifficulty } from '../utils/habitHelpers'
 
 export interface HabitMaterialDto {
   id: number
-  habitId: number
+  habitId?: number
+  groupId?: number
   fileName: string
   contentType: string
   size: number
@@ -12,6 +13,8 @@ export interface HabitMaterialDto {
   textLength: number
   createdAt: string
   warning?: string | null
+  /** habit | group — used when quiz panel merges shared materials */
+  source?: 'habit' | 'group'
 }
 
 export interface AssessmentOption {
@@ -131,12 +134,23 @@ export async function deleteHabitMaterial(habitId: number, materialId: number): 
 
 export async function generateAssessment(body: {
   habitId: number
+  groupId?: number
+  practice?: boolean
+  difficulty?: string
   apiKey: string
   baseUrl?: string
   model?: string
   language: string
   materialIds?: number[]
-}): Promise<{ habitId: number; habitName: string; difficulty: string; questions: AssessmentQuestion[] }> {
+  groupMaterialIds?: number[]
+}): Promise<{
+  habitId: number
+  groupId?: number
+  practice?: boolean
+  habitName: string
+  difficulty: string
+  questions: AssessmentQuestion[]
+}> {
   const res = await apiFetch('/assessment/generate', {
     method: 'POST',
     headers: authHeaders(true),
@@ -151,6 +165,8 @@ export async function generateAssessment(body: {
 
 export async function gradeAssessment(body: {
   habitId: number
+  groupId?: number
+  practice?: boolean
   difficulty: string
   apiKey: string
   baseUrl?: string

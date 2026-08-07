@@ -47,13 +47,22 @@ export async function createHabit(payload: CreateHabitPayload): Promise<{ habit:
     return { habit: data.habit ?? data, newlyUnlocked: data.newlyUnlocked }
 }
 
-export async function updateHabit(id: number, data: Partial<Habit>): Promise<void> {
-    const res = await apiFetch(`/habit/${id}`, {
-        method: 'PUT',
-        headers: authHeaders(true),
-        body: JSON.stringify(data),
-    })
-    if (!res.ok) throw new Error('更新失败')
+export async function updateHabit(
+  id: number,
+  data: Partial<{
+    name: string
+    assessmentEnabled: boolean
+    assessmentDifficulty: string
+    setGroupId: boolean
+    groupId: number | null
+  }>,
+): Promise<void> {
+  const res = await apiFetch(`/habit/${id}`, {
+    method: 'PUT',
+    headers: authHeaders(true),
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error('更新失败')
 }
 
 export async function deleteHabit(id: number): Promise<void> {

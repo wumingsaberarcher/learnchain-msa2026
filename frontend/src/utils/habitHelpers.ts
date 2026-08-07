@@ -33,6 +33,16 @@ export interface Habit {
     milestones: HabitMilestone[]
     assessmentEnabled?: boolean
     assessmentDifficulty?: AssessmentDifficulty
+    groupId?: number | null
+}
+
+export interface HabitGroup {
+    id: number
+    name: string
+    description?: string | null
+    createdAt: string
+    habitCount: number
+    materialCount: number
 }
 
 export type AssessmentDifficulty = 'easy' | 'medium' | 'hard'
@@ -52,6 +62,7 @@ export interface CreateHabitPayload {
     milestones?: CreateMilestonePayload[]
     assessmentEnabled?: boolean
     assessmentDifficulty?: AssessmentDifficulty
+    groupId?: number | null
 }
 
 export function getDifficultyXP(difficulty: number): number {

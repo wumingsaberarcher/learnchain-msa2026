@@ -31,8 +31,15 @@ public class KnowledgeRetrievalService
         var materialsQuery = _db.HabitMaterials
             .Where(m => m.UserId == userId && m.ExtractedText != "");
 
+        int? groupId = null;
         if (zone == ChatZones.Habit && hid > 0)
+        {
             materialsQuery = materialsQuery.Where(m => m.HabitId == hid);
+            groupId = await _db.Habits
+                .Where(h => h.Id == hid && h.UserId == userId)
+                .Select(h => h.GroupId)
+                .FirstOrDefaultAsync(ct);
+        }
 
         var materials = await materialsQuery
             .OrderByDescending(m => m.CreatedAt)
@@ -40,22 +47,37 @@ public class KnowledgeRetrievalService
             .Select(m => new { m.FileName, m.HabitId, m.ExtractedText })
             .ToListAsync(ct);
 
-        IEnumerable<(string FileName, int HabitId, string Text, int Score)> scoredMaterials = materials
+        var materialRows = materials
+            .Select(m => (FileName: m.FileName, HabitId: m.HabitId, Text: m.ExtractedText))
+            .ToList();
+
+        if (groupId is int gid && gid > 0)
+        {
+            var groupMats = await _db.HabitGroupMaterials
+                .Where(m => m.UserId == userId && m.GroupId == gid && m.ExtractedText != "")
+                .OrderByDescending(m => m.CreatedAt)
+                .Take(24)
+                .Select(m => new { m.FileName, m.ExtractedText })
+                .ToListAsync(ct);
+            materialRows.AddRange(groupMats.Select(m => (FileName: $"group:{m.FileName}", HabitId: hid, Text: m.ExtractedText)));
+        }
+
+        IEnumerable<(string FileName, int HabitId, string Text, int Score)> scoredMaterials = materialRows
             .Select(m =>
             {
                 var score = terms.Count == 0
                     ? 1
                     : terms.Count(t =>
                         m.FileName.Contains(t, StringComparison.OrdinalIgnoreCase)
-                        || m.ExtractedText.Contains(t, StringComparison.OrdinalIgnoreCase));
-                return (m.FileName, m.HabitId, m.ExtractedText, score);
+                        || m.Text.Contains(t, StringComparison.OrdinalIgnoreCase));
+                return (m.FileName, m.HabitId, m.Text, score);
             })
             .Where(x => terms.Count == 0 || x.score > 0)
             .OrderByDescending(x => x.score)
             .ThenByDescending(x => x.HabitId == hid ? 1 : 0);
 
         if (terms.Count == 0 && zone == ChatZones.Habit)
-            scoredMaterials = materials.Select(m => (m.FileName, m.HabitId, m.ExtractedText, 1));
+            scoredMaterials = materialRows.Select(m => (m.FileName, m.HabitId, m.Text, 1));
 
         var materialLines = new List<string>();
         var used = 0;

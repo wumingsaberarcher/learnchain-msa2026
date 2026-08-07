@@ -3,6 +3,7 @@ import { useHabitStore } from '../stores/habitStore'
 import { createCheckIn, getAllCheckIns } from '../api/checkInApi'
 import { getAllHabits } from '../api/habitApi'
 import CreateHabitWizard from '../components/CreateHabitWizard'
+import HabitGroupsBoard from '../components/HabitGroupsBoard'
 import type { CreateHabitPayload } from '../utils/habitHelpers'
 import {
     difficultyKey,
@@ -291,16 +292,11 @@ export default function Habits() {
                 <div className="habits-loading"><Loader2 className="w-6 h-6 animate-spin inline-block mr-2" />{t('habits.loading')}</div>
             ) : error ? (
                 <div className="habits-error">{error}</div>
-            ) : habits.length === 0 ? (
-                <div className="habits-empty">
-                    <div className="habits-empty-icon"><Target className="w-8 h-8" /></div>
-                    <h2>{t('habits.empty')}</h2>
-                    <p>{t('habits.emptyHint')}</p>
-                    <button type="button" className="btn btn-primary" onClick={() => setShowForm(true)}>{t('habits.createFirst')}</button>
-                </div>
             ) : (
-                <div className="habits-list">
-                    {habits.map(habit => {
+                <HabitGroupsBoard
+                    habits={habits}
+                    onHabitsChanged={() => { void fetchHabits() }}
+                    renderHabit={(habit) => {
                         const isChecked = habit.isCheckedToday
                         const isChecking = checkInLoading === `${habit.id}`
                         const isEditing = editingHabit?.id === habit.id
@@ -309,7 +305,7 @@ export default function Habits() {
                         const showMainCheckIn = canCheckInMain(habit)
 
                         return (
-                            <div key={habit.id} className={`habit-card${isChecked ? ' checked' : ''}${habit.isCompleted ? ' checked' : ''}`}>
+                            <div className={`habit-card${isChecked ? ' checked' : ''}${habit.isCompleted ? ' checked' : ''}`}>
                                 <div className="habit-card-info">
                                     {!isEditing && (
                                         <div className="habit-card-avatar"><Target className="w-6 h-6" /></div>
@@ -426,7 +422,6 @@ export default function Habits() {
                                         )}
                                     </div>
                                 </div>
-
                                 {!isEditing && (
                                     <div className="habit-card-actions">
                                         {showMainCheckIn && (
@@ -477,8 +472,8 @@ export default function Habits() {
                                 )}
                             </div>
                         )
-                    })}
-                </div>
+                    }}
+                />
             )}
 
             <div className="habits-section-divider">
