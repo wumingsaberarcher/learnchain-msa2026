@@ -17,6 +17,7 @@ public class AiAssistantService
     private readonly AppDbContext _context;
     private readonly HabitContextBuilder _habitContext;
     private readonly CompanionMemoryService _memory;
+    private readonly KnowledgeRetrievalService _knowledge;
     private readonly EmailService _email;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<AiAssistantService> _logger;
@@ -31,6 +32,7 @@ public class AiAssistantService
         AppDbContext context,
         HabitContextBuilder habitContext,
         CompanionMemoryService memory,
+        KnowledgeRetrievalService knowledge,
         EmailService email,
         IHttpClientFactory httpClientFactory,
         ILogger<AiAssistantService> logger)
@@ -38,6 +40,7 @@ public class AiAssistantService
         _context = context;
         _habitContext = habitContext;
         _memory = memory;
+        _knowledge = knowledge;
         _email = email;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
@@ -55,39 +58,78 @@ public class AiAssistantService
         var zh = request.Language.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
 
         var latestUser = request.Messages
-            .LastOrDefault(m => m.Role == "user" && !string.IsNullOrWhiteSpace(m.Content));
-        if (latestUser == null)
-            throw new InvalidOperationException("A user message is required.");
+            .LastOrDefault(m => m.Role == "user");
+        var userText = latestUser?.Content?.Trim() ?? "";
+        string? imageDataUrl = null;
+        if (!string.IsNullOrWhiteSpace(request.ImageDataUrl))
+        {
+            if (!ChatImageHelper.TryParse(request.ImageDataUrl, out var mime, out var b64, out var imgErr))
+                throw new InvalidOperationException(imgErr);
+            imageDataUrl = ChatImageHelper.NormalizeDataUrl(mime, b64);
+        }
+
+        if (string.IsNullOrWhiteSpace(userText) && imageDataUrl == null)
+            throw new InvalidOperationException("A user message or image is required.");
+
+        if (string.IsNullOrWhiteSpace(userText) && imageDataUrl != null)
+            userText = zh ? "请识别这张图片，并结合可用的记忆与学习资料回答；若资料不够就直接根据图片说明。" : "Please recognize this image and answer using available memories/study materials when relevant; otherwise answer from the image directly.";
 
         var session = await _memory.GetOrCreateSessionAsync(user.Id, request.ZoneType, request.HabitId, ct);
-        await _memory.AppendMessageAsync(session, "user", latestUser.Content, ct);
+        var storeText = imageDataUrl != null
+            ? (string.IsNullOrWhiteSpace(latestUser?.Content)
+                ? (zh ? "[图片]" : "[Image]")
+                : $"{(zh ? "[图片]" : "[Image]")} {latestUser!.Content.Trim()}")
+            : userText;
+        await _memory.AppendMessageAsync(session, "user", storeText, ct);
 
         var isDaily = session.ZoneType != ChatZones.Habit || session.HabitId <= 0;
         var contextJson = await _habitContext.BuildContextJsonAsync(user);
         var memories = isDaily
             ? new List<UserMemory>()
             : await _memory.GetRelevantMemoriesAsync(
-                user.Id, latestUser.Content, request.ZoneType, request.HabitId, ct: ct);
+                user.Id, userText, request.ZoneType, request.HabitId, ct: ct);
+
+        // Prefetch knowledge for habit zone, or when user sent an image / asked about materials.
+        var wantKnowledge = !isDaily || imageDataUrl != null
+            || userText.Contains("资料", StringComparison.Ordinal)
+            || userText.Contains("知识", StringComparison.Ordinal)
+            || userText.Contains("material", StringComparison.OrdinalIgnoreCase)
+            || userText.Contains("knowledge", StringComparison.OrdinalIgnoreCase);
+        var knowledgeBlock = wantKnowledge
+            ? await _knowledge.BuildContextBlockAsync(
+                user.Id, session.ZoneType, session.HabitId, userText, zh, ct)
+            : "";
+
         var recent = await _memory.GetRecentActiveMessagesAsync(
             session.Id, CompanionMemoryService.ShortTermMessageLimit, ct);
 
         var affection = CompanionAffectionService.Snapshot(user);
-        var systemPrompt = BuildSystemPrompt(zh, contextJson, session.Summary, memories, affection, session.ZoneType, session.HabitId);
+        var systemPrompt = BuildSystemPrompt(
+            zh, contextJson, session.Summary, memories, affection, session.ZoneType, session.HabitId, knowledgeBlock, imageDataUrl != null);
 
         var messages = new JsonArray
         {
             new JsonObject { ["role"] = "system", ["content"] = systemPrompt }
         };
 
-        foreach (var m in recent)
+        // Prior turns as text; latest turn may be multimodal (vision).
+        var prior = recent.Count > 0 ? recent.Take(recent.Count - 1) : recent;
+        foreach (var m in prior)
         {
             var role = m.Role is "assistant" or "user" ? m.Role : "user";
             if (string.IsNullOrWhiteSpace(m.Content)) continue;
             messages.Add(new JsonObject { ["role"] = role, ["content"] = m.Content.Trim() });
         }
 
+        if (imageDataUrl != null)
+            messages.Add(BuildVisionUserMessage(userText, imageDataUrl));
+        else
+            messages.Add(new JsonObject { ["role"] = "user", ["content"] = userText });
+
         var actions = new List<ChatActionResult>();
         string? finalReply = null;
+        // Some providers struggle with tools + images together; skip tools on vision turns.
+        var useTools = imageDataUrl == null;
 
         try
         {

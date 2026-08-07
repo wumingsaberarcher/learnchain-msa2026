@@ -407,7 +407,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
                     className="assess-textarea"
                     rows={6}
                     value={shortDraft}
-                    disabled={busy || phase === 'grading'}
+                    disabled={busy}
                     placeholder={t('assess.shortPlaceholder')}
                     onChange={(e) => setShortDraft(e.target.value)}
                   />

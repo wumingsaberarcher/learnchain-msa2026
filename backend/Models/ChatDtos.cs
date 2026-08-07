@@ -20,6 +20,8 @@ public class ChatRequest
     public string? ZoneType { get; set; }
     /// <summary>Required when ZoneType is habit.</summary>
     public int? HabitId { get; set; }
+    /// <summary>Optional image as data URL (data:image/jpeg;base64,...).</summary>
+    public string? ImageDataUrl { get; set; }
 }
 
 public class ChatActionResult
