@@ -29,7 +29,7 @@ const IDLE_MOOD_EN = [
   'Too lazy to talk much… I’ll just keep you company.',
   'Time crawls… let me lounge a bit longer.',
   'No rush… I’m not in a hurry either.',
-  'Yawn—I'll hang around a bit more.',
+  "Yawn—I'll hang around a bit more.",
   'So quiet… I’ll just rest here.',
 ]
 
@@ -204,7 +204,7 @@ export function pickCompanionLine(scene: 'idle' | 'focus', language: 'zh' | 'en'
 /** Lightweight emotion guess from assistant / companion text. */
 export function inferEmotionFromText(text: string): Emotion {
   const s = text.toLowerCase()
-  if (/生气|愤怒|angry|怒|烦|讨厌/.test(s)) return 'anger'
+  if (/生气|愤怒|angry|怒|烦|讨厌/.test(s)) return 'angry'
   if (/害怕|恐惧|吓|慌|紧张|怕|fear|scared|afraid|terrified|anxious|worry|担心/.test(s)) return 'fear'
   if (/难过|伤心|sorrow|sad|抱歉|对不起|累|困|sleepy|doze|tired/.test(s)) return 'sorrow'
   if (/惊喜|surprise|哇|！{2,}|!{2,}|天哪/.test(s)) return 'surprise'
