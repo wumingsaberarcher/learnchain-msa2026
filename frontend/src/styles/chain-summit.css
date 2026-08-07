@@ -4011,6 +4011,41 @@ footer p a:hover {
 	opacity: 0.75;
 }
 
+.habits-mat-dir-log {
+	margin: 0 0 0.5rem;
+	padding: 0.45rem 0.55rem;
+	border-radius: 8px;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	background: rgba(0, 0, 0, 0.35);
+	max-height: 7.5rem;
+	overflow-y: auto;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 0.72rem;
+	line-height: 1.45;
+}
+
+.habits-mat-dir-log-line {
+	color: rgba(180, 230, 200, 0.92);
+	word-break: break-word;
+}
+
+.habits-mat-dir-log-line.is-fail {
+	color: #ff8a8a;
+}
+
+.app-shell.theme-day .habits-mat-dir-log {
+	background: rgba(255, 255, 255, 0.75);
+	border-color: rgba(76, 120, 68, 0.2);
+}
+
+.app-shell.theme-day .habits-mat-dir-log-line {
+	color: #1a4a2a;
+}
+
+.app-shell.theme-day .habits-mat-dir-log-line.is-fail {
+	color: #b00020;
+}
+
 .habits-mat-dir-list {
 	display: flex;
 	flex-direction: column;

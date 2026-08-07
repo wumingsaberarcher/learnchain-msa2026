@@ -34,6 +34,8 @@ type DirItem = {
   pending?: boolean
 }
 
+type LogLine = { id: number; ok: boolean; text: string }
+
 function remoteToItem(m: HabitGroupMaterialDto): DirItem {
   return {
     key: `r-${m.id}`,
@@ -59,74 +61,140 @@ function localToItem(m: LocalGroupMaterial): DirItem {
   }
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = window.setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    promise.then(
+      (v) => {
+        window.clearTimeout(t)
+        resolve(v)
+      },
+      (e) => {
+        window.clearTimeout(t)
+        reject(e)
+      },
+    )
+  })
+}
+
 export default function GroupMaterialsDirectory({ groupId, groupName, onCountChange, onClose }: Props) {
   const { t } = useTranslation()
   const fileRef = useRef<HTMLInputElement>(null)
+  const logId = useRef(0)
+  const refreshGen = useRef(0)
   const [items, setItems] = useState<DirItem[]>([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
-  const [status, setStatus] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [logs, setLogs] = useState<LogLine[]>([])
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [busyKey, setBusyKey] = useState<string | null>(null)
 
-  const mergeLists = useCallback((local: LocalGroupMaterial[], remote: HabitGroupMaterialDto[]) => {
-    const remoteItems = remote.map(remoteToItem)
-    const localItems = local.map(localToItem)
-    // Prefer showing locals first (just added), then remote; dedupe by fileName+size soft match not needed
-    setItems([...localItems, ...remoteItems])
+  const pushLog = useCallback((text: string, ok = true) => {
+    const id = ++logId.current
+    const line = { id, ok, text }
+    console[ok ? 'info' : 'error'](`[materials-folder] ${text}`)
+    setLogs((prev) => [...prev.slice(-12), line])
+  }, [])
+
+  const applyLocalRemote = useCallback((local: LocalGroupMaterial[], remote: HabitGroupMaterialDto[]) => {
+    setItems([...local.map(localToItem), ...remote.map(remoteToItem)])
   }, [])
 
   const refresh = useCallback(async () => {
+    const gen = ++refreshGen.current
     setLoading(true)
-    setError(null)
+    pushLog(`1/3 ${t('groups.stageLoadLocal')}`)
     try {
       const local = await localListGroupFiles(groupId)
+      if (gen !== refreshGen.current) return
+      // Show local immediately — never wait on backend to paint the list.
+      applyLocalRemote(local, [])
+      pushLog(`✓ ${t('groups.stageLoadLocalOk', { n: local.length })}`)
+
+      pushLog(`2/3 ${t('groups.stageLoadRemote')}`)
       let remote: HabitGroupMaterialDto[] = []
       try {
-        remote = await listGroupMaterials(groupId)
-      } catch {
-        // Backend may be cold — local files still show.
+        remote = await withTimeout(listGroupMaterials(groupId), 8000, 'listGroupMaterials')
+        if (gen !== refreshGen.current) return
+        pushLog(`✓ ${t('groups.stageLoadRemoteOk', { n: remote.length })}`)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        pushLog(`⚠ ${t('groups.stageLoadRemoteSkip')}: ${msg}`, false)
+        console.warn('[materials-folder] remote list skipped:', e)
       }
-      mergeLists(local, remote)
+
+      // Re-read local in case user uploaded during remote wait
+      const localFresh = await localListGroupFiles(groupId)
+      if (gen !== refreshGen.current) return
+      applyLocalRemote(localFresh, remote)
+      pushLog(`3/3 ${t('groups.stageReady', { n: localFresh.length + remote.length })}`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'load failed')
+      const msg = e instanceof Error ? e.message : String(e)
+      pushLog(`✗ ${t('groups.stageLoadFail')}: ${msg}`, false)
+      console.error('[materials-folder] refresh failed:', e)
     } finally {
-      setLoading(false)
+      if (gen === refreshGen.current) setLoading(false)
     }
-  }, [groupId, mergeLists])
+  }, [groupId, applyLocalRemote, pushLog, t])
 
   useEffect(() => {
     void refresh()
   }, [refresh])
 
-  /** Instant local save — no backend wait. */
   const handleUpload = async (files: FileList | File[]) => {
     const list = Array.from(files)
-    if (!list.length) return
+    pushLog(`▶ ${t('groups.stagePick', { n: list.length })}`)
+    if (!list.length) {
+      pushLog(`✗ ${t('groups.stagePickEmpty')}`, false)
+      return
+    }
+
     setAdding(true)
-    setError(null)
-    setStatus(t('groups.savedLocally'))
+    let okCount = 0
     try {
-      for (const f of list) {
-        if (f.size <= 0) continue
-        if (f.size > 8 * 1024 * 1024) {
-          setError(t('groups.fileTooLarge', { name: f.name }))
+      for (let i = 0; i < list.length; i++) {
+        const f = list[i]!
+        const tag = `[${i + 1}/${list.length}] ${f.name}`
+        pushLog(`${tag} — ${t('groups.stageCheck')} (${(f.size / 1024).toFixed(1)} KB)`)
+
+        if (f.size <= 0) {
+          pushLog(`${tag} — ✗ ${t('groups.stageEmptyFile')}`, false)
           continue
         }
-        await localPutGroupFile(groupId, f)
+        if (f.size > 8 * 1024 * 1024) {
+          pushLog(`${tag} — ✗ ${t('groups.fileTooLarge', { name: f.name })}`, false)
+          continue
+        }
+
+        pushLog(`${tag} — ${t('groups.stageSaveLocal')}`)
+        try {
+          const row = await localPutGroupFile(groupId, f, (stage) => {
+            pushLog(`${tag} · ${stage}`)
+          })
+          // Optimistic: append immediately
+          setItems((prev) => {
+            const withoutDup = prev.filter((x) => x.key !== row.id)
+            return [localToItem(row), ...withoutDup]
+          })
+          okCount += 1
+          pushLog(`${tag} — ✓ ${t('groups.stageSaveLocalOk')}`)
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e)
+          pushLog(`${tag} — ✗ ${t('groups.stageSaveLocalFail')}: ${msg}`, false)
+          console.error('[materials-folder] localPut failed:', e)
+        }
       }
-      const local = await localListGroupFiles(groupId)
-      setItems((prev) => {
-        const remoteOnly = prev.filter((x) => x.source === 'remote')
-        return [...local.map(localToItem), ...remoteOnly]
-      })
+
+      // Bump generation so an in-flight refresh cannot wipe these rows with a stale snapshot
+      refreshGen.current += 1
       onCountChange?.()
-      setStatus(t('groups.savedLocalHint'))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'save failed')
-      setStatus(null)
+
+      if (okCount > 0) {
+        pushLog(`✓ ${t('groups.stageUploadDone', { n: okCount })}`)
+      } else {
+        pushLog(`✗ ${t('groups.stageUploadNone')}`, false)
+      }
     } finally {
       setAdding(false)
     }
@@ -144,11 +212,11 @@ export default function GroupMaterialsDirectory({ groupId, groupName, onCountCha
       return
     }
     setBusyKey(item.key)
-    setError(null)
     try {
       if (item.source === 'local' && item.localId) {
         await localRenameGroupFile(item.localId, name)
         setItems((prev) => prev.map((x) => (x.key === item.key ? { ...x, fileName: name } : x)))
+        pushLog(`✓ rename local: ${name}`)
       } else if (item.remoteId != null) {
         try {
           const updated = await renameGroupMaterial(groupId, item.remoteId, name)
@@ -159,13 +227,18 @@ export default function GroupMaterialsDirectory({ groupId, groupName, onCountCha
                 : x,
             ),
           )
+          pushLog(`✓ rename remote: ${updated.fileName}`)
         } catch (e) {
-          setError(e instanceof Error ? e.message : 'rename failed')
+          const msg = e instanceof Error ? e.message : String(e)
+          pushLog(`✗ rename remote failed: ${msg}`, false)
+          console.error('[materials-folder] rename remote:', e)
         }
       }
       setEditingKey(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'rename failed')
+      const msg = e instanceof Error ? e.message : String(e)
+      pushLog(`✗ rename failed: ${msg}`, false)
+      console.error('[materials-folder] rename:', e)
     } finally {
       setBusyKey(null)
     }
@@ -174,7 +247,6 @@ export default function GroupMaterialsDirectory({ groupId, groupName, onCountCha
   const handleDelete = async (item: DirItem) => {
     if (!confirm(t('groups.deleteFileConfirm', { name: item.fileName }))) return
     setBusyKey(item.key)
-    setError(null)
     try {
       if (item.source === 'local' && item.localId) {
         await localDeleteGroupFile(item.localId)
@@ -183,8 +255,11 @@ export default function GroupMaterialsDirectory({ groupId, groupName, onCountCha
       }
       setItems((prev) => prev.filter((x) => x.key !== item.key))
       onCountChange?.()
+      pushLog(`✓ deleted ${item.fileName}`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'delete failed')
+      const msg = e instanceof Error ? e.message : String(e)
+      pushLog(`✗ delete failed: ${msg}`, false)
+      console.error('[materials-folder] delete:', e)
     } finally {
       setBusyKey(null)
     }
@@ -217,15 +292,20 @@ export default function GroupMaterialsDirectory({ groupId, groupName, onCountCha
             accept=".pdf,.docx,.doc,.wps,.md,.txt,application/pdf"
             onChange={(e) => {
               const files = e.target.files
+              pushLog(`file-input change: ${files?.length ?? 0} file(s)`)
               e.target.value = ''
               if (files?.length) void handleUpload(files)
+              else pushLog(`✗ ${t('groups.stagePickEmpty')}`, false)
             }}
           />
           <button
             type="button"
             className="btn-habit btn-habit-checkin habits-mat-upload-btn"
             disabled={adding}
-            onClick={() => fileRef.current?.click()}
+            onClick={() => {
+              pushLog(t('groups.stageOpenPicker'))
+              fileRef.current?.click()
+            }}
           >
             {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             {t('assess.upload')}
@@ -236,12 +316,15 @@ export default function GroupMaterialsDirectory({ groupId, groupName, onCountCha
         </div>
       </div>
 
-      {error && (
-        <div className="habits-error" role="alert">
-          {error}
+      {logs.length > 0 && (
+        <div className="habits-mat-dir-log" aria-live="polite">
+          {logs.map((l) => (
+            <div key={l.id} className={`habits-mat-dir-log-line${l.ok ? '' : ' is-fail'}`}>
+              {l.text}
+            </div>
+          ))}
         </div>
       )}
-      {status && <p className="habits-mat-dir-status">{status}</p>}
 
       <div className="habits-mat-dir-list" role="list">
         {loading && items.length === 0 ? (
