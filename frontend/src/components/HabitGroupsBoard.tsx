@@ -37,7 +37,7 @@ export default function HabitGroupsBoard({ habits, onHabitsChanged, renderHabit 
   const { t } = useTranslation()
   const [groups, setGroups] = useState<HabitGroup[]>([])
   const [loading, setLoading] = useState(true)
-  const [collapsed, setCollapsed] = useState<Record<number | 'ungrouped', boolean>>({})
+  const [collapsed, setCollapsed] = useState<Partial<Record<number | 'ungrouped', boolean>>>({})
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
