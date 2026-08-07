@@ -93,6 +93,7 @@ try
     builder.Services.AddScoped<CompanionAffectionService>();
     builder.Services.AddScoped<HabitMaterialTextExtractor>();
     builder.Services.AddScoped<AssessmentService>();
+    builder.Services.AddScoped<HabitGroupDescriptionService>();
     builder.Services.AddScoped<KnowledgeRetrievalService>();
     builder.Services.AddSingleton<EmailService>();
     builder.Services.AddHttpClient("OpenAiCompatible", client =>

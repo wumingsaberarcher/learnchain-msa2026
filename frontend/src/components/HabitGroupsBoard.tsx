@@ -9,6 +9,7 @@ import {
   MoreHorizontal,
   Pencil,
   Play,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react'
@@ -16,14 +17,16 @@ import type { Habit, HabitGroup } from '../utils/habitHelpers'
 import {
   createHabitGroup,
   deleteHabitGroup,
+  generateGroupDescription,
   listHabitGroups,
   moveHabitToGroup,
   updateHabitGroup,
 } from '../api/habitGroupApi'
 import GroupMaterialsDirectory from './GroupMaterialsDirectory'
-import { localCountGroupFiles } from '../utils/groupMaterialsLocal'
+import { localCollectTextExcerpts, localCountGroupFiles } from '../utils/groupMaterialsLocal'
 import { triggerGroupPractice } from '../stores/assessmentStore'
 import { useHabitStore } from '../stores/habitStore'
+import { useAiSettingsStore } from '../stores/aiSettingsStore'
 import { useTranslation } from '../stores/languageStore'
 
 type Props = {
@@ -43,9 +46,12 @@ function normalizeGroup(raw: HabitGroup & { Name?: string; Description?: string 
 }
 
 export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const patchHabitLocal = useHabitStore((s) => s.patchHabitLocal)
   const patchHabitsLocal = useHabitStore((s) => s.patchHabitsLocal)
+  const apiKey = useAiSettingsStore((s) => s.apiKey)
+  const baseUrl = useAiSettingsStore((s) => s.baseUrl)
+  const model = useAiSettingsStore((s) => s.model)
   const [groups, setGroups] = useState<HabitGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<Partial<Record<number | 'ungrouped', boolean>>>({
@@ -55,6 +61,7 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
   const [busyId, setBusyId] = useState<number | null>(null)
+  const [genDescId, setGenDescId] = useState<number | null>(null)
   /** Which group's materials directory is open (inline, not modal). */
   const [materialsFor, setMaterialsFor] = useState<number | null>(null)
   const [menuHabitId, setMenuHabitId] = useState<number | null>(null)
@@ -174,6 +181,38 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
       await refreshGroups(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'rename failed')
+    }
+  }
+
+  const handleGenerateDesc = async (g: HabitGroup) => {
+    if (g.materialCount <= 0) {
+      setError(t('groups.genDescNeedMats'))
+      return
+    }
+    if (!apiKey.trim()) {
+      setError(t('groups.genDescNeedKey'))
+      return
+    }
+    setGenDescId(g.id)
+    setError(null)
+    try {
+      const localExcerpts = await localCollectTextExcerpts(g.id)
+      const { description } = await generateGroupDescription(g.id, {
+        apiKey: apiKey.trim(),
+        baseUrl: baseUrl.trim() || undefined,
+        model: model.trim() || undefined,
+        language,
+        overwrite: false,
+        localExcerpts: localExcerpts.length ? localExcerpts : undefined,
+      })
+      setGroups((gs) => gs.map((x) => (x.id === g.id ? { ...x, description } : x)))
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : ''
+      if (msg === 'missing_api_key') setError(t('groups.genDescNeedKey'))
+      else if (msg === 'no_materials') setError(t('groups.genDescNeedMats'))
+      else setError(msg || t('groups.genDescFail'))
+    } finally {
+      setGenDescId(null)
     }
   }
 
@@ -383,6 +422,29 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
               </div>,
               g.description ? (
                 <span className="habits-group-desc">{g.description}</span>
+              ) : g.materialCount > 0 ? (
+                <div className="habits-group-desc-row">
+                  <span className="habits-group-desc is-empty">{t('groups.genDescHint')}</span>
+                  <button
+                    type="button"
+                    className="habits-group-gen-desc"
+                    disabled={genDescId === g.id}
+                    title={t('groups.genDesc')}
+                    onClick={() => void handleGenerateDesc(g)}
+                  >
+                    {genDescId === g.id ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        {t('groups.genDescBusy')}
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        {t('groups.genDesc')}
+                      </>
+                    )}
+                  </button>
+                </div>
               ) : (
                 <span className="habits-group-desc is-empty">{t('groups.noDesc')}</span>
               ),

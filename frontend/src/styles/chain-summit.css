@@ -3765,6 +3765,46 @@ footer p a:hover {
 	max-width: 36rem;
 }
 
+.habits-group-desc-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 0.5rem 0.75rem;
+	margin-top: 0.15rem;
+	max-width: 40rem;
+}
+
+.habits-group-desc-row .habits-group-desc {
+	margin-top: 0;
+	flex: 1 1 12rem;
+}
+
+.habits-group-gen-desc {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	flex-shrink: 0;
+	padding: 0.28rem 0.65rem;
+	border-radius: 8px;
+	border: 1px solid rgba(0, 220, 200, 0.35);
+	background: rgba(0, 180, 160, 0.12);
+	color: rgba(180, 255, 245, 0.95);
+	font-size: 0.78rem;
+	font-weight: 500;
+	cursor: pointer;
+	line-height: 1.2;
+}
+
+.habits-group-gen-desc:hover:not(:disabled) {
+	background: rgba(0, 200, 180, 0.22);
+	border-color: rgba(0, 255, 220, 0.5);
+}
+
+.habits-group-gen-desc:disabled {
+	opacity: 0.65;
+	cursor: wait;
+}
+
 .habits-group-desc.is-empty {
 	color: rgba(200, 230, 240, 0.45);
 	font-style: italic;
@@ -4269,6 +4309,17 @@ footer p a:hover {
 .app-shell.theme-day .habits-group-desc,
 .app-shell.theme-day .habits-empty-hint {
 	color: rgba(26, 46, 26, 0.7);
+}
+
+.app-shell.theme-day .habits-group-gen-desc {
+	border-color: rgba(46, 125, 50, 0.4);
+	background: rgba(76, 175, 80, 0.12);
+	color: #1b5e20;
+}
+
+.app-shell.theme-day .habits-group-gen-desc:hover:not(:disabled) {
+	background: rgba(76, 175, 80, 0.22);
+	border-color: rgba(46, 125, 50, 0.55);
 }
 
 .app-shell.theme-day .habits-group-body {

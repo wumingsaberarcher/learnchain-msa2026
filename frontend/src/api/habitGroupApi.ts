@@ -139,3 +139,46 @@ export async function renameGroupMaterial(
   if (!res.ok) throw new Error(parseErrorBody(await res.text()) || 'Rename failed')
   return res.json()
 }
+
+export type LocalMaterialExcerpt = { fileName: string; text: string }
+
+export async function generateGroupDescription(
+  groupId: number,
+  body: {
+    apiKey: string
+    baseUrl?: string
+    model?: string
+    language?: string
+    overwrite?: boolean
+    localExcerpts?: LocalMaterialExcerpt[]
+  },
+): Promise<{ description: string; sourceNote: string }> {
+  const res = await apiFetch(`/habit-group/${groupId}/generate-description`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      apiKey: body.apiKey,
+      baseUrl: body.baseUrl,
+      model: body.model,
+      language: body.language,
+      overwrite: body.overwrite ?? false,
+      localExcerpts: body.localExcerpts,
+    }),
+  })
+  if (!res.ok) {
+    const raw = await res.text()
+    let code = ''
+    try {
+      const j = JSON.parse(raw) as { error?: string; message?: string }
+      code = j.error || ''
+      if (j.message) throw new Error(j.message)
+    } catch (e) {
+      if (e instanceof Error && e.message && !e.message.startsWith('{')) throw e
+    }
+    if (code === 'missing_api_key') throw new Error('missing_api_key')
+    if (code === 'no_materials') throw new Error('no_materials')
+    if (code === 'description_exists') throw new Error('description_exists')
+    throw new Error(parseErrorBody(raw) || `Generate failed (HTTP ${res.status})`)
+  }
+  return res.json()
+}

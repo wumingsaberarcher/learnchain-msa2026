@@ -1,5 +1,6 @@
 using backend.Data;
 using backend.Models;
+using backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,10 +14,12 @@ namespace backend.Controllers;
 public class HabitGroupController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly HabitGroupDescriptionService _descriptions;
 
-    public HabitGroupController(AppDbContext db)
+    public HabitGroupController(AppDbContext db, HabitGroupDescriptionService descriptions)
     {
         _db = db;
+        _descriptions = descriptions;
     }
 
     private int GetCurrentUserId()
@@ -105,6 +108,33 @@ public class HabitGroupController : ControllerBase
 
         await _db.SaveChangesAsync();
         return Ok(new { group.Id, group.Name, group.Description, group.CreatedAt });
+    }
+
+    /// <summary>
+    /// AI-generate a group description from shared materials (+ optional habit chat).
+    /// Requires at least one material with extractable text (server or local excerpts).
+    /// </summary>
+    [HttpPost("{id:int}/generate-description")]
+    public async Task<IActionResult> GenerateDescription(int id, [FromBody] GenerateGroupDescriptionRequest request)
+    {
+        var userId = GetCurrentUserId();
+        try
+        {
+            var (description, sourceNote) = await _descriptions.GenerateAsync(userId, id, request ?? new GenerateGroupDescriptionRequest());
+            return Ok(new { description, sourceNote });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ex.Message switch
+            {
+                "missing_api_key" => BadRequest(new { error = "missing_api_key", message = "API key required" }),
+                "group_not_found" => NotFound(new { error = "group_not_found" }),
+                "description_exists" => Conflict(new { error = "description_exists", message = "Group already has a description" }),
+                "no_materials" => BadRequest(new { error = "no_materials", message = "Upload materials with text first" }),
+                "empty_llm" => BadRequest(new { error = "empty_llm", message = "AI returned empty description" }),
+                _ => BadRequest(new { error = "generate_failed", message = ex.Message })
+            };
+        }
     }
 
     [HttpDelete("{id:int}")]

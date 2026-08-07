@@ -190,6 +190,34 @@ export async function localCountGroupFiles(groupId: number): Promise<number> {
   return list.length
 }
 
+/** Read text-like local files for AI description generation. */
+export async function localCollectTextExcerpts(
+  groupId: number,
+  opts?: { maxFiles?: number; maxChars?: number },
+): Promise<{ fileName: string; text: string }[]> {
+  const maxFiles = opts?.maxFiles ?? 6
+  const maxChars = opts?.maxChars ?? 3000
+  const files = await localListGroupFiles(groupId)
+  const out: { fileName: string; text: string }[] = []
+  for (const f of files) {
+    if (out.length >= maxFiles) break
+    const name = (f.fileName || '').toLowerCase()
+    const isText =
+      /\.(txt|md|markdown|csv|json|log)$/i.test(name) ||
+      (f.contentType || '').startsWith('text/') ||
+      f.contentType === 'application/json'
+    if (!isText) continue
+    try {
+      const raw = (await f.blob.text()).trim()
+      if (!raw) continue
+      out.push({ fileName: f.fileName, text: raw.slice(0, maxChars) })
+    } catch {
+      /* skip unreadable */
+    }
+  }
+  return out
+}
+
 export async function localGetBlob(id: string): Promise<Blob | null> {
   for (const map of memoryByGroup.values()) {
     const row = map.get(id)
