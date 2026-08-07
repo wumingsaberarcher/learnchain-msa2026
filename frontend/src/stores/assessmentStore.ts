@@ -123,5 +123,5 @@ export async function triggerAssessmentAfterCheckIn(habit: {
       : 'easy'
   const { useCompanionStore } = await import('./companionStore')
   await useAssessmentStore.getState().start(habit.id, habit.name, difficulty)
-  useCompanionStore.getState().enterGalMode()
+  useCompanionStore.getState().enterGalMode({ zoneType: 'habit', habitId: habit.id })
 }

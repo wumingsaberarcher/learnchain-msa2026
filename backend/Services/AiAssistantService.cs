@@ -59,16 +59,17 @@ public class AiAssistantService
         if (latestUser == null)
             throw new InvalidOperationException("A user message is required.");
 
-        var session = await _memory.GetOrCreateSessionAsync(user.Id, ct);
+        var session = await _memory.GetOrCreateSessionAsync(user.Id, request.ZoneType, request.HabitId, ct);
         await _memory.AppendMessageAsync(session, "user", latestUser.Content, ct);
 
         var contextJson = await _habitContext.BuildContextJsonAsync(user);
-        var memories = await _memory.GetRelevantMemoriesAsync(user.Id, latestUser.Content, ct: ct);
+        var memories = await _memory.GetRelevantMemoriesAsync(
+            user.Id, latestUser.Content, request.ZoneType, request.HabitId, ct: ct);
         var recent = await _memory.GetRecentActiveMessagesAsync(
             session.Id, CompanionMemoryService.ShortTermMessageLimit, ct);
 
         var affection = CompanionAffectionService.Snapshot(user);
-        var systemPrompt = BuildSystemPrompt(zh, contextJson, session.Summary, memories, affection);
+        var systemPrompt = BuildSystemPrompt(zh, contextJson, session.Summary, memories, affection, session.ZoneType, session.HabitId);
 
         var messages = new JsonArray
         {
@@ -180,7 +181,9 @@ public class AiAssistantService
         string contextJson,
         string rollingSummary,
         IReadOnlyList<UserMemory> memories,
-        AffectionSnapshot affection)
+        AffectionSnapshot affection,
+        string zoneType,
+        int habitId)
     {
         var lang = zh ? "Simplified Chinese" : "English";
         var memoryBlock = memories.Count == 0
@@ -196,10 +199,19 @@ public class AiAssistantService
             ? $"与用户的真实好感度：{affection.Points}/{affection.MaxPoints}（阶段 {affection.TierKey}，今日已获 {affection.GainedToday}/{affection.DailyCap}）。语气随羁绊自然亲近一些，但不要报出精确数字，除非用户问起。"
             : $"Real affection with the user: {affection.Points}/{affection.MaxPoints} (tier {affection.TierKey}, today {affection.GainedToday}/{affection.DailyCap}). Sound a bit closer as the bond grows; do not recite exact numbers unless asked.";
 
+        var zoneLine = zoneType == ChatZones.Habit && habitId > 0
+            ? (zh
+                ? $"当前是习惯学习区（habitId={habitId}）：只使用本区记忆与本区对话摘要，不要把日常闲聊区的记忆混进来。专注该习惯的学习/考核相关话题。"
+                : $"You are in a habit learning zone (habitId={habitId}): use only this zone's memories and summary—do not mix in daily-chat memories. Focus on study/assessment for this habit.")
+            : (zh
+                ? "当前是日常对话区：只使用日常区记忆与摘要，不要混入各习惯学习区的记忆。"
+                : "You are in the daily chat zone: use only daily-zone memories and summary—do not mix habit learning-zone memories.");
+
         return $"""
             You are LearnChain's friendly habit coach companion — not just a tool.
             Always reply in {lang}.
             You remember the user across sessions via long-term memories and a rolling conversation summary.
+            {zoneLine}
             Naturally weave in game progress (streaks, XP, levels, badges, chain continuity) when helpful — keep it encouraging, not robotic.
             {bondLine}
 
@@ -218,7 +230,7 @@ public class AiAssistantService
             Rolling conversation summary (older dialogue compressed):
             {summaryBlock}
 
-            Long-term memories about this user (use gently; do not dump as a list unless asked):
+            Long-term memories for THIS zone only (use gently; do not dump as a list unless asked):
             {memoryBlock}
             """;
     }

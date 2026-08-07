@@ -128,12 +128,15 @@ public class ChatController : ControllerBase
 
     /// <summary>Load persisted short-term history + rolling summary for the companion UI.</summary>
     [HttpGet("history")]
-    public async Task<ActionResult<ChatHistoryResponse>> GetHistory(CancellationToken ct)
+    public async Task<ActionResult<ChatHistoryResponse>> GetHistory(
+        [FromQuery] string? zoneType,
+        [FromQuery] int? habitId,
+        CancellationToken ct)
     {
         var user = await GetCurrentUserAsync();
         if (user == null) return Unauthorized();
 
-        var session = await _memory.GetOrCreateSessionAsync(user.Id, ct);
+        var session = await _memory.GetOrCreateSessionAsync(user.Id, zoneType, habitId, ct);
         var messages = await _memory.GetRecentActiveMessagesAsync(
             session.Id, CompanionMemoryService.ShortTermMessageLimit * 2, ct);
 
@@ -149,22 +152,29 @@ public class ChatController : ControllerBase
         });
     }
 
-    /// <summary>Reset conversation memory (messages + rolling summary). Keeps long-term memories and game data.</summary>
+    /// <summary>Reset conversation memory for the given zone (default: daily). Keeps long-term memories.</summary>
     [HttpDelete("session")]
-    public async Task<IActionResult> ResetSession(CancellationToken ct)
+    public async Task<IActionResult> ResetSession(
+        [FromQuery] string? zoneType,
+        [FromQuery] int? habitId,
+        CancellationToken ct)
     {
         var user = await GetCurrentUserAsync();
         if (user == null) return Unauthorized();
-        await _memory.ResetConversationAsync(user.Id, ct);
+        // Default to current daily zone when unspecified (UI "clear chat").
+        await _memory.ResetConversationAsync(user.Id, zoneType ?? ChatZones.Daily, habitId, ct);
         return Ok(new { message = "Conversation memory cleared" });
     }
 
     [HttpGet("memories")]
-    public async Task<ActionResult<List<UserMemoryDto>>> ListMemories(CancellationToken ct)
+    public async Task<ActionResult<List<UserMemoryDto>>> ListMemories(
+        [FromQuery] string? zoneType,
+        [FromQuery] int? habitId,
+        CancellationToken ct)
     {
         var user = await GetCurrentUserAsync();
         if (user == null) return Unauthorized();
-        var list = await _memory.ListMemoriesAsync(user.Id, ct);
+        var list = await _memory.ListMemoriesAsync(user.Id, zoneType, habitId, ct);
         return Ok(list.Select(m => new UserMemoryDto
         {
             Id = m.Id,
@@ -172,7 +182,9 @@ public class ChatController : ControllerBase
             Key = m.Key,
             Content = m.Content,
             Importance = m.Importance,
-            UpdatedAt = m.UpdatedAt
+            UpdatedAt = m.UpdatedAt,
+            ZoneType = m.ZoneType,
+            HabitId = m.HabitId
         }).ToList());
     }
 

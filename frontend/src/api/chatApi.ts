@@ -49,11 +49,31 @@ export interface AiProviderSettings {
     model: string
 }
 
+export type ChatZoneType = 'daily' | 'habit'
+
+export interface ChatScopeParam {
+    zoneType?: ChatZoneType
+    habitId?: number | null
+}
+
+function scopeQuery(scope?: ChatScopeParam) {
+    const zone = scope?.zoneType === 'habit' && scope.habitId != null && scope.habitId > 0
+        ? 'habit'
+        : 'daily'
+    const params = new URLSearchParams({ zoneType: zone })
+    if (zone === 'habit' && scope?.habitId) params.set('habitId', String(scope.habitId))
+    return params.toString()
+}
+
 export async function sendChat(
     messages: ChatMessagePayload[],
     language: 'zh' | 'en',
     provider: AiProviderSettings,
+    scope?: ChatScopeParam,
 ): Promise<ChatResponse> {
+    const zone = scope?.zoneType === 'habit' && scope.habitId != null && scope.habitId > 0
+        ? 'habit'
+        : 'daily'
     const res = await apiFetch('/chat', {
         method: 'POST',
         headers: authHeaders(true),
@@ -63,6 +83,8 @@ export async function sendChat(
             apiKey: provider.apiKey,
             baseUrl: provider.baseUrl || undefined,
             model: provider.model || undefined,
+            zoneType: zone,
+            habitId: zone === 'habit' ? scope?.habitId : undefined,
         }),
     })
 
@@ -88,8 +110,8 @@ export async function sendChat(
     }
 }
 
-export async function getChatHistory(): Promise<ChatHistoryResponse> {
-    const res = await apiFetch('/chat/history')
+export async function getChatHistory(scope?: ChatScopeParam): Promise<ChatHistoryResponse> {
+    const res = await apiFetch(`/chat/history?${scopeQuery(scope)}`)
     if (!res.ok) throw new Error('Failed to load chat history')
     const data = await res.json()
     const messages = (data.messages ?? data.Messages ?? []) as Array<Record<string, unknown>>
@@ -103,9 +125,9 @@ export async function getChatHistory(): Promise<ChatHistoryResponse> {
     }
 }
 
-/** Reset conversation (messages + rolling summary). Keeps long-term memories. */
-export async function resetChatSession(): Promise<void> {
-    const res = await apiFetch('/chat/session', {
+/** Reset conversation (messages + rolling summary) for one zone. Keeps long-term memories. */
+export async function resetChatSession(scope?: ChatScopeParam): Promise<void> {
+    const res = await apiFetch(`/chat/session?${scopeQuery(scope)}`, {
         method: 'DELETE',
     })
     if (!res.ok) throw new Error('Failed to reset conversation')

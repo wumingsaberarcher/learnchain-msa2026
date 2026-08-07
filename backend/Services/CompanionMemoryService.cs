@@ -42,18 +42,27 @@ public class CompanionMemoryService
     public static int EstimateTokens(string text) =>
         Math.Max(1, (int)Math.Ceiling((text?.Length ?? 0) / 4.0));
 
-    public async Task<ChatSession> GetOrCreateSessionAsync(int userId, CancellationToken ct = default)
+    public async Task<ChatSession> GetOrCreateSessionAsync(
+        int userId,
+        string? zoneType = null,
+        int? habitId = null,
+        CancellationToken ct = default)
     {
+        var (zone, hid) = ChatZones.Normalize(zoneType, habitId);
+
         var session = await _db.ChatSessions
-            .Where(s => s.UserId == userId)
+            .Where(s => s.UserId == userId && s.ZoneType == zone && s.HabitId == hid)
             .OrderByDescending(s => s.UpdatedAt)
             .FirstOrDefaultAsync(ct);
 
         if (session != null) return session;
 
+        // Legacy rows (pre-zone columns defaulted to daily/0) already covered above.
         session = new ChatSession
         {
             UserId = userId,
+            ZoneType = zone,
+            HabitId = hid,
             Summary = string.Empty,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -102,10 +111,16 @@ public class CompanionMemoryService
     }
 
     public async Task<List<UserMemory>> GetRelevantMemoriesAsync(
-        int userId, string? latestUserText, int limit = MemoryInjectLimit, CancellationToken ct = default)
+        int userId,
+        string? latestUserText,
+        string? zoneType = null,
+        int? habitId = null,
+        int limit = MemoryInjectLimit,
+        CancellationToken ct = default)
     {
+        var (zone, hid) = ChatZones.Normalize(zoneType, habitId);
         var memories = await _db.UserMemories
-            .Where(m => m.UserId == userId && !m.IsDeleted)
+            .Where(m => m.UserId == userId && !m.IsDeleted && m.ZoneType == zone && m.HabitId == hid)
             .ToListAsync(ct);
 
         if (memories.Count == 0) return memories;
@@ -137,12 +152,23 @@ public class CompanionMemoryService
         return picked;
     }
 
-    public async Task<List<UserMemory>> ListMemoriesAsync(int userId, CancellationToken ct = default) =>
-        await _db.UserMemories
-            .Where(m => m.UserId == userId && !m.IsDeleted)
+    public async Task<List<UserMemory>> ListMemoriesAsync(
+        int userId,
+        string? zoneType = null,
+        int? habitId = null,
+        CancellationToken ct = default)
+    {
+        var query = _db.UserMemories.Where(m => m.UserId == userId && !m.IsDeleted);
+        if (!string.IsNullOrWhiteSpace(zoneType))
+        {
+            var (zone, hid) = ChatZones.Normalize(zoneType, habitId);
+            query = query.Where(m => m.ZoneType == zone && m.HabitId == hid);
+        }
+        return await query
             .OrderByDescending(m => m.Importance)
             .ThenByDescending(m => m.UpdatedAt)
             .ToListAsync(ct);
+    }
 
     public async Task<bool> SoftDeleteMemoryAsync(int userId, int memoryId, CancellationToken ct = default)
     {
@@ -154,10 +180,26 @@ public class CompanionMemoryService
         return true;
     }
 
-    /// <summary>Clear short-term + summary (keep long-term memories and game data).</summary>
-    public async Task ResetConversationAsync(int userId, CancellationToken ct = default)
+    /// <summary>Clear short-term + summary for one zone (or all zones if zoneType null).</summary>
+    public async Task ResetConversationAsync(
+        int userId,
+        string? zoneType = null,
+        int? habitId = null,
+        CancellationToken ct = default)
     {
-        var sessions = await _db.ChatSessions.Where(s => s.UserId == userId).ToListAsync(ct);
+        List<ChatSession> sessions;
+        if (string.IsNullOrWhiteSpace(zoneType))
+        {
+            sessions = await _db.ChatSessions.Where(s => s.UserId == userId).ToListAsync(ct);
+        }
+        else
+        {
+            var (zone, hid) = ChatZones.Normalize(zoneType, habitId);
+            sessions = await _db.ChatSessions
+                .Where(s => s.UserId == userId && s.ZoneType == zone && s.HabitId == hid)
+                .ToListAsync(ct);
+        }
+
         var sessionIds = sessions.Select(s => s.Id).ToList();
         if (sessionIds.Count > 0)
         {
@@ -171,7 +213,7 @@ public class CompanionMemoryService
     /// <summary>Clear conversation + long-term memories.</summary>
     public async Task ResetAllMemoryAsync(int userId, CancellationToken ct = default)
     {
-        await ResetConversationAsync(userId, ct);
+        await ResetConversationAsync(userId, zoneType: null, habitId: null, ct: ct);
         var memories = await _db.UserMemories.Where(m => m.UserId == userId).ToListAsync(ct);
         _db.UserMemories.RemoveRange(memories);
         await _db.SaveChangesAsync(ct);
@@ -215,7 +257,7 @@ public class CompanionMemoryService
                 session.Summary = result.Summary.Trim();
 
             foreach (var mem in result.Memories)
-                await UpsertMemoryAsync(user.Id, mem, ct);
+                await UpsertMemoryAsync(user.Id, session.ZoneType, session.HabitId, mem, ct);
 
             foreach (var msg in toArchive)
                 msg.IsArchived = true;
@@ -232,8 +274,14 @@ public class CompanionMemoryService
         }
     }
 
-    private async Task UpsertMemoryAsync(int userId, MemoryUpsertDto dto, CancellationToken ct)
+    private async Task UpsertMemoryAsync(
+        int userId,
+        string zoneType,
+        int habitId,
+        MemoryUpsertDto dto,
+        CancellationToken ct)
     {
+        var (zone, hid) = ChatZones.Normalize(zoneType, habitId);
         var type = NormalizeType(dto.Type);
         var key = (dto.Key ?? "").Trim();
         var content = (dto.Content ?? "").Trim();
@@ -242,7 +290,12 @@ public class CompanionMemoryService
 
         var importance = dto.Importance is >= 1 and <= 5 ? dto.Importance : 3;
         var existing = await _db.UserMemories.FirstOrDefaultAsync(m =>
-            m.UserId == userId && !m.IsDeleted && m.Type == type && m.Key == key, ct);
+            m.UserId == userId
+            && !m.IsDeleted
+            && m.ZoneType == zone
+            && m.HabitId == hid
+            && m.Type == type
+            && m.Key == key, ct);
 
         if (existing != null)
         {
@@ -256,6 +309,8 @@ public class CompanionMemoryService
             _db.UserMemories.Add(new UserMemory
             {
                 UserId = userId,
+                ZoneType = zone,
+                HabitId = hid,
                 Type = type,
                 Key = key.Length > 120 ? key[..120] : key,
                 Content = content.Length > 2000 ? content[..2000] : content,

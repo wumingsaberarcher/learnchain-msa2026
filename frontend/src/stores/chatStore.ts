@@ -5,6 +5,7 @@ import {
     sendChat,
     type ChatActionResult,
     type ChatMessagePayload,
+    type ChatZoneType,
 } from '../api/chatApi'
 import { useAiSettingsStore } from './aiSettingsStore'
 import { useCompanionStore } from './companionStore'
@@ -22,6 +23,17 @@ export interface UiChatMessage {
     emotion?: Emotion
 }
 
+export interface ChatScope {
+    zoneType: ChatZoneType
+    habitId: number | null
+}
+
+export const DAILY_SCOPE: ChatScope = { zoneType: 'daily', habitId: null }
+
+export function scopesEqual(a: ChatScope, b: ChatScope) {
+    return a.zoneType === b.zoneType && (a.habitId ?? 0) === (b.habitId ?? 0)
+}
+
 interface ChatState {
     isOpen: boolean
     messages: UiChatMessage[]
@@ -31,6 +43,7 @@ interface ChatState {
     error: string | null
     lastActions: ChatActionResult[]
     userId: number | null
+    scope: ChatScope
     toggle: () => void
     open: () => void
     close: () => void
@@ -38,16 +51,38 @@ interface ChatState {
     clearError: () => void
     clearHistory: () => Promise<void>
     hydrateForUser: (userId: number | null) => void
+    /** Switch daily ↔ habit learning zone (isolates transcript + server memory). */
+    setScope: (scope: ChatScope) => Promise<void>
     sendMessage: (text: string, language: 'zh' | 'en') => Promise<ChatActionResult[]>
     appendCompanionAside: (content: string, scene: 'idle' | 'focus', emotion?: Emotion) => void
+    appendLocalExchange: (userContent: string, assistantContent: string) => void
 }
 
-const historyKey = (userId: number) => `learnchain-chat-${userId}`
+export function historyKey(userId: number, scope: ChatScope) {
+    if (scope.zoneType === 'habit' && scope.habitId != null && scope.habitId > 0) {
+        return `learnchain-chat-${userId}-habit-${scope.habitId}`
+    }
+    return `learnchain-chat-${userId}-daily`
+}
 
-function loadLocalMessages(userId: number | null): UiChatMessage[] {
-    if (!userId) return []
+/** Migrate legacy unscoped key into daily once. */
+function migrateLegacyKey(userId: number) {
+    const legacy = `learnchain-chat-${userId}`
+    const daily = historyKey(userId, DAILY_SCOPE)
     try {
-        const raw = localStorage.getItem(historyKey(userId))
+        if (!localStorage.getItem(daily) && localStorage.getItem(legacy)) {
+            localStorage.setItem(daily, localStorage.getItem(legacy)!)
+        }
+    } catch {
+        /* ignore */
+    }
+}
+
+function loadLocalMessages(userId: number | null, scope: ChatScope): UiChatMessage[] {
+    if (!userId) return []
+    migrateLegacyKey(userId)
+    try {
+        const raw = localStorage.getItem(historyKey(userId, scope))
         if (!raw) return []
         const parsed = JSON.parse(raw) as UiChatMessage[]
         return Array.isArray(parsed) ? parsed : []
@@ -56,13 +91,37 @@ function loadLocalMessages(userId: number | null): UiChatMessage[] {
     }
 }
 
-function saveLocalMessages(userId: number | null, messages: UiChatMessage[]) {
+function saveLocalMessages(userId: number | null, scope: ChatScope, messages: UiChatMessage[]) {
     if (!userId) return
-    localStorage.setItem(historyKey(userId), JSON.stringify(messages.slice(-100)))
+    localStorage.setItem(historyKey(userId, scope), JSON.stringify(messages.slice(-100)))
 }
 
 function uid() {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+async function hydrateScope(userId: number, scope: ChatScope) {
+    const local = loadLocalMessages(userId, scope)
+    try {
+        const history = await getChatHistory(scope)
+        const asides = local.filter(m => m.kind === 'aside')
+        const mapped: UiChatMessage[] = history.messages
+            .filter(m => m.role === 'user' || m.role === 'assistant')
+            .map((m, i) => ({
+                id: `srv-${userId}-${scope.zoneType}-${scope.habitId ?? 0}-${i}-${m.createdAt}`,
+                role: m.role as 'user' | 'assistant',
+                content: m.content,
+                createdAt: Date.parse(m.createdAt) || Date.now(),
+                kind: 'chat' as const,
+            }))
+        const messages = mapped.length > 0
+            ? [...mapped, ...asides].sort((a, b) => a.createdAt - b.createdAt).slice(-100)
+            : local
+        saveLocalMessages(userId, scope, messages)
+        return messages
+    } catch {
+        return local
+    }
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -74,6 +133,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     error: null,
     lastActions: [],
     userId: null,
+    scope: DAILY_SCOPE,
 
     toggle: () => set(s => ({ isOpen: !s.isOpen, error: null })),
     open: () => set({ isOpen: true }),
@@ -82,11 +142,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     clearError: () => set({ error: null }),
 
     clearHistory: async () => {
-        const { userId } = get()
+        const { userId, scope } = get()
         set({ messages: [], lastActions: [], error: null })
-        if (userId) localStorage.removeItem(historyKey(userId))
+        if (userId) localStorage.removeItem(historyKey(userId, scope))
         try {
-            await resetChatSession()
+            await resetChatSession(scope)
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to reset conversation'
             set({ error: message })
@@ -94,9 +154,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     },
 
     hydrateForUser: (userId) => {
+        const scope = DAILY_SCOPE
         set({
             userId,
-            messages: loadLocalMessages(userId),
+            scope,
+            messages: loadLocalMessages(userId, scope),
             error: null,
             lastActions: [],
             isOpen: false,
@@ -106,29 +168,46 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         if (!userId) return
 
-        void getChatHistory()
-            .then(history => {
-                if (get().userId !== userId) return
-                const local = get().messages
-                const asides = local.filter(m => m.kind === 'aside')
-                const mapped: UiChatMessage[] = history.messages
-                    .filter(m => m.role === 'user' || m.role === 'assistant')
-                    .map((m, i) => ({
-                        id: `srv-${userId}-${i}-${m.createdAt}`,
-                        role: m.role as 'user' | 'assistant',
-                        content: m.content,
-                        createdAt: Date.parse(m.createdAt) || Date.now(),
-                        kind: 'chat' as const,
-                    }))
-                const messages = mapped.length > 0
-                    ? [...mapped, ...asides].sort((a, b) => a.createdAt - b.createdAt).slice(-100)
-                    : local
-                set({ messages, isHydrating: false })
-                saveLocalMessages(userId, messages)
-            })
-            .catch(() => {
-                if (get().userId === userId) set({ isHydrating: false })
-            })
+        void hydrateScope(userId, scope).then(messages => {
+            if (get().userId !== userId || !scopesEqual(get().scope, scope)) return
+            set({ messages, isHydrating: false })
+        })
+    },
+
+    setScope: async (next) => {
+        const { userId, scope, messages } = get()
+        const normalized: ChatScope =
+            next.zoneType === 'habit' && next.habitId != null && next.habitId > 0
+                ? { zoneType: 'habit', habitId: next.habitId }
+                : DAILY_SCOPE
+
+        if (scopesEqual(scope, normalized)) {
+            // Still refresh from server when re-entering same zone
+            if (userId) {
+                set({ isHydrating: true })
+                const msgs = await hydrateScope(userId, normalized)
+                if (get().userId === userId && scopesEqual(get().scope, normalized)) {
+                    set({ messages: msgs, isHydrating: false })
+                }
+            }
+            return
+        }
+
+        if (userId) saveLocalMessages(userId, scope, messages)
+
+        set({
+            scope: normalized,
+            messages: userId ? loadLocalMessages(userId, normalized) : [],
+            lastActions: [],
+            error: null,
+            isHydrating: !!userId,
+        })
+
+        if (!userId) return
+        const msgs = await hydrateScope(userId, normalized)
+        if (get().userId === userId && scopesEqual(get().scope, normalized)) {
+            set({ messages: msgs, isHydrating: false })
+        }
     },
 
     appendCompanionAside: (content, scene, emotion) => {
@@ -143,10 +222,35 @@ export const useChatStore = create<ChatState>((set, get) => ({
             scene,
             emotion,
         }
-        const messages = [...get().messages, msg]
-        set({ messages })
-        saveLocalMessages(get().userId, messages)
+        const { userId, scope } = get()
+        const next = [...get().messages, msg]
+        set({ messages: next })
+        saveLocalMessages(userId, scope, next)
         if (emotion) useCompanionStore.getState().setEmotion(emotion, true)
+    },
+
+    appendLocalExchange: (userContent, assistantContent) => {
+        const { userId, scope } = get()
+        const now = Date.now()
+        const next = [
+            ...get().messages,
+            {
+                id: uid(),
+                role: 'user' as const,
+                content: userContent,
+                createdAt: now,
+                kind: 'chat' as const,
+            },
+            {
+                id: uid(),
+                role: 'assistant' as const,
+                content: assistantContent,
+                createdAt: now + 1,
+                kind: 'chat' as const,
+            },
+        ].slice(-100)
+        set({ messages: next })
+        saveLocalMessages(userId, scope, next)
     },
 
     sendMessage: async (text, language) => {
@@ -167,9 +271,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
             kind: 'chat',
         }
 
+        const { userId, scope } = get()
         const nextMessages = [...get().messages, userMsg]
         set({ messages: nextMessages, isSending: true, error: null, lastActions: [] })
-        saveLocalMessages(get().userId, nextMessages)
+        saveLocalMessages(userId, scope, nextMessages)
         if (!useCompanionStore.getState().galModeOpen) {
             useCompanionStore.getState().setEmotion('normal', true)
         }
@@ -181,7 +286,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 apiKey: provider.apiKey,
                 baseUrl: provider.baseUrl,
                 model: provider.model,
-            })
+            }, scope)
 
             const assistantMsg: UiChatMessage = {
                 id: uid(),
@@ -196,7 +301,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 isSending: false,
                 lastActions: res.actionsExecuted,
             })
-            saveLocalMessages(get().userId, withAssistant)
+            saveLocalMessages(userId, scope, withAssistant)
             if (res.affectionPoints != null) {
                 const { useAffectionStore } = await import('./affectionStore')
                 useAffectionStore.getState().applyAward({
@@ -205,7 +310,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     tierKey: res.affectionTierKey,
                 })
             }
-            // Gal mode drives face via emotion timeline typewriter — skip one-shot react
             if (!useCompanionStore.getState().galModeOpen) {
                 useCompanionStore.getState().reactToText(res.reply, true)
                 window.setTimeout(() => {

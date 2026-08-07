@@ -110,7 +110,7 @@ export default function AiAssistant() {
                                     interactive
                                     title={t('chat.galEnterHint')}
                                     onMouseEnter={() => tryHoverSurprise()}
-                                    onClick={() => enterGalMode()}
+                                    onClick={() => enterGalMode({ zoneType: 'daily' })}
                                 />
                                 <div>
                                     <strong>{t('chat.title')}</strong>
@@ -156,7 +156,7 @@ export default function AiAssistant() {
                                     interactive
                                     title={t('chat.galEnterHint')}
                                     onMouseEnter={() => tryHoverSurprise()}
-                                    onClick={() => enterGalMode()}
+                                    onClick={() => enterGalMode({ zoneType: 'daily' })}
                                 />
                                 <span>Canal</span>
                             </div>

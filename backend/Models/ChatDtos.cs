@@ -16,6 +16,10 @@ public class ChatRequest
     public string? BaseUrl { get; set; }
     /// <summary>Defaults to gpt-4o-mini</summary>
     public string? Model { get; set; }
+    /// <summary>daily | habit</summary>
+    public string? ZoneType { get; set; }
+    /// <summary>Required when ZoneType is habit.</summary>
+    public int? HabitId { get; set; }
 }
 
 public class ChatActionResult
@@ -56,6 +60,8 @@ public class UserMemoryDto
     public string Content { get; set; } = string.Empty;
     public int Importance { get; set; }
     public DateTime UpdatedAt { get; set; }
+    public string ZoneType { get; set; } = ChatZones.Daily;
+    public int HabitId { get; set; }
 }
 
 public class ChatPreferencesDto

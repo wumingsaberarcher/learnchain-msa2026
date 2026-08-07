@@ -42,6 +42,10 @@ public static class DatabaseMigrator
             EnsureSqliteColumn(connection, "Users", "CompanionAffectionGainedToday", "INTEGER NOT NULL DEFAULT 0");
             EnsureSqliteColumn(connection, "Habits", "AssessmentEnabled", "INTEGER NOT NULL DEFAULT 0");
             EnsureSqliteColumn(connection, "Habits", "AssessmentDifficulty", "TEXT NOT NULL DEFAULT 'easy'");
+            EnsureSqliteColumn(connection, "ChatSessions", "ZoneType", "TEXT NOT NULL DEFAULT 'daily'");
+            EnsureSqliteColumn(connection, "ChatSessions", "HabitId", "INTEGER NOT NULL DEFAULT 0");
+            EnsureSqliteColumn(connection, "UserMemories", "ZoneType", "TEXT NOT NULL DEFAULT 'daily'");
+            EnsureSqliteColumn(connection, "UserMemories", "HabitId", "INTEGER NOT NULL DEFAULT 0");
 
             using var achievementCmd = connection.CreateCommand();
             achievementCmd.CommandText = """
@@ -162,6 +166,10 @@ public static class DatabaseMigrator
             EnsurePostgresColumn(connection, "CheckIns", "MilestoneId", "integer NULL");
             EnsurePostgresColumn(connection, "Habits", "AssessmentEnabled", "boolean NOT NULL DEFAULT false");
             EnsurePostgresColumn(connection, "Habits", "AssessmentDifficulty", "text NOT NULL DEFAULT 'easy'");
+            EnsurePostgresColumn(connection, "ChatSessions", "ZoneType", "text NOT NULL DEFAULT 'daily'");
+            EnsurePostgresColumn(connection, "ChatSessions", "HabitId", "integer NOT NULL DEFAULT 0");
+            EnsurePostgresColumn(connection, "UserMemories", "ZoneType", "text NOT NULL DEFAULT 'daily'");
+            EnsurePostgresColumn(connection, "UserMemories", "HabitId", "integer NOT NULL DEFAULT 0");
 
             using (var materialsCmd = connection.CreateCommand())
             {

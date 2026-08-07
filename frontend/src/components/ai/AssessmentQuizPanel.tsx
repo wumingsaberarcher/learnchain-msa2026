@@ -225,35 +225,10 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
           dailyCap: result.affection.dailyCap,
         })
       }
-      const chat = useChatStore.getState()
-      const userId = chat.userId
-      if (userId != null) {
-        // Persist critique into local chat history for Gal history mode.
-        const now = Date.now()
-        const msgs = [
-          ...chat.messages,
-          {
-            id: `assess-u-${now}`,
-            role: 'user' as const,
-            content: t('assess.historyUser', { name: habitName }),
-            createdAt: now,
-            kind: 'chat' as const,
-          },
-          {
-            id: `assess-a-${now}`,
-            role: 'assistant' as const,
-            content: `${result.critique}\n${result.summary}`,
-            createdAt: now + 1,
-            kind: 'chat' as const,
-          },
-        ]
-        useChatStore.setState({ messages: msgs.slice(-100) })
-        try {
-          localStorage.setItem(`learnchain-chat-${userId}`, JSON.stringify(msgs.slice(-100)))
-        } catch {
-          /* ignore */
-        }
-      }
+      useChatStore.getState().appendLocalExchange(
+        t('assess.historyUser', { name: habitName }),
+        `${result.critique}\n${result.summary}`,
+      )
       // Short answer highlights from last short item if any
       const lastShort = [...result.results].reverse().find((r) => (r.highlights?.length || 0) > 0)
       if (lastShort) {

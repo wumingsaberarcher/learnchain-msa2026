@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { History, LogOut, MessageSquare, Mic, Send, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from 'react'
+import { ChevronDown, ChevronUp, History, LogOut, MessageSquare, Mic, Send, X } from 'lucide-react'
 import { useChatStore, type UiChatMessage } from '../../stores/chatStore'
 import { useCompanionStore } from '../../stores/companionStore'
 import { useAssessmentStore } from '../../stores/assessmentStore'
@@ -49,6 +49,7 @@ export default function GalgameStage() {
   const [blockMutter, setBlockMutter] = useState(false)
   const [viewMode, setViewMode] = useState<GalViewMode>('dialogue')
   const [hoverTickId, setHoverTickId] = useState<string | null>(null)
+  const [tickPreviewTop, setTickPreviewTop] = useState(40)
 
   const timelineRef = useRef<EmotionCue[]>([])
   const typeTimerRef = useRef<number | null>(null)
@@ -64,6 +65,8 @@ export default function GalgameStage() {
   const blockCooldownRef = useRef(0)
   const wasOverFaceRef = useRef(false)
   const historyListRef = useRef<HTMLDivElement>(null)
+  const tickRailRef = useRef<HTMLDivElement>(null)
+  const tickTrackRef = useRef<HTMLDivElement>(null)
   const playedCanalLineRef = useRef<string | null>(null)
 
   const historyMessages = useMemo(
@@ -275,6 +278,39 @@ export default function GalgameStage() {
     })
   }
 
+  const onTickRailWheel = (e: WheelEvent<HTMLDivElement>) => {
+    const track = tickTrackRef.current
+    if (!track) return
+    e.preventDefault()
+    e.stopPropagation()
+    track.scrollTop += e.deltaY
+  }
+
+  const scrollTicksTo = (edge: 'start' | 'end') => {
+    const track = tickTrackRef.current
+    if (!track) return
+    track.scrollTo({
+      top: edge === 'start' ? 0 : track.scrollHeight,
+      behavior: 'smooth',
+    })
+    if (historyMessages.length > 0) {
+      const target = edge === 'start'
+        ? historyMessages[0]
+        : historyMessages[historyMessages.length - 1]
+      if (target) scrollToMessage(target.id)
+    }
+  }
+
+  const onTickHover = (m: UiChatMessage, el: HTMLElement) => {
+    setHoverTickId(m.id)
+    const rail = tickRailRef.current
+    if (!rail) return
+    const railRect = rail.getBoundingClientRect()
+    const btnRect = el.getBoundingClientRect()
+    const top = btnRect.top - railRect.top + btnRect.height / 2
+    setTickPreviewTop(Math.max(28, Math.min(railRect.height - 40, top)))
+  }
+
   const hoverMsg = historyMessages.find((m) => m.id === hoverTickId)
   const errorText = error === 'missing_api_key' ? t('chat.missingApiKey') : error
 
@@ -338,20 +374,43 @@ export default function GalgameStage() {
 
       {assessmentActive && <AssessmentQuizPanel onCanalSpeak={playLine} />}
 
-      <div className="gal-tick-rail" aria-label={t('chat.galTimeline')}>
-        {historyMessages.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            className={`gal-tick ${m.role === 'assistant' ? 'long' : 'short'}${hoverTickId === m.id ? ' hover' : ''}`}
-            onMouseEnter={() => setHoverTickId(m.id)}
-            onMouseLeave={() => setHoverTickId(null)}
-            onClick={() => scrollToMessage(m.id)}
-            title={m.content.slice(0, 40)}
-          />
-        ))}
+      <div
+        className="gal-tick-rail"
+        aria-label={t('chat.galTimeline')}
+        ref={tickRailRef}
+        onWheel={onTickRailWheel}
+      >
+        <button
+          type="button"
+          className="gal-tick-edge"
+          title={t('chat.galTimelineTop')}
+          onClick={() => scrollTicksTo('start')}
+        >
+          <ChevronUp className="w-3.5 h-3.5" />
+        </button>
+        <div className="gal-tick-track" ref={tickTrackRef}>
+          {historyMessages.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className={`gal-tick ${m.role === 'assistant' ? 'long' : 'short'}${hoverTickId === m.id ? ' hover' : ''}`}
+              onMouseEnter={(e) => onTickHover(m, e.currentTarget)}
+              onMouseLeave={() => setHoverTickId(null)}
+              onClick={() => scrollToMessage(m.id)}
+              title={m.content.slice(0, 40)}
+            />
+          ))}
+        </div>
+        <button
+          type="button"
+          className="gal-tick-edge"
+          title={t('chat.galTimelineBottom')}
+          onClick={() => scrollTicksTo('end')}
+        >
+          <ChevronDown className="w-3.5 h-3.5" />
+        </button>
         {hoverMsg && (
-          <div className="gal-tick-preview" role="tooltip">
+          <div className="gal-tick-preview" role="tooltip" style={{ top: tickPreviewTop }}>
             <strong>{hoverMsg.role === 'assistant' ? 'Canal' : 'You'}</strong>
             <p>{hoverMsg.content.slice(0, 40)}{hoverMsg.content.length > 40 ? '…' : ''}</p>
           </div>

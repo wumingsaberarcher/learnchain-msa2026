@@ -82,7 +82,7 @@ interface CompanionState {
   setEmotion: (emotion: Emotion, talking?: boolean) => void
   reactToText: (text: string, talking?: boolean) => void
   tryHoverSurprise: () => void
-  enterGalMode: () => void
+  enterGalMode: (opts?: { zoneType?: 'daily' | 'habit'; habitId?: number | null }) => void
   exitGalMode: () => void
   clearGalSmoke: () => void
   setUserAvatarFromFile: (file: File) => Promise<void>
@@ -142,16 +142,26 @@ export const useCompanionStore = create<CompanionState>((set, get) => ({
     })
   },
 
-  enterGalMode: () => {
+  enterGalMode: (opts) => {
     const { userId } = get()
     if (userId != null) saveFlag(userId, 'gal', true)
-    set({
-      hasEnteredGalMode: true,
-      galModeOpen: true,
-      galSmokePlaying: true,
-      emotion: 'normal',
-      isTalking: false,
-    })
+    const zoneType = opts?.zoneType === 'habit' && opts.habitId != null && opts.habitId > 0
+      ? 'habit' as const
+      : 'daily' as const
+    const habitId = zoneType === 'habit' ? opts!.habitId! : null
+    void (async () => {
+      const { useChatStore, DAILY_SCOPE } = await import('./chatStore')
+      await useChatStore.getState().setScope(
+        zoneType === 'habit' ? { zoneType: 'habit', habitId } : DAILY_SCOPE,
+      )
+      set({
+        hasEnteredGalMode: true,
+        galModeOpen: true,
+        galSmokePlaying: true,
+        emotion: 'normal',
+        isTalking: false,
+      })
+    })()
   },
 
   exitGalMode: () => {
@@ -163,6 +173,10 @@ export const useCompanionStore = create<CompanionState>((set, get) => ({
     })
     void import('./assessmentStore').then(({ useAssessmentStore }) => {
       useAssessmentStore.getState().close()
+    })
+    // Return sidebar chat to daily zone when leaving Gal.
+    void import('./chatStore').then(({ useChatStore, DAILY_SCOPE }) => {
+      void useChatStore.getState().setScope(DAILY_SCOPE)
     })
   },
 

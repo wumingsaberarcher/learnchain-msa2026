@@ -1,9 +1,27 @@
 namespace backend.Models;
 
+public static class ChatZones
+{
+    public const string Daily = "daily";
+    public const string Habit = "habit";
+
+    public static (string ZoneType, int HabitId) Normalize(string? zoneType, int? habitId)
+    {
+        var z = (zoneType ?? Daily).Trim().ToLowerInvariant();
+        if (z == Habit && habitId is > 0)
+            return (Habit, habitId.Value);
+        return (Daily, 0);
+    }
+}
+
 public class ChatSession
 {
     public int Id { get; set; }
     public int UserId { get; set; }
+    /// <summary>daily | habit</summary>
+    public string ZoneType { get; set; } = ChatZones.Daily;
+    /// <summary>0 for daily zone; habit id for learning zones.</summary>
+    public int HabitId { get; set; }
     /// <summary>Rolling summary of older conversation (L2).</summary>
     public string Summary { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -33,6 +51,10 @@ public class UserMemory
 {
     public int Id { get; set; }
     public int UserId { get; set; }
+    /// <summary>daily | habit — isolates long-term memory by Gal zone.</summary>
+    public string ZoneType { get; set; } = ChatZones.Daily;
+    /// <summary>0 for daily; habit id for per-habit learning memories.</summary>
+    public int HabitId { get; set; }
     /// <summary>preference | fact | event | relationship</summary>
     public string Type { get; set; } = MemoryTypes.Fact;
     public string Key { get; set; } = string.Empty;
