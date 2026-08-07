@@ -18,7 +18,7 @@ export interface UiChatMessage {
     content: string
     createdAt: number
     /** Local-only aside lines from idle/focus peek (not sent to LLM). */
-    kind?: 'chat' | 'aside'
+    kind?: 'chat' | 'aside' | 'chatter'
     scene?: CompanionScene
     emotion?: Emotion
 }
@@ -96,15 +96,32 @@ function saveLocalMessages(userId: number | null, scope: ChatScope, messages: Ui
     localStorage.setItem(historyKey(userId, scope), JSON.stringify(messages.slice(-100)))
 }
 
+function messageKindForScope(scope: ChatScope): 'chat' | 'chatter' {
+    return scope.zoneType === 'habit' && scope.habitId != null && scope.habitId > 0
+        ? 'chat'
+        : 'chatter'
+}
+
 function uid() {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
 async function hydrateScope(userId: number, scope: ChatScope) {
     const local = loadLocalMessages(userId, scope)
+    const msgKind = messageKindForScope(scope)
     try {
         const history = await getChatHistory(scope)
         const asides = local.filter(m => m.kind === 'aside')
+        // Daily chatter is not formal conversation history — keep live continuity locally,
+        // but do not promote server rows into "对话记录" (kind: chat).
+        if (msgKind === 'chatter') {
+            const localChatty = local.filter(m => m.kind !== 'aside')
+            const messages = [...localChatty, ...asides]
+                .sort((a, b) => a.createdAt - b.createdAt)
+                .slice(-100)
+            saveLocalMessages(userId, scope, messages)
+            return messages
+        }
         const mapped: UiChatMessage[] = history.messages
             .filter(m => m.role === 'user' || m.role === 'assistant')
             .map((m, i) => ({
@@ -263,15 +280,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
             return []
         }
 
+        const { userId, scope } = get()
+        const kind = messageKindForScope(scope)
         const userMsg: UiChatMessage = {
             id: uid(),
             role: 'user',
             content: trimmed,
             createdAt: Date.now(),
-            kind: 'chat',
+            kind,
         }
 
-        const { userId, scope } = get()
         const nextMessages = [...get().messages, userMsg]
         set({ messages: nextMessages, isSending: true, error: null, lastActions: [] })
         saveLocalMessages(userId, scope, nextMessages)
@@ -293,7 +311,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 role: 'assistant',
                 content: res.reply,
                 createdAt: Date.now(),
-                kind: 'chat',
+                kind,
             }
             const withAssistant = [...get().messages, assistantMsg]
             set({

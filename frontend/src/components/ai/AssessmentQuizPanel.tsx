@@ -24,6 +24,22 @@ function fileKind(name: string) {
   return 'txt'
 }
 
+/** Treat as short-answer whenever options are missing/unusable (avoids blank quiz UI). */
+function isShortQuestion(q: AssessmentQuestion) {
+  const t = (q.type || '').toLowerCase()
+  if (
+    t.includes('short')
+    || t.includes('essay')
+    || t === 'qa'
+    || t.includes('open')
+    || t.includes('text')
+  ) {
+    return true
+  }
+  const usable = (q.options || []).filter((o) => (o.text || '').trim().length > 0)
+  return usable.length < 2
+}
+
 function highlightAnswer(text: string, highlights: { start: number; end: number }[]) {
   if (!highlights.length) return [{ text, kind: 'plain' as const }]
   const sorted = [...highlights].sort((a, b) => a.start - b.start)
@@ -151,7 +167,10 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
         model,
         language,
       })
-      setQuestions(data.questions)
+      const normalized = data.questions.map((q) =>
+        isShortQuestion(q) ? { ...q, type: 'short' } : { ...q, type: 'mcq' },
+      )
+      setQuestions(normalized)
       onCanalSpeak?.(t('assess.startLine', { name: habitName }))
     } catch (e) {
       setPhase('ready')
@@ -173,12 +192,13 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
   }
 
   const submitShort = async () => {
-    if (!question || !shortDraft.trim()) return
-    setAnswer(question.id, { textAnswer: shortDraft.trim() })
+    if (!question || !shortDraft.trim() || busy) return
+    const textAnswer = shortDraft.trim()
+    setAnswer(question.id, { textAnswer })
     if (currentIndex < questions.length - 1) {
       nextQuestion()
     } else {
-      await finishGrade()
+      await finishGrade({ [question.id]: { textAnswer } })
     }
   }
 
@@ -191,7 +211,9 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
     await finishGrade()
   }
 
-  const finishGrade = async () => {
+  const finishGrade = async (
+    answerOverride?: Record<string, { selectedOptionId?: string; textAnswer?: string }>,
+  ) => {
     if (!apiKey.trim()) {
       setError(t('chat.missingApiKey'))
       return
@@ -199,13 +221,21 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
     setBusy(true)
     setPhase('grading')
     try {
-      const payloadAnswers = questions.map((q) => ({
-        questionId: q.id,
-        type: q.type,
-        selectedOptionId: answers[q.id]?.selectedOptionId,
-        textAnswer: answers[q.id]?.textAnswer,
-        question: q,
-      }))
+      const latestAnswers = {
+        ...useAssessmentStore.getState().answers,
+        ...answerOverride,
+      }
+      const payloadAnswers = questions.map((q) => {
+        const asShort = isShortQuestion(q)
+        const normalized = asShort ? { ...q, type: 'short' as const } : { ...q, type: 'mcq' as const }
+        return {
+          questionId: q.id,
+          type: asShort ? 'short' : 'mcq',
+          selectedOptionId: latestAnswers[q.id]?.selectedOptionId,
+          textAnswer: latestAnswers[q.id]?.textAnswer,
+          question: normalized,
+        }
+      })
       const result = await gradeAssessment({
         habitId,
         difficulty,
@@ -371,13 +401,13 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
               </div>
               <h3 className="assess-prompt">{question.prompt}</h3>
 
-              {question.type === 'short' ? (
+              {isShortQuestion(question) ? (
                 <div className="assess-short">
                   <textarea
                     className="assess-textarea"
-                    rows={5}
+                    rows={6}
                     value={shortDraft}
-                    disabled={phase === 'revealing'}
+                    disabled={busy || phase === 'grading'}
                     placeholder={t('assess.shortPlaceholder')}
                     onChange={(e) => setShortDraft(e.target.value)}
                   />
@@ -388,6 +418,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
                       disabled={!speech.supported || busy}
                       onClick={() => speech.toggle()}
                       title={speech.supported ? t('chat.voice') : t('chat.voiceUnsupported')}
+                      aria-label={speech.supported ? t('chat.voice') : t('chat.voiceUnsupported')}
                     >
                       {shortListening ? (
                         <VoiceVolumeIcon level={speech.volumeLevel} className="w-4 h-4" />
@@ -397,11 +428,12 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
                     </button>
                     <button
                       type="button"
-                      className="assess-primary"
+                      className="assess-primary assess-submit"
                       disabled={!shortDraft.trim() || busy}
                       onClick={() => void submitShort()}
                     >
-                      {currentIndex < questions.length - 1 ? t('assess.next') : t('assess.finish')}
+                      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                      {currentIndex < questions.length - 1 ? t('assess.submitAnswer') : t('assess.finish')}
                     </button>
                   </div>
                 </div>

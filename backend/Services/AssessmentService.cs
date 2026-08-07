@@ -364,38 +364,59 @@ public class AssessmentService
         {
             if (item is not JsonObject o) continue;
             i++;
-            var type = (o["type"]?.GetValue<string>() ?? "mcq").Trim().ToLowerInvariant();
-            if (type == "short" && !allowShort) type = "mcq";
-            if (type != "short" && type != "mcq") type = "mcq";
+            var typeRaw = (o["type"]?.GetValue<string>() ?? "mcq").Trim().ToLowerInvariant();
+            var type = NormalizeQuestionType(typeRaw);
 
             var q = new AssessmentQuestionDto
             {
                 Id = o["id"]?.GetValue<string>() ?? $"q{i}",
                 Type = type,
                 Prompt = o["prompt"]?.GetValue<string>() ?? "",
-                CorrectOptionId = o["correctOptionId"]?.GetValue<string>(),
-                ReferenceAnswer = o["referenceAnswer"]?.GetValue<string>(),
-                MaxScore = o["maxScore"]?.GetValue<int>() ?? (type == "short" ? 5 : 1)
+                CorrectOptionId = o["correctOptionId"]?.GetValue<string>()
+                    ?? o["correct_option_id"]?.GetValue<string>(),
+                ReferenceAnswer = o["referenceAnswer"]?.GetValue<string>()
+                    ?? o["reference_answer"]?.GetValue<string>(),
+                MaxScore = o["maxScore"]?.GetValue<int>()
+                    ?? o["max_score"]?.GetValue<int>()
+                    ?? (type == "short" ? 5 : 1)
             };
+
+            var options = new List<AssessmentOptionDto>();
+            if (o["options"] is JsonArray opts)
+            {
+                foreach (var opt in opts)
+                {
+                    if (opt is not JsonObject oo) continue;
+                    var oid = oo["id"]?.GetValue<string>() ?? "";
+                    var otext = oo["text"]?.GetValue<string>() ?? "";
+                    if (string.IsNullOrWhiteSpace(oid) && string.IsNullOrWhiteSpace(otext)) continue;
+                    if (string.IsNullOrWhiteSpace(oid)) oid = ((char)('a' + options.Count)).ToString();
+                    options.Add(new AssessmentOptionDto { Id = oid, Text = otext });
+                }
+            }
+
+            // MCQ without usable choices → treat as short so the UI always has an answer box.
+            if (type == "mcq" && options.Count < 2)
+                type = "short";
+
+            // On easy/medium prefer MCQ when options exist; otherwise keep short rather than blank UI.
+            if (type == "short" && !allowShort && options.Count >= 2)
+                type = "mcq";
+
+            q.Type = type;
+            q.MaxScore = q.MaxScore > 0 ? q.MaxScore : (type == "short" ? 5 : 1);
 
             if (type == "mcq")
             {
-                var options = new List<AssessmentOptionDto>();
-                if (o["options"] is JsonArray opts)
-                {
-                    foreach (var opt in opts)
-                    {
-                        if (opt is not JsonObject oo) continue;
-                        options.Add(new AssessmentOptionDto
-                        {
-                            Id = oo["id"]?.GetValue<string>() ?? "",
-                            Text = oo["text"]?.GetValue<string>() ?? ""
-                        });
-                    }
-                }
                 q.Options = options;
                 if (string.IsNullOrWhiteSpace(q.CorrectOptionId) && options.Count > 0)
                     q.CorrectOptionId = options[0].Id;
+            }
+            else
+            {
+                q.Options = null;
+                if (string.IsNullOrWhiteSpace(q.ReferenceAnswer))
+                    q.ReferenceAnswer = o["answer"]?.GetValue<string>() ?? "";
             }
 
             if (!string.IsNullOrWhiteSpace(q.Prompt))
@@ -450,6 +471,16 @@ public class AssessmentService
         var content = node["choices"]?[0]?["message"]?["content"]?.GetValue<string>()
             ?? throw new InvalidOperationException("Empty LLM content.");
         return content;
+    }
+
+    private static string NormalizeQuestionType(string raw)
+    {
+        var t = (raw ?? "mcq").Trim().ToLowerInvariant();
+        if (t is "short" or "short_answer" or "shortanswer" or "essay" or "qa" or "open" or "text"
+            || t.Contains("short", StringComparison.Ordinal)
+            || t.Contains("问答", StringComparison.Ordinal))
+            return "short";
+        return "mcq";
     }
 
     private static string StripFences(string raw)

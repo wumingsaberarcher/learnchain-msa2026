@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, History, LogOut, MessageSquare, Mic, Send, X } from 'lucide-react'
 import { useChatStore, type UiChatMessage } from '../../stores/chatStore'
 import { useCompanionStore } from '../../stores/companionStore'
@@ -70,9 +70,14 @@ export default function GalgameStage() {
   const playedCanalLineRef = useRef<string | null>(null)
 
   const historyMessages = useMemo(
-    () => messages.filter((m) => m.kind !== 'aside' && (m.role === 'user' || m.role === 'assistant')),
+    () =>
+      messages.filter(
+        (m) => m.kind === 'chat' && (m.role === 'user' || m.role === 'assistant'),
+      ),
     [messages],
   )
+  const chatScope = useChatStore((s) => s.scope)
+  const isDailyChatter = chatScope.zoneType !== 'habit'
 
   const stopTypewriter = useCallback(() => {
     if (typeTimerRef.current != null) {
@@ -278,13 +283,20 @@ export default function GalgameStage() {
     })
   }
 
-  const onTickRailWheel = (e: WheelEvent<HTMLDivElement>) => {
+  // Non-passive wheel so we can scroll the tick track without console errors.
+  useEffect(() => {
+    const rail = tickRailRef.current
     const track = tickTrackRef.current
-    if (!track) return
-    e.preventDefault()
-    e.stopPropagation()
-    track.scrollTop += e.deltaY
-  }
+    if (!rail || !track) return
+    const onWheel = (e: Event) => {
+      const we = e as globalThis.WheelEvent
+      e.preventDefault()
+      e.stopPropagation()
+      track.scrollTop += we.deltaY
+    }
+    rail.addEventListener('wheel', onWheel, { passive: false })
+    return () => rail.removeEventListener('wheel', onWheel)
+  }, [historyMessages.length])
 
   const scrollTicksTo = (edge: 'start' | 'end') => {
     const track = tickTrackRef.current
@@ -378,7 +390,6 @@ export default function GalgameStage() {
         className="gal-tick-rail"
         aria-label={t('chat.galTimeline')}
         ref={tickRailRef}
-        onWheel={onTickRailWheel}
       >
         <button
           type="button"
@@ -421,7 +432,9 @@ export default function GalgameStage() {
         {viewMode === 'history' ? (
           <div className="gal-history-panel" ref={historyListRef}>
             {historyMessages.length === 0 ? (
-              <p className="gal-history-empty">{language.startsWith('zh') ? '还没有对话记录' : 'No messages yet'}</p>
+              <p className="gal-history-empty">
+                {isDailyChatter ? t('chat.galHistoryChatterOnly') : t('chat.galHistoryEmpty')}
+              </p>
             ) : (
               historyMessages.map((m: UiChatMessage) => (
                 <div

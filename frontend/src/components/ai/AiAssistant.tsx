@@ -203,11 +203,12 @@ export default function AiAssistant() {
                             )}
                             {messages.map(m => {
                                 const isAside = m.kind === 'aside'
+                                const isChatter = m.kind === 'chatter'
                                 const isUser = m.role === 'user'
                                 return (
                                     <div
                                         key={m.id}
-                                        className={`ai-msg-row ${isUser ? 'user' : 'assistant'}${isAside ? ' aside' : ''}`}
+                                        className={`ai-msg-row ${isUser ? 'user' : 'assistant'}${isAside ? ' aside' : ''}${isChatter ? ' chatter' : ''}`}
                                     >
                                         {!isUser && (
                                             <CanalAvatar
@@ -215,11 +216,14 @@ export default function AiAssistant() {
                                                 size="sm"
                                             />
                                         )}
-                                        <div className={`ai-bubble ai-bubble-${m.role}${isAside ? ' aside' : ''}`}>
+                                        <div className={`ai-bubble ai-bubble-${m.role}${isAside ? ' aside' : ''}${isChatter ? ' chatter' : ''}`}>
                                             {isAside && (
                                                 <span className="ai-aside-tag">
                                                     {m.scene === 'focus' ? t('chat.asideFocus') : t('chat.asideIdle')}
                                                 </span>
+                                            )}
+                                            {isChatter && !isUser && (
+                                                <span className="ai-aside-tag">{t('chat.chatterTag')}</span>
                                             )}
                                             {m.content}
                                         </div>

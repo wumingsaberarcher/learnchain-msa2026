@@ -62,9 +62,12 @@ public class AiAssistantService
         var session = await _memory.GetOrCreateSessionAsync(user.Id, request.ZoneType, request.HabitId, ct);
         await _memory.AppendMessageAsync(session, "user", latestUser.Content, ct);
 
+        var isDaily = session.ZoneType != ChatZones.Habit || session.HabitId <= 0;
         var contextJson = await _habitContext.BuildContextJsonAsync(user);
-        var memories = await _memory.GetRelevantMemoriesAsync(
-            user.Id, latestUser.Content, request.ZoneType, request.HabitId, ct: ct);
+        var memories = isDaily
+            ? new List<UserMemory>()
+            : await _memory.GetRelevantMemoriesAsync(
+                user.Id, latestUser.Content, request.ZoneType, request.HabitId, ct: ct);
         var recent = await _memory.GetRecentActiveMessagesAsync(
             session.Id, CompanionMemoryService.ShortTermMessageLimit, ct);
 
@@ -159,20 +162,24 @@ public class AiAssistantService
         }
 
         await _memory.AppendMessageAsync(session, "assistant", finalReply!, ct);
-        try
+        // Daily chatter stays short-term only — do not fold into lasting conversation records / memories.
+        if (!isDaily)
         {
-            await _memory.MaybeSummarizeAsync(session, user, apiKey, baseUrl, model, zh, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Companion summarize failed after chat; continuing with reply");
+            try
+            {
+                await _memory.MaybeSummarizeAsync(session, user, apiKey, baseUrl, model, zh, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Companion summarize failed after chat; continuing with reply");
+            }
         }
 
         return new ChatResponse
         {
             Reply = finalReply!,
             ActionsExecuted = actions,
-            SummaryUpdated = !string.IsNullOrWhiteSpace(session.Summary)
+            SummaryUpdated = !isDaily && !string.IsNullOrWhiteSpace(session.Summary)
         };
     }
 
@@ -199,13 +206,53 @@ public class AiAssistantService
             ? $"与用户的真实好感度：{affection.Points}/{affection.MaxPoints}（阶段 {affection.TierKey}，今日已获 {affection.GainedToday}/{affection.DailyCap}）。语气随羁绊自然亲近一些，但不要报出精确数字，除非用户问起。"
             : $"Real affection with the user: {affection.Points}/{affection.MaxPoints} (tier {affection.TierKey}, today {affection.GainedToday}/{affection.DailyCap}). Sound a bit closer as the bond grows; do not recite exact numbers unless asked.";
 
-        var zoneLine = zoneType == ChatZones.Habit && habitId > 0
-            ? (zh
-                ? $"当前是习惯学习区（habitId={habitId}）：只使用本区记忆与本区对话摘要，不要把日常闲聊区的记忆混进来。专注该习惯的学习/考核相关话题。"
-                : $"You are in a habit learning zone (habitId={habitId}): use only this zone's memories and summary—do not mix in daily-chat memories. Focus on study/assessment for this habit.")
-            : (zh
-                ? "当前是日常对话区：只使用日常区记忆与摘要，不要混入各习惯学习区的记忆。"
-                : "You are in the daily chat zone: use only daily-zone memories and summary—do not mix habit learning-zone memories.");
+        var isHabitZone = zoneType == ChatZones.Habit && habitId > 0;
+
+        if (!isHabitZone)
+        {
+            // Daily casual zone — chitchat + cold knowledge; not a formal conversation log.
+            return zh
+                ? $$"""
+                    你是 LearnChain 的伙伴 Canal。当前是【日常闲聊区】——轻松聊天，不是正式学习记录。
+                    请始终用简体中文回复。
+                    {{bondLine}}
+
+                    闲聊人设：
+                    - 就是闲聊：轻松、俏皮、短句为主，像朋友随口聊，不要端着导师腔。
+                    - 可以主动或应景抛一点「冷知识」科普（地理、海洋、生物优先；也可天文/气象），每次一两句点到为止，别写成小作文或课堂讲义。
+                    - 用户想聊习惯/打卡时再帮忙；默认不要主动催作业、不要考试式追问。
+                    - 不要把闲聊内容当成需要长期记住的「正式档案」。
+                    - 不能替用户打卡；不能改已有习惯的类型/难度。
+
+                    若用户明确要管习惯，可用工具；创建习惯时对方说「随便」就直接定 Daily 名与难度 1–3。
+                    XP 仅由难度决定（1→10，2→20，3→30）。
+
+                    当前游戏状态（需要时再提，别每句汇报）：
+                    {{contextJson}}
+                    """
+                : $$"""
+                    You are Canal, LearnChain's companion. This is the 【daily chitchat zone】 — casual talk, not a formal study log.
+                    Always reply in English.
+                    {{bondLine}}
+
+                    Casual vibe:
+                    - Keep it light, playful, mostly short replies — like a friend chatting, not a tutor lecture.
+                    - Feel free to drop tiny "cold facts" (geography, ocean, biology preferred; astronomy/weather ok) — one or two sentences, never a lecture.
+                    - Help with habits only when the user asks; don't nag check-ins or quiz them by default.
+                    - Do not treat this chitchat as lasting formal conversation archives.
+                    - You cannot check in for the user; you cannot change habit type/difficulty after creation.
+
+                    Use tools when they clearly want habit help. If they say "whatever/any", create a Daily habit with difficulty 1–3 immediately.
+                    XP maps from difficulty only (1→10, 2→20, 3→30).
+
+                    Current game state (mention only when useful):
+                    {{contextJson}}
+                    """;
+        }
+
+        var zoneLine = zh
+            ? $"当前是习惯学习区（habitId={habitId}）：只使用本区记忆与本区对话摘要，不要把日常闲聊区的记忆混进来。专注该习惯的学习/考核相关话题。这里的对话会计入学习区对话记录。"
+            : $"You are in a habit learning zone (habitId={habitId}): use only this zone's memories and summary—do not mix in daily-chat memories. Focus on study/assessment for this habit. These messages count as formal learning-zone conversation history.";
 
         return $"""
             You are LearnChain's friendly habit coach companion — not just a tool.
