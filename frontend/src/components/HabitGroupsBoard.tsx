@@ -25,11 +25,11 @@ import {
   type HabitGroupMaterialDto,
 } from '../api/habitGroupApi'
 import { triggerGroupPractice } from '../stores/assessmentStore'
+import { useHabitStore } from '../stores/habitStore'
 import { useTranslation } from '../stores/languageStore'
 
 type Props = {
   habits: Habit[]
-  onHabitsChanged: () => void
   renderHabit: (habit: Habit) => ReactNode
 }
 
@@ -44,8 +44,10 @@ function normalizeGroup(raw: HabitGroup & { Name?: string; Description?: string 
   }
 }
 
-export default function HabitGroupsBoard({ habits, onHabitsChanged, renderHabit }: Props) {
+export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
   const { t } = useTranslation()
+  const patchHabitLocal = useHabitStore((s) => s.patchHabitLocal)
+  const patchHabitsLocal = useHabitStore((s) => s.patchHabitsLocal)
   const [groups, setGroups] = useState<HabitGroup[]>([])
   const [loading, setLoading] = useState(true)
   /** Groups start compact (collapsed). Ungrouped stays expanded. */
@@ -129,22 +131,45 @@ export default function HabitGroupsBoard({ habits, onHabitsChanged, renderHabit 
 
   const handleMove = async (habitId: number, groupId: number | null) => {
     setMenuHabitId(null)
+    const prev = habits.find((h) => h.id === habitId)?.groupId ?? null
+    patchHabitLocal(habitId, { groupId })
+    setGroups((gs) =>
+      gs.map((g) => {
+        let habitCount = g.habitCount
+        if (prev === g.id) habitCount = Math.max(0, habitCount - 1)
+        if (groupId === g.id) habitCount += 1
+        return habitCount === g.habitCount ? g : { ...g, habitCount }
+      }),
+    )
     try {
       await moveHabitToGroup(habitId, groupId)
-      onHabitsChanged()
-      await refreshGroups()
     } catch (e) {
+      patchHabitLocal(habitId, { groupId: prev })
+      setGroups((gs) =>
+        gs.map((g) => {
+          let habitCount = g.habitCount
+          if (groupId === g.id) habitCount = Math.max(0, habitCount - 1)
+          if (prev === g.id) habitCount += 1
+          return habitCount === g.habitCount ? g : { ...g, habitCount }
+        }),
+      )
       setError(e instanceof Error ? e.message : 'move failed')
     }
   }
 
   const handleDeleteGroup = async (id: number) => {
     if (!confirm(t('groups.deleteConfirm'))) return
+    const snapshot = groups.find((g) => g.id === id)
+    const affected = habits.filter((h) => h.groupId === id).map((h) => h.id)
+    setGroups((gs) => gs.filter((g) => g.id !== id))
+    patchHabitsLocal((list) => list.map((h) => (h.groupId === id ? { ...h, groupId: null } : h)))
     try {
       await deleteHabitGroup(id)
-      onHabitsChanged()
-      await refreshGroups()
     } catch (e) {
+      if (snapshot) setGroups((gs) => [...gs, snapshot].sort((a, b) => b.id - a.id))
+      patchHabitsLocal((list) =>
+        list.map((h) => (affected.includes(h.id) ? { ...h, groupId: id } : h)),
+      )
       setError(e instanceof Error ? e.message : 'delete failed')
     }
   }
@@ -214,7 +239,7 @@ export default function HabitGroupsBoard({ habits, onHabitsChanged, renderHabit 
           void onDropZone(key)
         }}
       >
-        <header className="habits-group-head">
+        <div className="habits-group-head">
           <button
             type="button"
             className="habits-group-toggle"
@@ -228,7 +253,7 @@ export default function HabitGroupsBoard({ habits, onHabitsChanged, renderHabit 
             </span>
           </button>
           {actions}
-        </header>
+        </div>
         <div className="habits-group-body">{body}</div>
       </section>
     )
@@ -357,7 +382,11 @@ export default function HabitGroupsBoard({ habits, onHabitsChanged, renderHabit 
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>,
-              g.description ? <span className="habits-group-desc">{g.description}</span> : null,
+              g.description ? (
+                <span className="habits-group-desc">{g.description}</span>
+              ) : (
+                <span className="habits-group-desc is-empty">{t('groups.noDesc')}</span>
+              ),
             )}
           </div>
         )

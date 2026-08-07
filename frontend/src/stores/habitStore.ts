@@ -21,6 +21,8 @@ interface HabitState {
     fetchHabits: () => Promise<void>
     addHabit: (habit: CreateHabitPayload) => Promise<Habit>
     updateHabit: (id: number, updatedHabit: Partial<Habit>) => Promise<void>
+    patchHabitLocal: (id: number, patch: Partial<Habit>) => void
+    patchHabitsLocal: (updater: (habits: Habit[]) => Habit[]) => void
     deleteHabit: (id: number) => Promise<void>
     fetchTodayCheckedHabits: () => Promise<void>
     markHabitCheckedToday: (habitId: number) => void
@@ -115,6 +117,16 @@ export const useHabitStore = create<HabitState>((set, get) => {
             } catch {
                 alert('更新习惯失败')
             }
+        },
+
+        patchHabitLocal: (id, patch) => {
+            set((state) => ({
+                habits: state.habits.map((h) => (h.id === id ? { ...h, ...patch } : h)),
+            }))
+        },
+
+        patchHabitsLocal: (updater) => {
+            set((state) => ({ habits: updater(state.habits) }))
         },
 
         deleteHabit: async (id) => {

@@ -295,7 +295,6 @@ export default function Habits() {
             ) : (
                 <HabitGroupsBoard
                     habits={habits}
-                    onHabitsChanged={() => { void fetchHabits() }}
                     renderHabit={(habit) => {
                         const isChecked = habit.isCheckedToday
                         const isChecking = checkInLoading === `${habit.id}`
