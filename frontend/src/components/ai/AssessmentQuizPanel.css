@@ -347,6 +347,53 @@
 	overflow: auto;
 }
 
+.assess-upload-trace {
+	margin: 0;
+	padding: 0.5rem 0.55rem;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	background: rgba(0, 0, 0, 0.35);
+	font-size: 0.68rem;
+	line-height: 1.35;
+	max-height: 11rem;
+	overflow: auto;
+	color: #d7e2f8;
+}
+
+.assess-upload-trace.ok {
+	border-color: rgba(90, 210, 140, 0.45);
+	background: rgba(30, 90, 60, 0.28);
+}
+
+.assess-upload-trace.fail {
+	border-color: rgba(255, 120, 130, 0.5);
+	background: rgba(120, 40, 50, 0.28);
+}
+
+.assess-upload-trace-title {
+	font-weight: 700;
+	margin-bottom: 0.35rem;
+	font-size: 0.72rem;
+}
+
+.assess-upload-trace ol {
+	margin: 0;
+	padding-left: 0;
+	list-style: none;
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+}
+
+.assess-upload-trace li.good {
+	color: #9eefc0;
+}
+
+.assess-upload-trace li.bad {
+	color: #ffb4bc;
+	font-weight: 600;
+}
+
 .assess-ready {
 	min-height: 220px;
 	display: flex;
