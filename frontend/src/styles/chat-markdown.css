@@ -1,7 +1,7 @@
 /* Canal chat typography + Markdown rendering */
 
 :root {
-	--font-chat: "Outfit", "Noto Sans SC", sans-serif;
+	--font-chat: "Source Sans 3", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
 	--font-chat-code: "JetBrains Mono", ui-monospace, monospace;
 }
 
@@ -164,8 +164,10 @@
 .gal-dialog-md,
 .gal-history-md {
 	font-family: var(--font-chat);
-	font-size: 0.95rem;
-	line-height: 1.6;
+	font-size: 0.98rem;
+	line-height: 1.65;
+	font-weight: 500;
+	color: #f5f8ff;
 }
 
 .gal-dialog-md {
@@ -176,12 +178,20 @@
 
 .gal-dialog-text {
 	font-family: var(--font-chat);
-	font-size: 1rem;
-	line-height: 1.65;
-	letter-spacing: 0.015em;
-	font-weight: 450;
+	font-size: 1.02rem;
+	line-height: 1.7;
+	letter-spacing: 0.01em;
+	font-weight: 500;
 }
 
 .gal-history-bubble {
 	font-family: var(--font-chat);
+}
+
+.ai-bubble {
+	font-family: var(--font-chat);
+	font-size: 0.95rem;
+	line-height: 1.65;
+	letter-spacing: 0.01em;
+	font-weight: 500;
 }

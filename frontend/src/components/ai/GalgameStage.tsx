@@ -350,7 +350,7 @@ export default function GalgameStage() {
   const errorText = error === 'missing_api_key' ? t('chat.missingApiKey') : error
 
   return (
-    <div className={`gal-stage${assessmentActive ? ' has-assess' : ''}`} role="dialog" aria-label={t('chat.galTitle')}>
+    <div className={`gal-stage${assessmentActive ? ' has-assess' : ''}${viewMode === 'history' ? ' is-history' : ''}`} role="dialog" aria-label={t('chat.galTitle')}>
       <SmokeBurst active={galSmokePlaying} onDone={clearGalSmoke} />
 
       <div className="gal-topbar">
@@ -362,7 +362,7 @@ export default function GalgameStage() {
             className={viewMode === 'dialogue' ? 'active' : ''}
             onClick={() => setViewMode('dialogue')}
           >
-            <MessageSquare className="w-3.5 h-3.5" />
+            <MessageSquare className="w-4 h-4" />
             {t('chat.galModeDialogue')}
           </button>
           <button
@@ -372,7 +372,7 @@ export default function GalgameStage() {
             className={viewMode === 'history' ? 'active' : ''}
             onClick={() => setViewMode('history')}
           >
-            <History className="w-3.5 h-3.5" />
+            <History className="w-4 h-4" />
             {t('chat.galModeHistory')}
           </button>
         </div>
@@ -387,6 +387,7 @@ export default function GalgameStage() {
       </div>
 
       <div className="gal-stage-bg" />
+      {viewMode === 'history' && <div className="gal-history-scrim" aria-hidden />}
 
       <div className="gal-character-wrap">
         {live2dFailed ? (
@@ -452,6 +453,28 @@ export default function GalgameStage() {
       </div>
 
       <div className={`gal-dialog-stack ${handBlocking ? 'is-blocked' : ''}`} ref={dialogStackRef}>
+        <div className="gal-mode-toggle gal-mode-toggle-dock" role="tablist" aria-label={t('chat.galTitle')}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'dialogue'}
+            className={viewMode === 'dialogue' ? 'active' : ''}
+            onClick={() => setViewMode('dialogue')}
+          >
+            <MessageSquare className="w-4 h-4" />
+            {t('chat.galModeDialogue')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'history'}
+            className={viewMode === 'history' ? 'active' : ''}
+            onClick={() => setViewMode('history')}
+          >
+            <History className="w-4 h-4" />
+            {t('chat.galModeHistory')}
+          </button>
+        </div>
         {viewMode === 'history' ? (
           <div className="gal-history-panel" ref={historyListRef}>
             {historyMessages.length === 0 ? (
