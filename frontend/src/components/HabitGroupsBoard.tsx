@@ -61,21 +61,23 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
   const [materialsFor, setMaterialsFor] = useState<number | null>(null)
   const [materials, setMaterials] = useState<HabitGroupMaterialDto[]>([])
   const [uploading, setUploading] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null)
+  const [modalError, setModalError] = useState<string | null>(null)
   const [menuHabitId, setMenuHabitId] = useState<number | null>(null)
   const [dragHabitId, setDragHabitId] = useState<number | null>(null)
   const [dropTarget, setDropTarget] = useState<number | 'ungrouped' | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const refreshGroups = useCallback(async () => {
-    setLoading(true)
+  const refreshGroups = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true)
     try {
       const list = await listHabitGroups()
       setGroups(list.map((g) => normalizeGroup(g as HabitGroup & { Name?: string })))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load groups')
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [])
 
@@ -100,10 +102,12 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
 
   const openMaterials = async (groupId: number) => {
     setMaterialsFor(groupId)
+    setModalError(null)
+    setUploadStatus(null)
     try {
       setMaterials(await listGroupMaterials(groupId))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'materials failed')
+      setModalError(e instanceof Error ? e.message : 'materials failed')
     }
   }
 
@@ -196,14 +200,22 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
     if (materialsFor == null) return
     const list = Array.from(files)
     setUploading(true)
+    setModalError(null)
     try {
-      for (const f of list) {
-        await uploadGroupMaterial(materialsFor, f)
+      for (let i = 0; i < list.length; i++) {
+        const f = list[i]!
+        setUploadStatus(
+          list.length > 1 ? `上传中 ${i + 1}/${list.length}：${f.name}` : `上传中：${f.name}`,
+        )
+        const dto = await uploadGroupMaterial(materialsFor, f, setUploadStatus)
+        if (dto.warning) setModalError(dto.warning)
       }
       setMaterials(await listGroupMaterials(materialsFor))
-      await refreshGroups()
+      await refreshGroups(true)
+      setUploadStatus(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'upload failed')
+      setModalError(e instanceof Error ? e.message : 'upload failed')
+      setUploadStatus(null)
     } finally {
       setUploading(false)
     }
@@ -414,12 +426,22 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
               </button>
             </div>
             <p className="habits-wizard-hint">{t('groups.materialsHint')}</p>
+            {modalError && (
+              <div className="habits-error" role="alert" style={{ marginBottom: '0.65rem' }}>
+                {modalError}
+              </div>
+            )}
+            {uploadStatus && (
+              <p className="habits-wizard-hint" style={{ marginBottom: '0.5rem' }}>
+                {uploadStatus}
+              </p>
+            )}
             <input
               ref={fileRef}
               type="file"
               multiple
               hidden
-              accept=".pdf,.docx,.doc,.wps,.md,.txt"
+              accept=".pdf,.docx,.doc,.wps,.md,.txt,application/pdf"
               onChange={(e) => {
                 const files = e.target.files
                 e.target.value = ''
@@ -433,10 +455,12 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
               onClick={() => fileRef.current?.click()}
             >
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              {t('assess.upload')}
+              {uploading ? (uploadStatus ?? '…') : t('assess.upload')}
             </button>
             <ul className="habits-group-mat-list">
-              {materials.length === 0 && <li className="habits-empty-hint">{t('assess.noMaterials')}</li>}
+              {materials.length === 0 && !uploading && (
+                <li className="habits-empty-hint">{t('assess.noMaterials')}</li>
+              )}
               {materials.map((m) => (
                 <li key={m.id}>
                   <span>
@@ -452,7 +476,7 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
                     onClick={() =>
                       void deleteGroupMaterial(materialsFor, m.id).then(async () => {
                         setMaterials(await listGroupMaterials(materialsFor))
-                        await refreshGroups()
+                        await refreshGroups(true)
                       })
                     }
                   >
