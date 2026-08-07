@@ -82,3 +82,11 @@ D:\learnchain-msa2026\backend\bin\Debug\net10.0\Npgsql.EntityFrameworkCore.Postg
 D:\learnchain-msa2026\backend\bin\Debug\net10.0\Music\ceta.aac
 D:\learnchain-msa2026\backend\bin\Debug\net10.0\Music\faster-than-light.aac
 D:\learnchain-msa2026\backend\bin\Debug\net10.0\Music\waiting-for-the-sun.aac
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\DocumentFormat.OpenXml.dll
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\DocumentFormat.OpenXml.Framework.dll
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\System.IO.Packaging.dll
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\UglyToad.PdfPig.dll
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\UglyToad.PdfPig.Core.dll
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\UglyToad.PdfPig.Fonts.dll
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\UglyToad.PdfPig.Tokenization.dll
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\UglyToad.PdfPig.Tokens.dll

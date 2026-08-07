@@ -31,7 +31,11 @@ export interface Habit {
     isDueToday: boolean
     currentStreak: number
     milestones: HabitMilestone[]
+    assessmentEnabled?: boolean
+    assessmentDifficulty?: AssessmentDifficulty
 }
+
+export type AssessmentDifficulty = 'easy' | 'medium' | 'hard'
 
 export interface CreateMilestonePayload {
     title: string
@@ -46,6 +50,8 @@ export interface CreateHabitPayload {
     difficulty: number
     dueDate?: string
     milestones?: CreateMilestonePayload[]
+    assessmentEnabled?: boolean
+    assessmentDifficulty?: AssessmentDifficulty
 }
 
 export function getDifficultyXP(difficulty: number): number {

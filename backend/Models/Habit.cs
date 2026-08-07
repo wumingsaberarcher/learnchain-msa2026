@@ -19,6 +19,12 @@ public class Habit
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
 
+    /// <summary>When true, Canal opens a quiz after a successful check-in.</summary>
+    public bool AssessmentEnabled { get; set; }
+
+    /// <summary>easy | medium | hard</summary>
+    public string AssessmentDifficulty { get; set; } = "easy";
+
     [NotMapped]
     public int CurrentStreak { get; set; }
 

@@ -17,4 +17,5 @@ public class AppDbContext : DbContext
     public DbSet<ChatSession> ChatSessions { get; set; }
     public DbSet<ChatMessage> ChatMessages { get; set; }
     public DbSet<UserMemory> UserMemories { get; set; }
+    public DbSet<HabitMaterial> HabitMaterials { get; set; }
 }

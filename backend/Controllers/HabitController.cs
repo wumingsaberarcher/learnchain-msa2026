@@ -140,6 +140,8 @@ public class HabitController : ControllerBase
             CompletionType = habitType == "OneTime" ? 1 : 0,
             IsActive = true,
             IsCompleted = false,
+            AssessmentEnabled = request.AssessmentEnabled,
+            AssessmentDifficulty = NormalizeAssessmentDifficulty(request.AssessmentDifficulty),
             CreatedAt = DateTime.UtcNow
         };
 
@@ -184,7 +186,7 @@ public class HabitController : ControllerBase
 
     [HttpPut("{id}")]
     [Authorize]
-    public async Task<IActionResult> UpdateHabit(int id, [FromBody] Habit habit)
+    public async Task<IActionResult> UpdateHabit(int id, [FromBody] UpdateHabitRequest request)
     {
         int currentUserId = GetCurrentUserId();
 
@@ -194,9 +196,9 @@ public class HabitController : ControllerBase
         if (existingHabit == null)
             return NotFound("习惯不存在或无权限");
 
-        if (!string.IsNullOrWhiteSpace(habit.Name))
+        if (!string.IsNullOrWhiteSpace(request.Name))
         {
-            var trimmedName = habit.Name.Trim();
+            var trimmedName = request.Name.Trim();
             bool nameExists = await _context.Habits.AnyAsync(h =>
                 h.UserId == currentUserId &&
                 h.IsActive &&
@@ -209,8 +211,20 @@ public class HabitController : ControllerBase
             existingHabit.Name = trimmedName;
         }
 
+        if (request.AssessmentEnabled.HasValue)
+            existingHabit.AssessmentEnabled = request.AssessmentEnabled.Value;
+
+        if (!string.IsNullOrWhiteSpace(request.AssessmentDifficulty))
+            existingHabit.AssessmentDifficulty = NormalizeAssessmentDifficulty(request.AssessmentDifficulty);
+
         await _context.SaveChangesAsync();
         return NoContent();
+    }
+
+    private static string NormalizeAssessmentDifficulty(string? value)
+    {
+        var v = (value ?? "easy").Trim().ToLowerInvariant();
+        return v is "medium" or "hard" ? v : "easy";
     }
 
     [HttpDelete("{id}")]

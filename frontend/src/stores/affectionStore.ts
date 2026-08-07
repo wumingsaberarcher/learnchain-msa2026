@@ -81,7 +81,9 @@ export const useAffectionStore = create<AffectionState>((set) => ({
 
   applyAward: (partial) => {
     set((s) => {
-      const points = partial.points ?? s.points
+      const points =
+        partial.points ??
+        (partial.awarded != null ? Math.max(0, s.points + partial.awarded) : s.points)
       const derived = tierFromPoints(points)
       return {
         points,

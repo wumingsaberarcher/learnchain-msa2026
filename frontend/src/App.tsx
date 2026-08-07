@@ -163,6 +163,9 @@ function App() {
                         await fetchCurrentUser()
                         await fetchHabits()
                         await fetchTodayCheckedHabits()
+                        const { triggerAssessmentAfterCheckIn } = await import('./stores/assessmentStore')
+                        const habit = useHabitStore.getState().habits.find(h => h.id === result.habitId)
+                        if (habit) await triggerAssessmentAfterCheckIn(habit)
                     }}
                 />
 

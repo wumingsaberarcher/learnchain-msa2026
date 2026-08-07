@@ -161,6 +161,9 @@ export const useCompanionStore = create<CompanionState>((set, get) => ({
       isTalking: false,
       emotion: 'normal',
     })
+    void import('./assessmentStore').then(({ useAssessmentStore }) => {
+      useAssessmentStore.getState().close()
+    })
   },
 
   clearGalSmoke: () => set({ galSmokePlaying: false }),

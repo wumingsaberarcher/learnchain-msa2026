@@ -7,6 +7,9 @@ public class CreateHabitRequest
     public int Difficulty { get; set; } = 1;
     public DateTime? DueDate { get; set; }
     public List<CreateMilestoneRequest>? Milestones { get; set; }
+    public bool AssessmentEnabled { get; set; }
+    /// <summary>easy | medium | hard</summary>
+    public string AssessmentDifficulty { get; set; } = "easy";
 }
 
 public class CreateMilestoneRequest
@@ -15,4 +18,11 @@ public class CreateMilestoneRequest
     public DateTime DueDate { get; set; }
     public int XPValue { get; set; }
     public int SortOrder { get; set; }
+}
+
+public class UpdateHabitRequest
+{
+    public string? Name { get; set; }
+    public bool? AssessmentEnabled { get; set; }
+    public string? AssessmentDifficulty { get; set; }
 }

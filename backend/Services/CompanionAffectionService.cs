@@ -67,6 +67,28 @@ public class CompanionAffectionService
         return await AwardAsync(user, ChatGain, ct);
     }
 
+    /// <summary>Decrease affection (floor 0). Does not touch daily gain cap.</summary>
+    public async Task<AffectionAwardResult> PenaltyAsync(User user, int amount, CancellationToken ct = default)
+    {
+        EnsureDay(user);
+        if (amount <= 0)
+            return Result(user, 0);
+
+        var before = user.CompanionAffection;
+        user.CompanionAffection = Math.Max(0, user.CompanionAffection - amount);
+        var delta = user.CompanionAffection - before; // negative or 0
+        await _db.SaveChangesAsync(ct);
+        return Result(user, delta);
+    }
+
+    public static int AssessmentFailPenalty(string difficulty) =>
+        (difficulty ?? "easy").Trim().ToLowerInvariant() switch
+        {
+            "hard" => 15,
+            "medium" => 10,
+            _ => 5,
+        };
+
     private async Task<AffectionAwardResult> AwardAsync(User user, int want, CancellationToken ct)
     {
         EnsureDay(user);

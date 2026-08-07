@@ -28,6 +28,7 @@ import {
 } from 'lucide-react'
 import { useFocusModeStore } from '../stores/focusModeStore'
 import { useBgmStore } from '../stores/bgmStore'
+import { triggerAssessmentAfterCheckIn } from '../stores/assessmentStore'
 
 interface CheckIn {
     id: number
@@ -138,7 +139,11 @@ export default function Habits() {
             return
         }
         try {
-            await updateHabit(editingHabit.id, { name: editingHabit.name.trim() })
+            await updateHabit(editingHabit.id, {
+                name: editingHabit.name.trim(),
+                assessmentEnabled: !!editingHabit.assessmentEnabled,
+                assessmentDifficulty: editingHabit.assessmentDifficulty || 'easy',
+            })
             setEditingHabit(null)
             setSuccessMessage(t('habits.updateSuccess'))
             await fetchHabits()
@@ -171,6 +176,8 @@ export default function Habits() {
             await fetchHabits()
             markHabitCheckedToday(habitId)
             await fetchTodayCheckedHabits()
+            const habit = habits.find(h => h.id === habitId)
+            if (habit) await triggerAssessmentAfterCheckIn(habit)
         } catch (err: any) {
             alert(err?.message || '打卡失败，请重试')
         } finally {
@@ -309,15 +316,36 @@ export default function Habits() {
                                     )}
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                         {isEditing ? (
-                                            <div className="habit-edit-row">
-                                                <input
-                                                    type="text"
-                                                    value={editingHabit.name}
-                                                    onChange={e => setEditingHabit({ ...editingHabit, name: e.target.value })}
-                                                    className="habit-edit-input"
-                                                />
-                                                <button type="button" className="btn-habit btn-habit-checkin" onClick={handleUpdateHabit}>{t('habits.save')}</button>
-                                                <button type="button" className="btn-habit btn-habit-ghost" onClick={() => setEditingHabit(null)}>{t('auth.cancel')}</button>
+                                            <div className="habit-edit-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.5rem' }}>
+                                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                                    <input
+                                                        type="text"
+                                                        value={editingHabit.name}
+                                                        onChange={e => setEditingHabit({ ...editingHabit, name: e.target.value })}
+                                                        className="habit-edit-input"
+                                                    />
+                                                    <button type="button" className="btn-habit btn-habit-checkin" onClick={handleUpdateHabit}>{t('habits.save')}</button>
+                                                    <button type="button" className="btn-habit btn-habit-ghost" onClick={() => setEditingHabit(null)}>{t('auth.cancel')}</button>
+                                                </div>
+                                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={!!editingHabit.assessmentEnabled}
+                                                        onChange={e => setEditingHabit({ ...editingHabit, assessmentEnabled: e.target.checked })}
+                                                    />
+                                                    {t('habits.assessment')}
+                                                </label>
+                                                {editingHabit.assessmentEnabled && (
+                                                    <select
+                                                        className="habit-edit-input"
+                                                        value={editingHabit.assessmentDifficulty || 'easy'}
+                                                        onChange={e => setEditingHabit({ ...editingHabit, assessmentDifficulty: e.target.value })}
+                                                    >
+                                                        <option value="easy">{t('assess.diff.easy')}</option>
+                                                        <option value="medium">{t('assess.diff.medium')}</option>
+                                                        <option value="hard">{t('assess.diff.hard')}</option>
+                                                    </select>
+                                                )}
                                             </div>
                                         ) : (
                                             <>
@@ -326,6 +354,9 @@ export default function Habits() {
                                                     <span className="habit-badge habit-badge-freq">{t(habitTypeKey(habit.habitType || 'Daily'))}</span>
                                                     <span className="habit-badge habit-badge-difficulty">{t(difficultyKey(habit.difficulty || 1))}</span>
                                                     <span className="habit-badge habit-badge-xp">+{habit.baseXP} XP</span>
+                                                    {habit.assessmentEnabled && (
+                                                        <span className="habit-badge habit-badge-streak">{t('habits.assessmentOn')}</span>
+                                                    )}
                                                     {habit.habitType === 'OneTime' && (
                                                         <span className="habit-badge habit-badge-onetime">{t('habits.oneTime')}</span>
                                                     )}

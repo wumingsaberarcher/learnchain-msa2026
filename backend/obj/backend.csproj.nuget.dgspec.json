@@ -10,7 +10,7 @@
         "projectUniqueName": "D:\\learnchain-msa2026\\backend\\backend.csproj",
         "projectName": "backend",
         "projectPath": "D:\\learnchain-msa2026\\backend\\backend.csproj",
-        "packagesPath": "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\ebc2c54c299fd1249e93e2bc2df3af04\\nuget",
+        "packagesPath": "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\9780c96a819f7fb542522db907b59bfe\\nuget",
         "outputPath": "D:\\learnchain-msa2026\\backend\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
@@ -56,6 +56,10 @@
               "target": "Package",
               "version": "[4.2.0, )"
             },
+            "DocumentFormat.OpenXml": {
+              "target": "Package",
+              "version": "[3.2.0, )"
+            },
             "MailKit": {
               "target": "Package",
               "version": "[4.14.1, )"
@@ -87,6 +91,10 @@
             "Scalar.AspNetCore": {
               "target": "Package",
               "version": "[2.16.10, )"
+            },
+            "UglyToad.PdfPig": {
+              "target": "Package",
+              "version": "[1.7.0-custom-5, )"
             }
           },
           "imports": [

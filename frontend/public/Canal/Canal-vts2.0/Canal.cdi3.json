@@ -1,0 +1,288 @@
+{
+	"Version": 3,
+	"Parameters": [
+		{
+			"Id": "ParamAngleX",
+			"GroupId": "ParamGroup",
+			"Name": "角度 X"
+		},
+		{
+			"Id": "ParamAngleY",
+			"GroupId": "ParamGroup",
+			"Name": "角度 Y"
+		},
+		{
+			"Id": "ParamAngleZ",
+			"GroupId": "ParamGroup",
+			"Name": "角度 Z"
+		},
+		{
+			"Id": "ParamEyeBallX",
+			"GroupId": "ParamGroup2",
+			"Name": "眼珠 X"
+		},
+		{
+			"Id": "ParamEyeBallY",
+			"GroupId": "ParamGroup2",
+			"Name": "眼珠 Y"
+		},
+		{
+			"Id": "ParamEyeLOpen",
+			"GroupId": "ParamGroup2",
+			"Name": "左眼 开闭"
+		},
+		{
+			"Id": "ParamEyeLSmile",
+			"GroupId": "ParamGroup2",
+			"Name": "左眼 微笑"
+		},
+		{
+			"Id": "ParamEyeROpen",
+			"GroupId": "ParamGroup2",
+			"Name": "右眼 开闭"
+		},
+		{
+			"Id": "ParamEyeRSmile",
+			"GroupId": "ParamGroup2",
+			"Name": "右眼 微笑"
+		},
+		{
+			"Id": "Param",
+			"GroupId": "ParamGroup2",
+			"Name": "左眼物理X"
+		},
+		{
+			"Id": "Param2",
+			"GroupId": "ParamGroup2",
+			"Name": "左眼物理Y"
+		},
+		{
+			"Id": "Param3",
+			"GroupId": "ParamGroup2",
+			"Name": "右眼物理X"
+		},
+		{
+			"Id": "Param4",
+			"GroupId": "ParamGroup2",
+			"Name": "右眼物理Y"
+		},
+		{
+			"Id": "ParamBrowLY",
+			"GroupId": "ParamGroup3",
+			"Name": "左眉 上下"
+		},
+		{
+			"Id": "ParamBrowLX",
+			"GroupId": "ParamGroup3",
+			"Name": "左眉 左右"
+		},
+		{
+			"Id": "ParamBrowLAngle",
+			"GroupId": "ParamGroup3",
+			"Name": "左眉 角度"
+		},
+		{
+			"Id": "ParamBrowLForm",
+			"GroupId": "ParamGroup3",
+			"Name": "左眉 変形"
+		},
+		{
+			"Id": "ParamBrowRY",
+			"GroupId": "ParamGroup3",
+			"Name": "右眉 上下"
+		},
+		{
+			"Id": "ParamBrowRX",
+			"GroupId": "ParamGroup3",
+			"Name": "右眉 左右"
+		},
+		{
+			"Id": "ParamBrowRAngle",
+			"GroupId": "ParamGroup3",
+			"Name": "右眉 角度"
+		},
+		{
+			"Id": "ParamBrowRForm",
+			"GroupId": "ParamGroup3",
+			"Name": "右眉 変形"
+		},
+		{
+			"Id": "ParamMouthForm",
+			"GroupId": "ParamGroup4",
+			"Name": "嘴 变形"
+		},
+		{
+			"Id": "ParamMouthOpenY",
+			"GroupId": "ParamGroup4",
+			"Name": "嘴 开闭"
+		},
+		{
+			"Id": "ParamBodyAngleX",
+			"GroupId": "ParamGroup5",
+			"Name": "身体旋转 X"
+		},
+		{
+			"Id": "ParamBodyAngleY",
+			"GroupId": "ParamGroup5",
+			"Name": "身体旋转 Y"
+		},
+		{
+			"Id": "ParamBodyAngleZ",
+			"GroupId": "ParamGroup5",
+			"Name": "身体旋转 Z"
+		},
+		{
+			"Id": "ParamHairFront",
+			"GroupId": "ParamGroup6",
+			"Name": "摇动 前发"
+		},
+		{
+			"Id": "ParamHairSide",
+			"GroupId": "ParamGroup6",
+			"Name": "摇动 侧发"
+		},
+		{
+			"Id": "ParamHairBack",
+			"GroupId": "ParamGroup6",
+			"Name": "摇动 后发"
+		},
+		{
+			"Id": "ParamCheek",
+			"GroupId": "",
+			"Name": "脸颊泛红"
+		},
+		{
+			"Id": "ParamBreath",
+			"GroupId": "",
+			"Name": "呼吸"
+		}
+	],
+	"ParameterGroups": [
+		{
+			"Id": "ParamGroup",
+			"GroupId": "",
+			"Name": "头部xyz"
+		},
+		{
+			"Id": "ParamGroup2",
+			"GroupId": "",
+			"Name": "眼睛"
+		},
+		{
+			"Id": "ParamGroup3",
+			"GroupId": "",
+			"Name": "眉毛"
+		},
+		{
+			"Id": "ParamGroup4",
+			"GroupId": "",
+			"Name": "嘴巴"
+		},
+		{
+			"Id": "ParamGroup5",
+			"GroupId": "",
+			"Name": "身体"
+		},
+		{
+			"Id": "ParamGroup6",
+			"GroupId": "",
+			"Name": "头发"
+		}
+	],
+	"Parts": [
+		{
+			"Id": "Part",
+			"Name": "front hair"
+		},
+		{
+			"Id": "Part2",
+			"Name": "eye-l"
+		},
+		{
+			"Id": "Part3",
+			"Name": "eye-r"
+		},
+		{
+			"Id": "Part4",
+			"Name": "irides-l"
+		},
+		{
+			"Id": "Part7",
+			"Name": "eyebrow-r"
+		},
+		{
+			"Id": "Part6",
+			"Name": "eyebrow-l"
+		},
+		{
+			"Id": "Part5",
+			"Name": "irides-r"
+		},
+		{
+			"Id": "Part10",
+			"Name": "mouth"
+		},
+		{
+			"Id": "Part11",
+			"Name": "nose"
+		},
+		{
+			"Id": "Part12",
+			"Name": "face"
+		},
+		{
+			"Id": "Part8",
+			"Name": "ear-l"
+		},
+		{
+			"Id": "Part9",
+			"Name": "ear-r"
+		},
+		{
+			"Id": "Part14",
+			"Name": "左肩膀"
+		},
+		{
+			"Id": "Part17",
+			"Name": "leg-l"
+		},
+		{
+			"Id": "Part18",
+			"Name": "leg-r"
+		},
+		{
+			"Id": "Part15",
+			"Name": "右肩膀"
+		},
+		{
+			"Id": "Part13",
+			"Name": "back hair"
+		},
+		{
+			"Id": "ArtMesh10_Skinning",
+			"Name": "handwear-l(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh31_Skinning",
+			"Name": "leg-l(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh32_Skinning",
+			"Name": "leg-r(蒙皮)"
+		},
+		{
+			"Id": "ArtMesh11_Skinning",
+			"Name": "handwear-r(蒙皮)"
+		}
+	],
+	"CombinedParameters": [
+		[
+			"Param",
+			"Param2"
+		],
+		[
+			"Param3",
+			"Param4"
+		]
+	]
+}

@@ -38,6 +38,8 @@ export default function CreateHabitWizard({ onClose, onSubmit, existingNames }: 
     const [nameError, setNameError] = useState('')
     const [habitType, setHabitType] = useState<HabitType>('Daily')
     const [difficulty, setDifficulty] = useState(1)
+    const [assessmentEnabled, setAssessmentEnabled] = useState(false)
+    const [assessmentDifficulty, setAssessmentDifficulty] = useState<'easy' | 'medium' | 'hard'>('easy')
     const [dueDate, setDueDate] = useState('')
     const [calendarMonth, setCalendarMonth] = useState(() => new Date())
     const [milestones, setMilestones] = useState<CreateMilestonePayload[]>([])
@@ -97,6 +99,8 @@ export default function CreateHabitWizard({ onClose, onSubmit, existingNames }: 
                 name: name.trim(),
                 habitType,
                 difficulty,
+                assessmentEnabled,
+                assessmentDifficulty: assessmentEnabled ? assessmentDifficulty : 'easy',
             }
 
             if (habitType === 'OneTime') {
@@ -212,6 +216,32 @@ export default function CreateHabitWizard({ onClose, onSubmit, existingNames }: 
                                 {t('wizard.onetimeHint', { milestone: milestoneXP, final: finalXP })}
                             </p>
                         )}
+                        <div className="habits-assessment-block" style={{ marginTop: '1rem' }}>
+                            <label className="habits-wizard-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={assessmentEnabled}
+                                    onChange={(e) => setAssessmentEnabled(e.target.checked)}
+                                />
+                                {t('wizard.assessmentEnable')}
+                            </label>
+                            <p className="habits-wizard-hint">{t('wizard.assessmentHint')}</p>
+                            {assessmentEnabled && (
+                                <div className="habits-difficulty-grid" style={{ marginTop: '0.65rem' }}>
+                                    {(['easy', 'medium', 'hard'] as const).map((d) => (
+                                        <button
+                                            key={d}
+                                            type="button"
+                                            className={`habits-difficulty-card${assessmentDifficulty === d ? ' selected' : ''}`}
+                                            onClick={() => setAssessmentDifficulty(d)}
+                                        >
+                                            <span className="habits-difficulty-name">{t(`assess.diff.${d}`)}</span>
+                                            <span className="habits-type-desc">{t(`assess.diff.${d}Desc`)}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
 

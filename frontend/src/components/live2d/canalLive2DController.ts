@@ -223,6 +223,11 @@ export class CanalLive2DController {
 
     this.setParam(CanalParams.eyeBallX, this.eyeBallX)
     this.setParam(CanalParams.eyeBallY, this.eyeBallY)
+    // Canal 2.0 iris warp physics — follow look with a touch of lag/separation.
+    this.setParam(CanalParams.eyeLPhysicsX, this.eyeBallX * 0.9)
+    this.setParam(CanalParams.eyeLPhysicsY, this.eyeBallY * 0.9)
+    this.setParam(CanalParams.eyeRPhysicsX, this.eyeBallX * 0.85)
+    this.setParam(CanalParams.eyeRPhysicsY, this.eyeBallY * 0.85)
   }
 
   private updateBlink(dt: number) {

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { LogOut, Mic, Send, X } from 'lucide-react'
-import { useChatStore } from '../../stores/chatStore'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { History, LogOut, MessageSquare, Mic, Send, X } from 'lucide-react'
+import { useChatStore, type UiChatMessage } from '../../stores/chatStore'
 import { useCompanionStore } from '../../stores/companionStore'
+import { useAssessmentStore } from '../../stores/assessmentStore'
 import { useTranslation } from '../../stores/settingsStore'
 import {
   buildEmotionTimeline,
@@ -12,15 +13,18 @@ import Live2DCanal, { type Live2DCanalHandle } from '../live2d/Live2DCanal'
 import Character from '../character/Character'
 import type { Emotion } from '../character/emotionAssets'
 import SmokeBurst from './SmokeBurst'
+import AssessmentQuizPanel from './AssessmentQuizPanel'
 import { useSpeechInput } from './useSpeechInput'
 import VoiceVolumeIcon from './VoiceVolumeIcon'
 import './GalgameStage.css'
 
 const MS_PER_CHAR = 38
 
+type GalViewMode = 'dialogue' | 'history'
+
 export default function GalgameStage() {
   const { t, language } = useTranslation()
-  const { isSending, error, sendMessage, clearError, setListening, isListening } = useChatStore()
+  const { isSending, error, sendMessage, clearError, setListening, isListening, messages } = useChatStore()
   const {
     emotion,
     isTalking,
@@ -29,6 +33,10 @@ export default function GalgameStage() {
     clearGalSmoke,
     exitGalMode,
   } = useCompanionStore()
+  const assessmentActive = useAssessmentStore((s) => s.active)
+  const canalLine = useAssessmentStore((s) => s.canalLine)
+  const clearCanalLine = useAssessmentStore((s) => s.setCanalLine)
+  const closeAssessment = useAssessmentStore((s) => s.close)
 
   const [draft, setDraft] = useState('')
   const [displayText, setDisplayText] = useState('')
@@ -39,6 +47,8 @@ export default function GalgameStage() {
   const [dialogMaxHeight, setDialogMaxHeight] = useState<number | null>(null)
   const [handBlocking, setHandBlocking] = useState(false)
   const [blockMutter, setBlockMutter] = useState(false)
+  const [viewMode, setViewMode] = useState<GalViewMode>('dialogue')
+  const [hoverTickId, setHoverTickId] = useState<string | null>(null)
 
   const timelineRef = useRef<EmotionCue[]>([])
   const typeTimerRef = useRef<number | null>(null)
@@ -53,6 +63,13 @@ export default function GalgameStage() {
   const inputRowRef = useRef<HTMLDivElement>(null)
   const blockCooldownRef = useRef(0)
   const wasOverFaceRef = useRef(false)
+  const historyListRef = useRef<HTMLDivElement>(null)
+  const playedCanalLineRef = useRef<string | null>(null)
+
+  const historyMessages = useMemo(
+    () => messages.filter((m) => m.kind !== 'aside' && (m.role === 'user' || m.role === 'assistant')),
+    [messages],
+  )
 
   const stopTypewriter = useCallback(() => {
     if (typeTimerRef.current != null) {
@@ -77,6 +94,7 @@ export default function GalgameStage() {
       setFullText(line)
       setDisplayText('')
       setTyping(true)
+      setViewMode('dialogue')
 
       const face0 = options?.forceEmotion ?? emotionAt(timelineRef.current, 0)
       setEmotion(face0, true)
@@ -106,13 +124,24 @@ export default function GalgameStage() {
     startedIntroRef.current = true
     const delay = galSmokePlaying ? 520 : 80
     const timer = window.setTimeout(() => {
-      playLine(t('chat.galIntro'))
+      if (assessmentActive) {
+        playLine(t('assess.startLine', { name: useAssessmentStore.getState().habitName || '…' }))
+      } else {
+        playLine(t('chat.galIntro'))
+      }
       setIntroDone(true)
     }, delay)
     return () => window.clearTimeout(timer)
-  }, [galSmokePlaying, playLine, t])
+  }, [galSmokePlaying, playLine, t, assessmentActive])
 
   useEffect(() => () => stopTypewriter(), [stopTypewriter])
+
+  useEffect(() => {
+    if (!canalLine || canalLine === playedCanalLineRef.current) return
+    playedCanalLineRef.current = canalLine
+    playLine(canalLine)
+    clearCanalLine(null)
+  }, [canalLine, playLine, clearCanalLine])
 
   /** Keep dialog below Canal's face; she "pushes" it down when it climbs too high. */
   useEffect(() => {
@@ -132,13 +161,12 @@ export default function GalgameStage() {
       const maxH = Math.max(MIN_BOX, stackBottom - faceLine - inputH - gap)
       setDialogMaxHeight(maxH)
 
-      // Natural height without cap (temporarily clear maxHeight via scrollHeight of content).
       const textEl = box.querySelector('.gal-dialog-text') as HTMLElement | null
       const natural =
         (textEl?.scrollHeight ?? 0) +
         (box.querySelector('.gal-dialog-name')?.clientHeight ?? 0) +
         (box.querySelector('.gal-dialog-hint')?.clientHeight ?? 0) +
-        48 // padding fudge
+        48
       const overFace = natural > maxH + 8
 
       if (overFace && !wasOverFaceRef.current && Date.now() > blockCooldownRef.current) {
@@ -163,7 +191,7 @@ export default function GalgameStage() {
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [displayText, typing, fullText])
+  }, [displayText, typing, fullText, viewMode])
 
   const speech = useSpeechInput({
     language,
@@ -184,12 +212,15 @@ export default function GalgameStage() {
         onComplete: () => {
           if (exitAfterFarewellRef.current) {
             exitAfterFarewellRef.current = false
-            window.setTimeout(() => exitGalMode(), 420)
+            window.setTimeout(() => {
+              closeAssessment()
+              exitGalMode()
+            }, 420)
           }
         },
       })
     },
-    [exitGalMode, playLine, t],
+    [exitGalMode, playLine, t, closeAssessment],
   )
 
   const onExitHover = () => {
@@ -199,7 +230,6 @@ export default function GalgameStage() {
   }
 
   const onExitLeave = () => {
-    // Allow farewell again next time they hover (after a short cool-down)
     window.setTimeout(() => {
       farewellHoverLockRef.current = false
     }, 900)
@@ -207,10 +237,10 @@ export default function GalgameStage() {
 
   const handleExitClick = () => {
     if (exitAfterFarewellRef.current) {
+      closeAssessment()
       exitGalMode()
       return
     }
-    // Click without (or during) hover farewell → say goodbye then leave
     farewellHoverLockRef.current = true
     startFarewell(true)
   }
@@ -237,20 +267,53 @@ export default function GalgameStage() {
     }
   }
 
+  const scrollToMessage = (id: string) => {
+    setViewMode('history')
+    window.requestAnimationFrame(() => {
+      const el = historyListRef.current?.querySelector(`[data-msg-id="${id}"]`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    })
+  }
+
+  const hoverMsg = historyMessages.find((m) => m.id === hoverTickId)
   const errorText = error === 'missing_api_key' ? t('chat.missingApiKey') : error
 
   return (
-    <div className="gal-stage" role="dialog" aria-label={t('chat.galTitle')}>
+    <div className={`gal-stage${assessmentActive ? ' has-assess' : ''}`} role="dialog" aria-label={t('chat.galTitle')}>
       <SmokeBurst active={galSmokePlaying} onDone={clearGalSmoke} />
 
-      <button
-        type="button"
-        className="gal-close"
-        title={t('chat.galClose')}
-        onClick={handleExitClick}
-      >
-        <X className="w-5 h-5" />
-      </button>
+      <div className="gal-topbar">
+        <div className="gal-mode-toggle" role="tablist" aria-label={t('chat.galTitle')}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'dialogue'}
+            className={viewMode === 'dialogue' ? 'active' : ''}
+            onClick={() => setViewMode('dialogue')}
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            {t('chat.galModeDialogue')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'history'}
+            className={viewMode === 'history' ? 'active' : ''}
+            onClick={() => setViewMode('history')}
+          >
+            <History className="w-3.5 h-3.5" />
+            {t('chat.galModeHistory')}
+          </button>
+        </div>
+        <button
+          type="button"
+          className="gal-close"
+          title={t('chat.galClose')}
+          onClick={handleExitClick}
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
       <div className="gal-stage-bg" />
 
@@ -273,32 +336,75 @@ export default function GalgameStage() {
         )}
       </div>
 
-      <div className={`gal-dialog-stack ${handBlocking ? 'is-blocked' : ''}`} ref={dialogStackRef}>
-        {blockMutter && (
-          <div className="gal-block-mutter" role="status">
-            {t('chat.galBlockFace')}
+      {assessmentActive && <AssessmentQuizPanel onCanalSpeak={playLine} />}
+
+      <div className="gal-tick-rail" aria-label={t('chat.galTimeline')}>
+        {historyMessages.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            className={`gal-tick ${m.role === 'assistant' ? 'long' : 'short'}${hoverTickId === m.id ? ' hover' : ''}`}
+            onMouseEnter={() => setHoverTickId(m.id)}
+            onMouseLeave={() => setHoverTickId(null)}
+            onClick={() => scrollToMessage(m.id)}
+            title={m.content.slice(0, 40)}
+          />
+        ))}
+        {hoverMsg && (
+          <div className="gal-tick-preview" role="tooltip">
+            <strong>{hoverMsg.role === 'assistant' ? 'Canal' : 'You'}</strong>
+            <p>{hoverMsg.content.slice(0, 40)}{hoverMsg.content.length > 40 ? '…' : ''}</p>
           </div>
         )}
-        <div
-          className={`gal-dialog-box ${handBlocking ? 'is-hand-blocked' : ''}`}
-          ref={dialogBoxRef}
-          style={dialogMaxHeight != null ? { maxHeight: dialogMaxHeight } : undefined}
-        >
-          {handBlocking && (
-            <div className="gal-hand-block" aria-hidden>
-              <span className="gal-hand-sleeve" />
-              <span className="gal-hand-palm" />
+      </div>
+
+      <div className={`gal-dialog-stack ${handBlocking ? 'is-blocked' : ''}`} ref={dialogStackRef}>
+        {viewMode === 'history' ? (
+          <div className="gal-history-panel" ref={historyListRef}>
+            {historyMessages.length === 0 ? (
+              <p className="gal-history-empty">{language.startsWith('zh') ? '还没有对话记录' : 'No messages yet'}</p>
+            ) : (
+              historyMessages.map((m: UiChatMessage) => (
+                <div
+                  key={m.id}
+                  data-msg-id={m.id}
+                  className={`gal-history-bubble ${m.role}`}
+                >
+                  <div className="gal-history-role">{m.role === 'assistant' ? 'Canal' : 'You'}</div>
+                  <p>{m.content}</p>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          <>
+            {blockMutter && (
+              <div className="gal-block-mutter" role="status">
+                {t('chat.galBlockFace')}
+              </div>
+            )}
+            <div
+              className={`gal-dialog-box ${handBlocking ? 'is-hand-blocked' : ''}`}
+              ref={dialogBoxRef}
+              style={dialogMaxHeight != null ? { maxHeight: dialogMaxHeight } : undefined}
+            >
+              {handBlocking && (
+                <div className="gal-hand-block" aria-hidden>
+                  <span className="gal-hand-sleeve" />
+                  <span className="gal-hand-palm" />
+                </div>
+              )}
+              <div className="gal-dialog-name">Canal</div>
+              <p className="gal-dialog-text" aria-live="polite">
+                {displayText || (isSending ? t('chat.thinking') : introDone ? '' : '…')}
+                {typing && <span className="gal-caret" />}
+              </p>
+              {fullText && !typing && displayText === fullText && (
+                <span className="gal-dialog-hint">{t('chat.galContinue')}</span>
+              )}
             </div>
-          )}
-          <div className="gal-dialog-name">Canal</div>
-          <p className="gal-dialog-text" aria-live="polite">
-            {displayText || (isSending ? t('chat.thinking') : introDone ? '' : '…')}
-            {typing && <span className="gal-caret" />}
-          </p>
-          {fullText && !typing && displayText === fullText && (
-            <span className="gal-dialog-hint">{t('chat.galContinue')}</span>
-          )}
-        </div>
+          </>
+        )}
 
         <div className="gal-input-row" ref={inputRowRef}>
           <textarea

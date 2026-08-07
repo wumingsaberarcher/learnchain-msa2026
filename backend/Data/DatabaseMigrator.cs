@@ -40,6 +40,8 @@ public static class DatabaseMigrator
             EnsureSqliteColumn(connection, "Users", "CompanionAffection", "INTEGER NOT NULL DEFAULT 0");
             EnsureSqliteColumn(connection, "Users", "CompanionAffectionDayUtc", "TEXT NULL");
             EnsureSqliteColumn(connection, "Users", "CompanionAffectionGainedToday", "INTEGER NOT NULL DEFAULT 0");
+            EnsureSqliteColumn(connection, "Habits", "AssessmentEnabled", "INTEGER NOT NULL DEFAULT 0");
+            EnsureSqliteColumn(connection, "Habits", "AssessmentDifficulty", "TEXT NOT NULL DEFAULT 'easy'");
 
             using var achievementCmd = connection.CreateCommand();
             achievementCmd.CommandText = """
@@ -66,6 +68,22 @@ public static class DatabaseMigrator
                 );
                 """;
             cmd.ExecuteNonQuery();
+
+            using var materialsCmd = connection.CreateCommand();
+            materialsCmd.CommandText = """
+                CREATE TABLE IF NOT EXISTS HabitMaterials (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    HabitId INTEGER NOT NULL,
+                    UserId INTEGER NOT NULL,
+                    FileName TEXT NOT NULL,
+                    ContentType TEXT NOT NULL DEFAULT '',
+                    Size INTEGER NOT NULL DEFAULT 0,
+                    StoredPath TEXT NOT NULL DEFAULT '',
+                    ExtractedText TEXT NOT NULL DEFAULT '',
+                    CreatedAt TEXT NOT NULL
+                );
+                """;
+            materialsCmd.ExecuteNonQuery();
 
             using var chatSessionCmd = connection.CreateCommand();
             chatSessionCmd.CommandText = """
@@ -142,6 +160,26 @@ public static class DatabaseMigrator
             EnsurePostgresColumn(connection, "Habits", "DueDate", "timestamp with time zone NULL");
             EnsurePostgresColumn(connection, "Habits", "IsCompleted", "boolean NOT NULL DEFAULT false");
             EnsurePostgresColumn(connection, "CheckIns", "MilestoneId", "integer NULL");
+            EnsurePostgresColumn(connection, "Habits", "AssessmentEnabled", "boolean NOT NULL DEFAULT false");
+            EnsurePostgresColumn(connection, "Habits", "AssessmentDifficulty", "text NOT NULL DEFAULT 'easy'");
+
+            using (var materialsCmd = connection.CreateCommand())
+            {
+                materialsCmd.CommandText = """
+                    CREATE TABLE IF NOT EXISTS "HabitMaterials" (
+                        "Id" serial PRIMARY KEY,
+                        "HabitId" integer NOT NULL,
+                        "UserId" integer NOT NULL,
+                        "FileName" text NOT NULL,
+                        "ContentType" text NOT NULL DEFAULT '',
+                        "Size" bigint NOT NULL DEFAULT 0,
+                        "StoredPath" text NOT NULL DEFAULT '',
+                        "ExtractedText" text NOT NULL DEFAULT '',
+                        "CreatedAt" timestamp with time zone NOT NULL
+                    );
+                    """;
+                materialsCmd.ExecuteNonQuery();
+            }
 
             using (var chatSessionCmd = connection.CreateCommand())
             {
