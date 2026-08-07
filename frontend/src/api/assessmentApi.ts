@@ -1,5 +1,4 @@
-import { apiFetch, authHeaders, getAuthToken, handleUnauthorized } from './http'
-import { API_BASE, RENDER_API_BASE, resolveUploadApiBase } from '../config/api'
+import { apiFetch, authHeaders } from './http'
 import type { AssessmentDifficulty } from '../utils/habitHelpers'
 
 export interface HabitMaterialDto {
@@ -69,8 +68,6 @@ export interface AssessmentGradeResult {
   }
 }
 
-const MAX_MATERIAL_BYTES = 8 * 1024 * 1024
-
 function parseErrorBody(text: string): string {
   if (!text?.trim()) return ''
   try {
@@ -87,55 +84,40 @@ export async function listHabitMaterials(habitId: number): Promise<HabitMaterial
   return res.json()
 }
 
+/**
+ * Same path as the last known-good build (7164a27): same-origin `/api` + multipart FormData.
+ * Do not set Content-Type — the browser must add the multipart boundary.
+ */
 export async function uploadHabitMaterial(habitId: number, file: File): Promise<HabitMaterialDto> {
-  const token = getAuthToken()
-  if (!token) {
-    handleUnauthorized()
-    throw new Error('登录已过期，请重新登录后再上传')
-  }
-  if (file.size > MAX_MATERIAL_BYTES) {
+  if (file.size <= 0) throw new Error('文件是空的')
+  if (file.size > 8 * 1024 * 1024) {
     throw new Error(`文件过大（${(file.size / 1024 / 1024).toFixed(1)}MB），上限 8MB`)
   }
 
-  const postOnce = async (base: string) => {
-    const form = new FormData()
-    form.append('file', file, file.name)
-    try {
-      return await fetch(`${base}/habit/${habitId}/materials`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
-      })
-    } catch (err) {
-      if (err instanceof TypeError) {
-        throw new Error('无法连接服务器上传文件。请确认后端已唤醒后重试。')
-      }
-      throw err
-    }
-  }
+  const form = new FormData()
+  form.append('file', file)
 
-  // Same-origin first (stable for txt/md/small pdf). Large files go direct to Render.
-  // If proxy returns 413, retry once against Render (rebuild FormData — body is single-use).
-  let base = resolveUploadApiBase(file.size)
-  let res = await postOnce(base)
-  if (
-    res.status === 413
-    && base !== RENDER_API_BASE
-    && !API_BASE.startsWith('http')
-  ) {
-    base = RENDER_API_BASE
-    res = await postOnce(base)
+  let res: Response
+  try {
+    res = await apiFetch(`/habit/${habitId}/materials`, {
+      method: 'POST',
+      body: form,
+    })
+  } catch (err) {
+    if (err instanceof TypeError) {
+      throw new Error('无法连接服务器。请稍后重试（后端可能正在唤醒）。')
+    }
+    throw err
   }
 
   if (res.status === 401) {
-    handleUnauthorized()
     throw new Error('登录已过期，请重新登录后再上传')
   }
   if (res.status === 413) {
-    throw new Error('文件太大，上传被拦截（请压缩到 8MB 以内）')
+    throw new Error('文件太大（请压缩到 8MB 以内，或拆成更小的 PDF）')
   }
   if (!res.ok) {
-    throw new Error(parseErrorBody(await res.text()) || `Upload failed (${res.status})`)
+    throw new Error(parseErrorBody(await res.text()) || `上传失败（HTTP ${res.status}）`)
   }
   return res.json()
 }

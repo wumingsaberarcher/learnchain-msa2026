@@ -13,12 +13,16 @@ export function isJwtExpired(token: string, skewSeconds = 60): boolean {
   try {
     const parts = token.split('.')
     if (parts.length < 2) return true
-    const json = atob(parts[1]!.replace(/-/g, '+').replace(/_/g, '/'))
+    let b64 = parts[1]!.replace(/-/g, '+').replace(/_/g, '/')
+    const pad = b64.length % 4
+    if (pad) b64 += '='.repeat(4 - pad)
+    const json = atob(b64)
     const payload = JSON.parse(json) as { exp?: number }
     if (typeof payload.exp !== 'number') return false
     return Date.now() >= payload.exp * 1000 - skewSeconds * 1000
   } catch {
-    return true
+    // Don't treat decode glitches as expiry — that logged users out and broke uploads.
+    return false
   }
 }
 

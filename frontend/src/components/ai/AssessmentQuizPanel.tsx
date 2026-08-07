@@ -429,7 +429,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
             ref={fileRef}
             type="file"
             multiple
-            accept=".pdf,.docx,.doc,.wps,.md,.markdown,.txt,.text,application/pdf,text/plain,text/markdown,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            accept=".pdf,.docx,.doc,.wps,.md,.txt,application/pdf,text/plain,text/markdown"
             hidden
             onChange={(e) => {
               const files = e.target.files
@@ -446,6 +446,11 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             {uploading && uploadProgress ? uploadProgress : t('assess.upload')}
           </button>
+          {error && (
+            <div className="assess-error assess-error-sidebar" role="alert">
+              {error}
+            </div>
+          )}
           {usableMaterials.length > 0 && (
             <div className="assess-select-actions">
               <button type="button" onClick={selectAllUsable}>{t('assess.selectAll')}</button>

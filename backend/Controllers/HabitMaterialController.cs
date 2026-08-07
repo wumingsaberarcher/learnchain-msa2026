@@ -64,39 +64,36 @@ public class HabitMaterialController : ControllerBase
     }
 
     [HttpPost]
-    [RequestSizeLimit(12 * 1024 * 1024)]
-    [RequestFormLimits(MultipartBodyLengthLimit = 12 * 1024 * 1024)]
-    public async Task<ActionResult<object>> Upload(int habitId, [FromForm] IFormFile? file, CancellationToken ct)
+    [RequestSizeLimit(HabitMaterialTextExtractor.MaxUploadBytes)]
+    public async Task<ActionResult<object>> Upload(int habitId, IFormFile file, CancellationToken ct)
     {
         var userId = GetCurrentUserId();
         if (await FindHabitAsync(habitId, userId) == null)
             return NotFound("习惯不存在或无权限");
 
-        // Be tolerant of form field names (file / files / first attachment).
-        var upload = file
-            ?? Request.Form.Files.GetFile("file")
-            ?? Request.Form.Files.FirstOrDefault();
-        if (upload == null || upload.Length == 0)
-            return BadRequest("请选择文件（未收到上传内容）");
+        if (file == null || file.Length == 0)
+            return BadRequest("请选择文件");
 
-        if (upload.Length > HabitMaterialTextExtractor.MaxUploadBytes)
+        if (file.Length > HabitMaterialTextExtractor.MaxUploadBytes)
             return BadRequest("文件过大（上限 8MB）");
 
-        if (!_extractor.IsAllowed(upload.FileName))
+        if (!_extractor.IsAllowed(file.FileName))
             return BadRequest("仅支持 pdf / docx / doc / wps / md / txt（WPS 建议另存为 .docx 或 .pdf）");
 
+        // Extract text first (reads the upload stream). Then persist via IFormFile.CopyToAsync
+        // which re-opens the buffered upload — same pattern as the last working build.
         string extracted;
         try
         {
-            await using var read = upload.OpenReadStream();
-            extracted = await _extractor.ExtractAsync(upload.FileName, read, ct);
+            await using var read = file.OpenReadStream();
+            extracted = await _extractor.ExtractAsync(file.FileName, read, ct);
         }
         catch (Exception ex)
         {
             return BadRequest($"无法提取文本：{ex.Message}");
         }
 
-        var ext = Path.GetExtension(upload.FileName ?? "").ToLowerInvariant();
+        var ext = Path.GetExtension(file.FileName ?? "").ToLowerInvariant();
         var hasText = !string.IsNullOrWhiteSpace(extracted);
         string? warning = null;
         if (!hasText)
@@ -108,7 +105,7 @@ public class HabitMaterialController : ControllerBase
 
         var root = Path.Combine(_env.ContentRootPath, "App_Data", "habit-materials", userId.ToString(), habitId.ToString());
         Directory.CreateDirectory(root);
-        var safeName = Path.GetFileName(upload.FileName);
+        var safeName = Path.GetFileName(file.FileName);
         if (string.IsNullOrWhiteSpace(safeName))
             safeName = $"upload-{DateTime.UtcNow:yyyyMMddHHmmss}";
         var storedName = $"{Guid.NewGuid():N}_{safeName}";
@@ -116,8 +113,7 @@ public class HabitMaterialController : ControllerBase
 
         await using (var fs = System.IO.File.Create(fullPath))
         {
-            await using var src = upload.OpenReadStream();
-            await src.CopyToAsync(fs, ct);
+            await file.CopyToAsync(fs, ct);
         }
 
         var material = new HabitMaterial
@@ -125,10 +121,10 @@ public class HabitMaterialController : ControllerBase
             HabitId = habitId,
             UserId = userId,
             FileName = safeName,
-            ContentType = string.IsNullOrWhiteSpace(upload.ContentType)
+            ContentType = string.IsNullOrWhiteSpace(file.ContentType)
                 ? _extractor.DetectContentType(safeName)
-                : upload.ContentType,
-            Size = upload.Length,
+                : file.ContentType,
+            Size = file.Length,
             StoredPath = Path.Combine(userId.ToString(), habitId.ToString(), storedName).Replace('\\', '/'),
             ExtractedText = extracted ?? "",
             CreatedAt = DateTime.UtcNow
