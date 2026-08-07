@@ -160,29 +160,43 @@ export default function GalgameStage() {
     clearCanalLine(null)
   }, [canalLine, playLine, clearCanalLine])
 
-  /** Keep dialog below Canal's face; she "pushes" it down when it climbs too high. */
+  /** Keep dialog/history stack below Canal's face; she "pushes" it down when it climbs too high. */
   useEffect(() => {
     const stack = dialogStackRef.current
-    const box = dialogBoxRef.current
-    if (!stack || !box) return
+    if (!stack) return
 
-    const FACE_LINE_RATIO = 0.36
-    const MIN_BOX = 120
+    // Protect upper torso/face — content must stay below this line.
+    const FACE_LINE_RATIO = 0.44
+    const MIN_BOX = 100
 
     const measure = () => {
       const vh = window.innerHeight
       const faceLine = vh * FACE_LINE_RATIO
       const stackBottom = stack.getBoundingClientRect().bottom
+      const toggleH =
+        (stack.querySelector('.gal-mode-toggle-dock') as HTMLElement | null)?.offsetHeight ?? 0
       const inputH = inputRowRef.current?.offsetHeight ?? 56
-      const gap = 12
-      const maxH = Math.max(MIN_BOX, stackBottom - faceLine - inputH - gap)
+      const mutterH =
+        (stack.querySelector('.gal-block-mutter') as HTMLElement | null)?.offsetHeight ?? 0
+      const gaps = 20
+      // Budget for the message panel only (history OR dialogue box), after chrome above/below it.
+      const budget = stackBottom - faceLine - toggleH - inputH - mutterH - gaps
+      const maxH = Math.max(MIN_BOX, Math.min(budget, Math.round(vh * 0.34)))
       setDialogMaxHeight(maxH)
 
-      const textEl = box.querySelector('.gal-dialog-text') as HTMLElement | null
+      const box = dialogBoxRef.current
+      const history = historyListRef.current
+      const panel = box ?? history
+      if (!panel) return
+
+      const textEl =
+        (panel.querySelector('.gal-dialog-text') as HTMLElement | null) ||
+        (panel.querySelector('.gal-dialog-md') as HTMLElement | null) ||
+        (panel.querySelector('.chat-md') as HTMLElement | null)
       const natural =
-        (textEl?.scrollHeight ?? 0) +
-        (box.querySelector('.gal-dialog-name')?.clientHeight ?? 0) +
-        (box.querySelector('.gal-dialog-hint')?.clientHeight ?? 0) +
+        (textEl?.scrollHeight ?? panel.scrollHeight) +
+        (panel.querySelector('.gal-dialog-name')?.clientHeight ?? 0) +
+        (panel.querySelector('.gal-dialog-hint')?.clientHeight ?? 0) +
         48
       const overFace = natural > maxH + 8
 
@@ -201,14 +215,16 @@ export default function GalgameStage() {
 
     measure()
     const ro = new ResizeObserver(() => measure())
-    ro.observe(box)
     ro.observe(stack)
+    if (inputRowRef.current) ro.observe(inputRowRef.current)
+    if (dialogBoxRef.current) ro.observe(dialogBoxRef.current)
+    if (historyListRef.current) ro.observe(historyListRef.current)
     window.addEventListener('resize', measure)
     return () => {
       ro.disconnect()
       window.removeEventListener('resize', measure)
     }
-  }, [displayText, typing, fullText, viewMode])
+  }, [displayText, typing, fullText, viewMode, rawMarkdown, historyMessages.length])
 
   const speech = useSpeechInput({
     language,
@@ -476,7 +492,11 @@ export default function GalgameStage() {
           </button>
         </div>
         {viewMode === 'history' ? (
-          <div className="gal-history-panel" ref={historyListRef}>
+          <div
+            className="gal-history-panel"
+            ref={historyListRef}
+            style={dialogMaxHeight != null ? { maxHeight: dialogMaxHeight } : undefined}
+          >
             {historyMessages.length === 0 ? (
               <p className="gal-history-empty">
                 {isDailyChatter ? t('chat.galHistoryChatterOnly') : t('chat.galHistoryEmpty')}

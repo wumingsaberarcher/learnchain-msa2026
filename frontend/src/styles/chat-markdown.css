@@ -171,7 +171,9 @@
 }
 
 .gal-dialog-md {
-	max-height: min(42vh, 360px);
+	max-height: none;
+	flex: 1 1 auto;
+	min-height: 0;
 	overflow-y: auto;
 	padding-right: 0.2rem;
 }
