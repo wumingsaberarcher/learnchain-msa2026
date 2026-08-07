@@ -320,9 +320,14 @@
 		display: none;
 	}
 
+	/* Assessment owns the screen on phones — dialogue was covering Generate quiz. */
 	.gal-stage.has-assess .gal-dialog-stack {
-		margin: 0 auto 0.75rem;
-		width: calc(100% - 1.25rem);
+		display: none;
+	}
+
+	.gal-stage.has-assess .gal-character-wrap {
+		opacity: 0.22;
+		pointer-events: none;
 	}
 }
 

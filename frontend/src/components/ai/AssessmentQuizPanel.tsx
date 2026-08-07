@@ -125,9 +125,6 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<string | null>(null)
-  /** Visible step-by-step upload log (also mirrored to console). */
-  const [uploadTrace, setUploadTrace] = useState<{ ok: boolean | null; text: string }[]>([])
-  const [uploadOutcome, setUploadOutcome] = useState<'ok' | 'fail' | null>(null)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [shortDraft, setShortDraft] = useState('')
   const [busy, setBusy] = useState(false)
@@ -218,91 +215,44 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
   const selectAllUsable = () => setSelectedIds(usableMaterials.map((m) => m.id))
   const clearSelection = () => setSelectedIds([])
 
-  const pushTrace = (text: string, ok: boolean | null = null) => {
-    console.info('[AssessUpload]', text)
-    setUploadTrace((prev) => [...prev, { ok, text }])
-  }
-
   const onUpload = async (files: FileList | File[]) => {
     const list = Array.from(files)
-    setUploadTrace([])
-    setUploadOutcome(null)
-    setError(null)
-
-    if (list.length === 0) {
-      pushTrace('未选中任何文件（可能点了取消）', false)
-      setUploadOutcome('fail')
-      setError('未选中任何文件')
-      return
-    }
-    if (habitId == null) {
-      pushTrace('habitId 为空，无法上传', false)
-      setUploadOutcome('fail')
-      setError('考核会话异常（habitId 缺失），请关闭后重新打卡进入')
-      return
-    }
-
+    if (list.length === 0 || habitId == null) return
     setUploading(true)
-    pushTrace(`开始上传 · habitId=${habitId} · 共 ${list.length} 个文件`, true)
+    setError(null)
     const failures: string[] = []
     const warnings: string[] = []
-    let okCount = 0
     try {
       for (let i = 0; i < list.length; i++) {
         const file = list[i]
         setUploadProgress(`${i + 1}/${list.length}`)
-        pushTrace(`—— 文件 ${i + 1}/${list.length}: ${file.name}`, null)
         try {
-          const dto = await uploadHabitMaterial(habitId, file, (step, detail) => {
-            pushTrace(detail ? `${step} · ${detail}` : step, step.startsWith('失败') ? false : true)
+          const dto = await uploadHabitMaterial(habitId, file, (msg) => {
+            setUploadProgress(`${i + 1}/${list.length} · ${msg}`)
           })
-          okCount += 1
           if (!dto.hasText || dto.warning) {
             warnings.push(`${file.name}: ${dto.warning || t('assess.noText')}`)
           }
         } catch (e) {
-          const reason = e instanceof Error ? e.message : t('assess.uploadFail')
-          failures.push(`${file.name}: ${reason}`)
-          pushTrace(`文件失败: ${reason}`, false)
+          failures.push(`${file.name}: ${e instanceof Error ? e.message : t('assess.uploadFail')}`)
         }
       }
-
-      pushTrace('刷新资料列表…', null)
       try {
         await refreshMaterials()
-        const n = useAssessmentStore.getState().materials.length
-        pushTrace(`列表已刷新 · 当前共 ${n} 份资料`, true)
-      } catch (e) {
-        const reason = e instanceof Error ? e.message : t('assess.uploadRefreshFail')
-        pushTrace(`刷新列表失败: ${reason}`, false)
-        if (failures.length === 0) {
-          failures.push(t('assess.uploadRefreshFail'))
-        }
+      } catch {
+        if (failures.length === 0) failures.push(t('assess.uploadRefreshFail'))
       }
-
       if (failures.length > 0) {
-        setUploadOutcome('fail')
         setError(
           failures.length === list.length
             ? failures.join('\n')
-            : t('assess.uploadPartial', { ok: okCount, fail: failures.length }) +
+            : t('assess.uploadPartial', { ok: list.length - failures.length, fail: failures.length }) +
               '\n' +
               failures.join('\n'),
         )
       } else if (warnings.length > 0) {
-        setUploadOutcome('ok')
         setError(warnings.join('\n'))
-        pushTrace(`全部请求成功，但有警告（${warnings.length}）`, true)
-      } else {
-        setUploadOutcome('ok')
-        setError(null)
-        pushTrace(`全部成功（${okCount}/${list.length}）`, true)
       }
-    } catch (e) {
-      const reason = e instanceof Error ? e.message : String(e)
-      pushTrace(`未捕获异常: ${reason}`, false)
-      setUploadOutcome('fail')
-      setError(reason)
     } finally {
       setUploadProgress(null)
       setUploading(false)
@@ -482,61 +432,20 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
             hidden
             onChange={(e) => {
               const files = e.target.files
-              console.info('[AssessUpload] input onChange', {
-                count: files?.length ?? 0,
-                names: files ? Array.from(files).map((f) => f.name) : [],
-              })
-              // Keep FileList copy before clearing the input value.
               const copied = files?.length ? Array.from(files) : []
               e.target.value = ''
               if (copied.length) void onUpload(copied)
-              else {
-                setUploadTrace([{ ok: false, text: '文件选择对话框关闭且未选中文件' }])
-                setUploadOutcome('fail')
-              }
             }}
           />
           <button
             type="button"
             className="assess-upload-btn"
             disabled={uploading}
-            onClick={() => {
-              console.info('[AssessUpload] open file picker', { habitId })
-              setUploadTrace([{ ok: null, text: '已打开文件选择框，请选择文件…' }])
-              setUploadOutcome(null)
-              fileRef.current?.click()
-            }}
+            onClick={() => fileRef.current?.click()}
           >
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            {uploading && uploadProgress
-              ? t('assess.uploadingProgress', { current: uploadProgress.split('/')[0], total: uploadProgress.split('/')[1] || '?' })
-              : t('assess.upload')}
+            {uploading && uploadProgress ? uploadProgress : t('assess.upload')}
           </button>
-          {uploadTrace.length > 0 && (
-            <div
-              className={`assess-upload-trace${uploadOutcome === 'ok' ? ' ok' : ''}${uploadOutcome === 'fail' ? ' fail' : ''}`}
-              role="status"
-              aria-live="polite"
-            >
-              <div className="assess-upload-trace-title">
-                {uploadOutcome === 'ok'
-                  ? '上传完成'
-                  : uploadOutcome === 'fail'
-                    ? '上传未成功（见下方卡在哪一步）'
-                    : uploading
-                      ? '上传进行中…'
-                      : '上传日志'}
-              </div>
-              <ol>
-                {uploadTrace.map((row, i) => (
-                  <li key={`${i}-${row.text.slice(0, 24)}`} className={row.ok === false ? 'bad' : row.ok ? 'good' : ''}>
-                    {row.ok === true ? '✓ ' : row.ok === false ? '✗ ' : '· '}
-                    {row.text}
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
           {error && (
             <div className="assess-error assess-error-sidebar" role="alert">
               {error}

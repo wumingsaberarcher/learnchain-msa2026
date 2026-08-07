@@ -217,13 +217,14 @@ export default function CreateHabitWizard({ onClose, onSubmit, existingNames }: 
                             </p>
                         )}
                         <div className="habits-assessment-block" style={{ marginTop: '1rem' }}>
-                            <label className="habits-wizard-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <label className="habits-wizard-label habits-assessment-enable" style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
                                 <input
                                     type="checkbox"
                                     checked={assessmentEnabled}
                                     onChange={(e) => setAssessmentEnabled(e.target.checked)}
+                                    style={{ marginTop: '0.2rem', flexShrink: 0 }}
                                 />
-                                {t('wizard.assessmentEnable')}
+                                <span>{t('wizard.assessmentEnable')}</span>
                             </label>
                             <p className="habits-wizard-hint">{t('wizard.assessmentHint')}</p>
                             {assessmentEnabled && (

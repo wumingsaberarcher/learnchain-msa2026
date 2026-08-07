@@ -826,6 +826,16 @@ p a:hover {
 /* Create Habit Wizard */
 .habits-wizard {
 	max-width: 520px;
+	max-height: min(92vh, 720px);
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	padding: 1.35rem 1.35rem 1rem;
+}
+
+.habits-wizard .habits-modal-header {
+	flex-shrink: 0;
+	margin-bottom: 0.85rem;
 }
 
 .habits-wizard-step {
@@ -837,7 +847,8 @@ p a:hover {
 .habits-wizard-progress {
 	display: flex;
 	gap: 0.5rem;
-	margin-bottom: 1.5rem;
+	margin-bottom: 1rem;
+	flex-shrink: 0;
 }
 
 .habits-wizard-dot {
@@ -853,7 +864,22 @@ p a:hover {
 }
 
 .habits-wizard-body {
-	margin-bottom: 0.5rem;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	-webkit-overflow-scrolling: touch;
+	margin-bottom: 0.75rem;
+	padding-right: 0.15rem;
+	overscroll-behavior: contain;
+}
+
+.habits-wizard .habits-modal-actions {
+	flex-shrink: 0;
+	margin-top: 0;
+	padding-top: 0.75rem;
+	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	position: relative;
+	z-index: 2;
 }
 
 .habits-wizard-label {
@@ -862,6 +888,12 @@ p a:hover {
 	font-weight: 600;
 	color: rgba(255, 255, 255, 0.9);
 	margin-bottom: 0.75rem;
+}
+
+.habits-assessment-block .habits-wizard-label {
+	font-size: 0.84rem;
+	line-height: 1.35;
+	align-items: flex-start;
 }
 
 .habits-wizard-hint {
@@ -1245,6 +1277,19 @@ p a:hover {
 }
 
 @media (max-width: 768px) {
+	.habits-modal-overlay {
+		padding: 0.5rem;
+		align-items: flex-end;
+	}
+
+	.habits-wizard {
+		max-height: min(92dvh, 92vh);
+		width: 100%;
+		max-width: none;
+		border-radius: 20px 20px 14px 14px;
+		padding: 1rem 1rem 0.85rem;
+	}
+
 	.habits-type-grid,
 	.habits-difficulty-grid {
 		grid-template-columns: 1fr;
@@ -1401,6 +1446,17 @@ nav {
 	background: rgba(255, 255, 255, 0.1);
 	border-color: rgba(0, 255, 255, 0.3);
 	color: var(--primary);
+}
+
+/* Hide floating chrome while habit wizard/auth overlays are open (mobile overlap). */
+body:has(.habits-modal-overlay) .theme-locale-fab,
+body:has(.habits-modal-overlay) .ai-fab,
+body:has(.habits-modal-overlay) .companion-peek,
+body:has(.auth-modal-overlay) .theme-locale-fab,
+body:has(.auth-modal-overlay) .ai-fab,
+body:has(.auth-modal-overlay) .companion-peek {
+	visibility: hidden !important;
+	pointer-events: none !important;
 }
 
 /* Theme + Locale floating FAB (bottom-left, mirrors AI fab) */
