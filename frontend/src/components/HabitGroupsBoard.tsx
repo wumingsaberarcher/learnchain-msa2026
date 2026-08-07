@@ -467,7 +467,7 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
                     <strong>{m.fileName}</strong>
                     <small>
                       {(m.size / 1024).toFixed(1)} KB
-                      {m.hasText ? ` · ${m.textLength}` : ` · ${t('assess.noText')}`}
+                      {m.hasText ? ` · ${m.textLength} chars` : ` · ${t('assess.noText')}`}
                     </small>
                   </span>
                   <button

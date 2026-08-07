@@ -168,6 +168,8 @@ try
 
     app.MapControllers();
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "learnchain-backend" }));
+    // Same payload under /api so Vercel `/api` rewrites can wake/probe without a 401 on /habit.
+    app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", service = "learnchain-backend" }));
     app.MapGet("/music/tracks", () => Results.Ok(new[]
     {
         new { id = "ceta", title = "CETA", file = "ceta.aac", unlock = "default" },

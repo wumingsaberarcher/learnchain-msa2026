@@ -9,16 +9,33 @@ async function probeBackend(timeoutMs = 6000): Promise<boolean> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), timeoutMs)
   try {
-    const res = await fetch(`${API_BASE}/habit`, {
+    // Prefer a public ping so DevTools doesn't show a scary red 401 on /habit.
+    const res = await fetch(`${API_BASE}/health`, {
       method: 'GET',
       signal: ctrl.signal,
+      cache: 'no-store',
+    })
+    if (res.status > 0) return true
+  } catch {
+    /* fall through to authenticated-ish habit probe */
+  } finally {
+    clearTimeout(timer)
+  }
+
+  const ctrl2 = new AbortController()
+  const timer2 = setTimeout(() => ctrl2.abort(), timeoutMs)
+  try {
+    // Fallback for older backends without /health — 401 still means "awake".
+    const res = await fetch(`${API_BASE}/habit`, {
+      method: 'GET',
+      signal: ctrl2.signal,
       cache: 'no-store',
     })
     return res.status > 0
   } catch {
     return false
   } finally {
-    clearTimeout(timer)
+    clearTimeout(timer2)
   }
 }
 
