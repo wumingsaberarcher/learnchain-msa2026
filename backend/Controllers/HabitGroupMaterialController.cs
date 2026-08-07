@@ -204,4 +204,51 @@ public class HabitGroupMaterialController : ControllerBase
         await _db.SaveChangesAsync();
         return NoContent();
     }
+
+    public class RenameGroupMaterialRequest
+    {
+        public string FileName { get; set; } = string.Empty;
+    }
+
+    [HttpPut("{materialId:int}")]
+    public async Task<ActionResult<object>> Rename(int groupId, int materialId, [FromBody] RenameGroupMaterialRequest request)
+    {
+        var userId = GetCurrentUserId();
+        var material = await _db.HabitGroupMaterials
+            .FirstOrDefaultAsync(m => m.Id == materialId && m.GroupId == groupId && m.UserId == userId);
+        if (material == null) return NotFound();
+
+        var raw = (request.FileName ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(raw))
+            return BadRequest("文件名不能为空");
+
+        // Prevent path tricks; keep a display name only (disk path stays Stable via StoredPath).
+        var safe = Path.GetFileName(raw.Replace('\\', '/'));
+        if (string.IsNullOrWhiteSpace(safe))
+            return BadRequest("文件名无效");
+
+        // If the user dropped the extension, keep the original one so extract/type stays coherent.
+        var oldExt = Path.GetExtension(material.FileName);
+        if (string.IsNullOrEmpty(Path.GetExtension(safe)) && !string.IsNullOrEmpty(oldExt))
+            safe += oldExt;
+
+        if (safe.Length > 200)
+            safe = safe[..200];
+
+        material.FileName = safe;
+        await _db.SaveChangesAsync();
+
+        return Ok(new
+        {
+            material.Id,
+            material.GroupId,
+            material.FileName,
+            material.ContentType,
+            material.Size,
+            hasText = material.ExtractedText != "",
+            textLength = material.ExtractedText.Length,
+            source = "group",
+            material.CreatedAt
+        });
+    }
 }

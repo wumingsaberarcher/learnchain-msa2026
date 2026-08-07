@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   ChevronDown,
   ChevronRight,
+  FolderOpen,
   FolderPlus,
   GripVertical,
   Loader2,
@@ -9,21 +10,17 @@ import {
   Pencil,
   Play,
   Trash2,
-  Upload,
   X,
 } from 'lucide-react'
 import type { Habit, HabitGroup } from '../utils/habitHelpers'
 import {
   createHabitGroup,
-  deleteGroupMaterial,
   deleteHabitGroup,
-  listGroupMaterials,
   listHabitGroups,
   moveHabitToGroup,
   updateHabitGroup,
-  uploadGroupMaterial,
-  type HabitGroupMaterialDto,
 } from '../api/habitGroupApi'
+import GroupMaterialsDirectory from './GroupMaterialsDirectory'
 import { triggerGroupPractice } from '../stores/assessmentStore'
 import { useHabitStore } from '../stores/habitStore'
 import { useTranslation } from '../stores/languageStore'
@@ -50,7 +47,6 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
   const patchHabitsLocal = useHabitStore((s) => s.patchHabitsLocal)
   const [groups, setGroups] = useState<HabitGroup[]>([])
   const [loading, setLoading] = useState(true)
-  /** Groups start compact (collapsed). Ungrouped stays expanded. */
   const [expanded, setExpanded] = useState<Partial<Record<number | 'ungrouped', boolean>>>({
     ungrouped: true,
   })
@@ -58,15 +54,11 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
   const [busyId, setBusyId] = useState<number | null>(null)
+  /** Which group's materials directory is open (inline, not modal). */
   const [materialsFor, setMaterialsFor] = useState<number | null>(null)
-  const [materials, setMaterials] = useState<HabitGroupMaterialDto[]>([])
-  const [uploading, setUploading] = useState(false)
-  const [uploadStatus, setUploadStatus] = useState<string | null>(null)
-  const [modalError, setModalError] = useState<string | null>(null)
   const [menuHabitId, setMenuHabitId] = useState<number | null>(null)
   const [dragHabitId, setDragHabitId] = useState<number | null>(null)
   const [dropTarget, setDropTarget] = useState<number | 'ungrouped' | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState<string | null>(null)
 
   const refreshGroups = useCallback(async (quiet = false) => {
@@ -100,15 +92,9 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
     return { map, ungrouped }
   }, [habits])
 
-  const openMaterials = async (groupId: number) => {
-    setMaterialsFor(groupId)
-    setModalError(null)
-    setUploadStatus(null)
-    try {
-      setMaterials(await listGroupMaterials(groupId))
-    } catch (e) {
-      setModalError(e instanceof Error ? e.message : 'materials failed')
-    }
+  const openMaterialsDir = (groupId: number) => {
+    setMaterialsFor((cur) => (cur === groupId ? null : groupId))
+    setExpanded((e) => ({ ...e, [groupId]: true }))
   }
 
   const handleCreate = async () => {
@@ -166,6 +152,7 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
     const snapshot = groups.find((g) => g.id === id)
     const affected = habits.filter((h) => h.groupId === id).map((h) => h.id)
     setGroups((gs) => gs.filter((g) => g.id !== id))
+    if (materialsFor === id) setMaterialsFor(null)
     patchHabitsLocal((list) => list.map((h) => (h.groupId === id ? { ...h, groupId: null } : h)))
     try {
       await deleteHabitGroup(id)
@@ -183,7 +170,7 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
     if (!name?.trim()) return
     try {
       await updateHabitGroup(g.id, { name: name.trim() })
-      await refreshGroups()
+      await refreshGroups(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'rename failed')
     }
@@ -194,31 +181,6 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
     await handleMove(dragHabitId, target === 'ungrouped' ? null : target)
     setDragHabitId(null)
     setDropTarget(null)
-  }
-
-  const uploadToOpenGroup = async (files: FileList | File[]) => {
-    if (materialsFor == null) return
-    const list = Array.from(files)
-    setUploading(true)
-    setModalError(null)
-    try {
-      for (let i = 0; i < list.length; i++) {
-        const f = list[i]!
-        setUploadStatus(
-          list.length > 1 ? `上传中 ${i + 1}/${list.length}：${f.name}` : `上传中：${f.name}`,
-        )
-        const dto = await uploadGroupMaterial(materialsFor, f, setUploadStatus)
-        if (dto.warning) setModalError(dto.warning)
-      }
-      setMaterials(await listGroupMaterials(materialsFor))
-      await refreshGroups(true)
-      setUploadStatus(null)
-    } catch (e) {
-      setModalError(e instanceof Error ? e.message : 'upload failed')
-      setUploadStatus(null)
-    } finally {
-      setUploading(false)
-    }
   }
 
   if (loading && groups.length === 0) {
@@ -366,6 +328,7 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
 
       {groups.map((g) => {
         const members = grouped.map.get(g.id) ?? []
+        const showDir = materialsFor === g.id
         return (
           <div key={g.id}>
             {renderDropZone(
@@ -379,13 +342,26 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
               <>
                 {members.length === 0 && <p className="habits-empty-hint">{t('groups.emptyHabits')}</p>}
                 {members.map((h) => renderHabitRow(h, g.id))}
+                {showDir && (
+                  <GroupMaterialsDirectory
+                    groupId={g.id}
+                    groupName={g.name || t('groups.unnamed')}
+                    onClose={() => setMaterialsFor(null)}
+                    onCountChange={() => void refreshGroups(true)}
+                  />
+                )}
               </>,
               <div className="habits-group-actions">
                 <button type="button" className="habits-group-icon-btn" title={t('groups.practice')} onClick={() => void triggerGroupPractice(g)}>
                   <Play className="w-4 h-4" />
                 </button>
-                <button type="button" className="habits-group-icon-btn" title={t('groups.materials')} onClick={() => void openMaterials(g.id)}>
-                  <Upload className="w-4 h-4" />
+                <button
+                  type="button"
+                  className={`habits-group-icon-btn${showDir ? ' is-active' : ''}`}
+                  title={t('groups.materialsDir')}
+                  onClick={() => openMaterialsDir(g.id)}
+                >
+                  <FolderOpen className="w-4 h-4" />
                 </button>
                 <button type="button" className="habits-group-icon-btn" title={t('groups.rename')} onClick={() => void handleRename(g)}>
                   <Pencil className="w-4 h-4" />
@@ -414,93 +390,6 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
           {grouped.ungrouped.length === 0 && <p className="habits-empty-hint">{t('groups.emptyUngrouped')}</p>}
           {grouped.ungrouped.map((h) => renderHabitRow(h, null))}
         </>,
-      )}
-
-      {materialsFor != null && (
-        <div className="habits-modal-overlay" onClick={() => setMaterialsFor(null)}>
-          <div className="habits-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="habits-modal-header">
-              <h3 className="habits-modal-title">{t('groups.materials')}</h3>
-              <button type="button" className="habits-modal-close" onClick={() => setMaterialsFor(null)}>
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <p className="habits-wizard-hint">{t('groups.materialsHint')}</p>
-            {modalError && (
-              <div className="habits-error" role="alert" style={{ marginBottom: '0.65rem' }}>
-                {modalError}
-              </div>
-            )}
-            {uploadStatus && (
-              <p className="habits-wizard-hint" style={{ marginBottom: '0.5rem' }}>
-                {uploadStatus}
-              </p>
-            )}
-            <input
-              ref={fileRef}
-              type="file"
-              multiple
-              hidden
-              accept=".pdf,.docx,.doc,.wps,.md,.txt,application/pdf"
-              onChange={(e) => {
-                const files = e.target.files
-                e.target.value = ''
-                if (files?.length) void uploadToOpenGroup(files)
-              }}
-            />
-            <button
-              type="button"
-              className="btn-habit btn-habit-checkin"
-              disabled={uploading}
-              onClick={() => fileRef.current?.click()}
-            >
-              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              {uploading ? (uploadStatus ?? '…') : t('assess.upload')}
-            </button>
-            <ul className="habits-group-mat-list">
-              {materials.length === 0 && !uploading && (
-                <li className="habits-empty-hint">{t('assess.noMaterials')}</li>
-              )}
-              {materials.map((m) => (
-                <li key={m.id}>
-                  <span>
-                    <strong>{m.fileName}</strong>
-                    <small>
-                      {(m.size / 1024).toFixed(1)} KB
-                      {m.hasText ? ` · ${m.textLength} chars` : ` · ${t('assess.noText')}`}
-                    </small>
-                  </span>
-                  <button
-                    type="button"
-                    className="habits-group-icon-btn danger"
-                    onClick={() =>
-                      void deleteGroupMaterial(materialsFor, m.id).then(async () => {
-                        setMaterials(await listGroupMaterials(materialsFor))
-                        await refreshGroups(true)
-                      })
-                    }
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <div className="habits-modal-actions">
-              <button
-                type="button"
-                className="btn-habit btn-habit-checkin"
-                onClick={() => {
-                  const g = groups.find((x) => x.id === materialsFor)
-                  if (g) void triggerGroupPractice(g)
-                  setMaterialsFor(null)
-                }}
-              >
-                <Play className="w-4 h-4" />
-                {t('groups.practice')}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   )

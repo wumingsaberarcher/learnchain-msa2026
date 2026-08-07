@@ -125,3 +125,17 @@ export async function deleteGroupMaterial(groupId: number, materialId: number): 
   const res = await apiFetch(`/habit-group/${groupId}/materials/${materialId}`, { method: 'DELETE' })
   if (!res.ok) throw new Error('Delete failed')
 }
+
+export async function renameGroupMaterial(
+  groupId: number,
+  materialId: number,
+  fileName: string,
+): Promise<HabitGroupMaterialDto> {
+  const res = await apiFetch(`/habit-group/${groupId}/materials/${materialId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileName }),
+  })
+  if (!res.ok) throw new Error(parseErrorBody(await res.text()) || 'Rename failed')
+  return res.json()
+}

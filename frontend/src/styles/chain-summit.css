@@ -3907,6 +3907,148 @@ footer p a:hover {
 	color: rgba(242, 246, 255, 0.7);
 }
 
+.habits-group-icon-btn.is-active {
+	background: rgba(0, 255, 255, 0.16);
+	border-color: rgba(0, 255, 255, 0.4);
+}
+
+.habits-mat-dir {
+	margin-top: 0.55rem;
+	padding: 0.75rem 0.8rem;
+	border-radius: 12px;
+	border: 1px solid rgba(0, 255, 255, 0.2);
+	background: rgba(0, 0, 0, 0.28);
+}
+
+.habits-mat-dir-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.5rem;
+	margin-bottom: 0.55rem;
+}
+
+.habits-mat-dir-title {
+	font-weight: 700;
+	font-size: 0.98rem;
+	color: #fff;
+}
+
+.habits-mat-dir-sub {
+	margin-top: 0.2rem;
+	font-size: 0.78rem;
+	line-height: 1.35;
+	color: rgba(200, 230, 240, 0.7);
+}
+
+.habits-mat-dir-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	margin-bottom: 0.65rem;
+}
+
+.habits-mat-dir-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+.habits-mat-dir-row {
+	display: flex;
+	align-items: center;
+	gap: 0.55rem;
+	padding: 0.5rem 0.55rem;
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.habits-mat-ext {
+	flex-shrink: 0;
+	min-width: 2.4rem;
+	height: 1.7rem;
+	padding: 0 0.35rem;
+	border-radius: 6px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 0.68rem;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	background: rgba(180, 60, 80, 0.85);
+	color: #fff;
+}
+
+.habits-mat-dir-main {
+	flex: 1;
+	min-width: 0;
+}
+
+.habits-mat-name-btn {
+	display: block;
+	width: 100%;
+	text-align: left;
+	background: transparent;
+	border: none;
+	color: inherit;
+	padding: 0;
+	cursor: pointer;
+	font: inherit;
+}
+
+.habits-mat-name-btn strong {
+	display: block;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.habits-mat-name-btn:hover strong {
+	text-decoration: underline;
+}
+
+.habits-mat-dir-main small {
+	display: block;
+	opacity: 0.65;
+	font-size: 0.75rem;
+	margin-top: 0.12rem;
+}
+
+.habits-mat-rename-input {
+	width: 100%;
+	margin: 0;
+}
+
+.habits-mat-dir-actions {
+	display: inline-flex;
+	gap: 0.2rem;
+	flex-shrink: 0;
+}
+
+.app-shell.theme-day .habits-mat-dir {
+	background: rgba(255, 255, 255, 0.55);
+	border-color: rgba(76, 120, 68, 0.28);
+}
+
+.app-shell.theme-day .habits-mat-dir-title {
+	color: #1a2e1a;
+}
+
+.app-shell.theme-day .habits-mat-dir-sub {
+	color: rgba(26, 46, 26, 0.65);
+}
+
+.app-shell.theme-day .habits-mat-dir-row {
+	background: rgba(255, 255, 255, 0.7);
+	border-color: rgba(76, 120, 68, 0.18);
+}
+
+.app-shell.theme-day .habits-group-icon-btn.is-active {
+	background: rgba(46, 125, 50, 0.14);
+	border-color: rgba(46, 125, 50, 0.4);
+}
+
 .habits-group-mat-list {
 	list-style: none;
 	margin: 0.75rem 0 0;
