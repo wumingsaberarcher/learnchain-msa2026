@@ -108,6 +108,8 @@ export async function generateAssessment(body: {
   baseUrl?: string
   model?: string
   language: string
+  /** Only these materials are used for question generation. */
+  materialIds?: number[]
 }): Promise<{ habitId: number; habitName: string; difficulty: string; questions: AssessmentQuestion[] }> {
   const res = await apiFetch('/assessment/generate', {
     method: 'POST',

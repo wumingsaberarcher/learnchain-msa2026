@@ -78,6 +78,38 @@
 	opacity: 0.8;
 }
 
+.assess-select-hint {
+	margin: 0;
+	font-size: 0.7rem;
+	line-height: 1.4;
+	opacity: 0.72;
+}
+
+.assess-select-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: 0.68rem;
+}
+
+.assess-select-actions button {
+	border: 1px solid rgba(150, 180, 255, 0.28);
+	background: rgba(80, 120, 200, 0.12);
+	color: inherit;
+	border-radius: 999px;
+	padding: 0.2rem 0.55rem;
+	cursor: pointer;
+	font: inherit;
+	font-size: 0.68rem;
+	font-weight: 600;
+}
+
+.assess-select-actions span {
+	opacity: 0.75;
+	margin-left: auto;
+}
+
 .assess-upload-btn {
 	display: inline-flex;
 	align-items: center;
@@ -98,49 +130,114 @@
 	padding: 0;
 	display: flex;
 	flex-direction: column;
-	gap: 0.35rem;
+	gap: 0.4rem;
 }
 
 .assess-file-list li {
 	display: grid;
 	grid-template-columns: 1fr auto;
-	gap: 0.2rem;
-	align-items: start;
+	gap: 0.25rem;
+	align-items: stretch;
 }
 
 .assess-file {
-	display: flex;
-	gap: 0.4rem;
-	align-items: flex-start;
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	gap: 0.55rem;
+	align-items: center;
 	text-align: left;
-	padding: 0.4rem;
-	border-radius: 10px;
-	border: 1px solid transparent;
-	background: transparent;
+	padding: 0.55rem 0.6rem;
+	border-radius: 12px;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	background: rgba(255, 255, 255, 0.03);
 	color: inherit;
 	cursor: pointer;
+	transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+	min-width: 0;
 }
 
-.assess-file.active {
-	border-color: rgba(140, 180, 255, 0.45);
-	background: rgba(90, 130, 220, 0.18);
+.assess-file:hover:not(:disabled) {
+	border-color: rgba(140, 180, 255, 0.35);
+	background: rgba(90, 130, 220, 0.1);
 }
 
-.assess-file.bad strong {
+.assess-file.selected {
+	border-color: rgba(56, 189, 248, 0.65);
+	background: rgba(34, 150, 220, 0.22);
+	box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25);
+}
+
+.assess-file.bad,
+.assess-file:disabled {
 	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.assess-file-badge {
+	width: 2.35rem;
+	height: 2.35rem;
+	border-radius: 10px;
+	display: grid;
+	place-items: center;
+	font-size: 0.62rem;
+	font-weight: 800;
+	letter-spacing: 0.04em;
+	flex-shrink: 0;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	background: rgba(255, 255, 255, 0.06);
+	color: #e8eefc;
+}
+
+.assess-file-badge.kind-pdf {
+	background: linear-gradient(145deg, rgba(220, 70, 70, 0.35), rgba(140, 30, 40, 0.45));
+	border-color: rgba(255, 140, 140, 0.4);
+	color: #ffe4e4;
+}
+
+.assess-file-badge.kind-docx {
+	background: linear-gradient(145deg, rgba(60, 120, 220, 0.35), rgba(30, 70, 160, 0.45));
+	border-color: rgba(140, 180, 255, 0.4);
+}
+
+.assess-file-badge.kind-md,
+.assess-file-badge.kind-txt {
+	background: linear-gradient(145deg, rgba(40, 160, 120, 0.3), rgba(20, 100, 80, 0.4));
+	border-color: rgba(120, 220, 180, 0.35);
+}
+
+.assess-file-copy {
+	min-width: 0;
 }
 
 .assess-file strong {
 	display: block;
-	font-size: 0.75rem;
-	line-height: 1.25;
-	word-break: break-all;
+	font-size: 0.78rem;
+	line-height: 1.3;
+	word-break: break-word;
 }
 
 .assess-file small {
 	display: block;
 	font-size: 0.65rem;
-	opacity: 0.6;
+	opacity: 0.65;
+	margin-top: 0.15rem;
+}
+
+.assess-file-check {
+	width: 1.35rem;
+	height: 1.35rem;
+	border-radius: 999px;
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	display: grid;
+	place-items: center;
+	flex-shrink: 0;
+	background: rgba(0, 0, 0, 0.2);
+}
+
+.assess-file-check.on {
+	border-color: rgba(56, 189, 248, 0.8);
+	background: rgba(14, 165, 233, 0.85);
+	color: #041018;
 }
 
 .assess-file-del {
@@ -148,7 +245,36 @@
 	background: transparent;
 	color: rgba(255, 180, 180, 0.85);
 	cursor: pointer;
-	padding: 0.25rem;
+	padding: 0.35rem;
+	align-self: center;
+}
+
+.assess-result-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.55rem;
+	margin-top: 0.75rem;
+}
+
+.assess-secondary {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.4rem;
+	padding: 0.55rem 0.9rem;
+	border-radius: 999px;
+	border: 1px solid rgba(168, 85, 247, 0.45);
+	background: rgba(124, 58, 237, 0.2);
+	color: #f3e8ff;
+	font: inherit;
+	font-size: 0.85rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.assess-secondary:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
 }
 
 .assess-empty {
@@ -346,6 +472,20 @@
 	align-items: center;
 	flex-shrink: 0;
 	padding-bottom: 0.25rem;
+}
+
+.assess-reveal-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.65rem;
+	margin-top: 0.85rem;
+	padding: 0.7rem 0.85rem;
+	border-radius: 12px;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	background: rgba(0, 0, 0, 0.28);
+	font-size: 0.88rem;
 }
 
 .assess-submit {

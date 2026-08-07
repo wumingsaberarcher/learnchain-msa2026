@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FileText, Loader2, Mic, Trash2, Upload, X } from 'lucide-react'
+import { Check, Loader2, Mic, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import {
   deleteHabitMaterial,
   generateAssessment,
   gradeAssessment,
   uploadHabitMaterial,
+  type AssessmentGradeResult,
   type AssessmentQuestion,
 } from '../../api/assessmentApi'
 import { useAiSettingsStore } from '../../stores/aiSettingsStore'
@@ -56,6 +57,41 @@ function highlightAnswer(text: string, highlights: { start: number; end: number 
   return parts
 }
 
+function buildWrongReviewPrompt(
+  result: AssessmentGradeResult,
+  questions: AssessmentQuestion[],
+  answers: Record<string, { selectedOptionId?: string; textAnswer?: string }>,
+  zh: boolean,
+): string | null {
+  const wrongs = result.results.filter((r) => !r.correct)
+  if (wrongs.length === 0) return null
+
+  const blocks = wrongs.map((r, i) => {
+    const q = questions.find((x) => x.id === r.questionId)
+    const a = answers[r.questionId]
+    const prompt = q?.prompt?.trim() || `(Q ${r.questionId})`
+    if (q && !isShortQuestion(q)) {
+      const userOpt = (q.options || []).find(
+        (o) => o.id.toLowerCase() === (a?.selectedOptionId || '').toLowerCase(),
+      )
+      const correctOpt = (q.options || []).find(
+        (o) => o.id.toLowerCase() === (r.correctOptionId || q.correctOptionId || '').toLowerCase(),
+      )
+      const opts = (q.options || []).map((o) => `  ${o.id.toUpperCase()}. ${o.text}`).join('\n')
+      return zh
+        ? `【错题 ${i + 1}】\n题干：${prompt}\n选项：\n${opts}\n我的选择：${(a?.selectedOptionId || '?').toUpperCase()} ${userOpt?.text || ''}\n正确答案：${(r.correctOptionId || q.correctOptionId || '?').toUpperCase()} ${correctOpt?.text || ''}\n批改备注：${r.explanation || '无'}`
+        : `[Miss ${i + 1}]\nPrompt: ${prompt}\nOptions:\n${opts}\nMy pick: ${(a?.selectedOptionId || '?').toUpperCase()} ${userOpt?.text || ''}\nCorrect: ${(r.correctOptionId || q.correctOptionId || '?').toUpperCase()} ${correctOpt?.text || ''}\nGrader note: ${r.explanation || 'n/a'}`
+    }
+    return zh
+      ? `【错题 ${i + 1}】\n题干：${prompt}\n我的作答：${a?.textAnswer || '（空）'}\n参考要点：${q?.referenceAnswer || '无'}\n批改备注：${r.explanation || '无'}`
+      : `[Miss ${i + 1}]\nPrompt: ${prompt}\nMy answer: ${a?.textAnswer || '(empty)'}\nReference: ${q?.referenceAnswer || 'n/a'}\nGrader note: ${r.explanation || 'n/a'}`
+  })
+
+  return zh
+    ? `我刚完成习惯考核，以下是错题明细。请用 Canal 的口吻逐题讲解：\n1) 我为什么选错/答错；\n2) 正确思路；\n3) 对应关键知识点（结合资料，简洁清楚，可用小标题/列表）。\n不要复述整份卷子，只讲错题。\n\n${blocks.join('\n\n')}`
+    : `I just finished a habit assessment. Here are my misses. Please explain each in Canal's voice:\n1) why my choice/answer was wrong;\n2) the correct reasoning;\n3) the key knowledge point (tied to the materials; keep it clear with short lists).\nOnly cover the misses.\n\n${blocks.join('\n\n')}`
+}
+
 export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (line: string) => void }) {
   const { t, language } = useTranslation()
   const {
@@ -85,11 +121,13 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
   const apiKey = useAiSettingsStore((s) => s.apiKey)
   const baseUrl = useAiSettingsStore((s) => s.baseUrl)
   const model = useAiSettingsStore((s) => s.model)
+  const sendMessage = useChatStore((s) => s.sendMessage)
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
-  const [selectedMaterialId, setSelectedMaterialId] = useState<number | null>(null)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [shortDraft, setShortDraft] = useState('')
   const [busy, setBusy] = useState(false)
+  const [explaining, setExplaining] = useState(false)
   const [shortResult, setShortResult] = useState<{
     explanation: string
     highlights: { start: number; end: number; reason: string }[]
@@ -97,11 +135,26 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
     score: number
     maxScore: number
   } | null>(null)
+  const [shortListening, setShortListening] = useState(false)
+  const explainedRef = useRef<string | null>(null)
 
   const question: AssessmentQuestion | undefined = questions[currentIndex]
   const usableMaterials = useMemo(() => materials.filter((m) => m.hasText), [materials])
+  const selectedUsable = useMemo(
+    () => usableMaterials.filter((m) => selectedIds.includes(m.id)),
+    [usableMaterials, selectedIds],
+  )
 
-  const [shortListening, setShortListening] = useState(false)
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const usableIds = usableMaterials.map((m) => m.id)
+      if (usableIds.length === 0) return []
+      if (prev.length === 0) return usableIds
+      const kept = prev.filter((id) => usableIds.includes(id))
+      const added = usableIds.filter((id) => !prev.includes(id))
+      return [...kept, ...added]
+    })
+  }, [usableMaterials])
 
   const speech = useSpeechInput({
     language,
@@ -116,13 +169,50 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
     setShortResult(null)
   }, [question?.id, answers])
 
-  useEffect(() => {
-    if (phase === 'result' && gradeResult?.critique) {
-      onCanalSpeak?.(gradeResult.critique)
+  const askCanalAboutWrongs = async (
+    result: AssessmentGradeResult,
+    qs: AssessmentQuestion[],
+    ans: Record<string, { selectedOptionId?: string; textAnswer?: string }>,
+  ) => {
+    const zh = language.startsWith('zh')
+    const prompt = buildWrongReviewPrompt(result, qs, ans, zh)
+    if (!prompt) {
+      onCanalSpeak?.(t('assess.explainNone'))
+      return
     }
-  }, [phase, gradeResult, onCanalSpeak])
+    if (!apiKey.trim()) {
+      setError(t('chat.missingApiKey'))
+      return
+    }
+    setExplaining(true)
+    onCanalSpeak?.(t('assess.explainIntro'))
+    try {
+      await sendMessage(prompt, language)
+    } catch {
+      setError(t('assess.explainFail'))
+    } finally {
+      setExplaining(false)
+    }
+  }
+
+  useEffect(() => {
+    if (phase !== 'result' || !gradeResult) return
+    const key = `${habitId}-${gradeResult.summary}-${gradeResult.correctCount}`
+    if (explainedRef.current === key) return
+    explainedRef.current = key
+    if (gradeResult.results.some((r) => !r.correct)) return
+    if (gradeResult.critique) onCanalSpeak?.(gradeResult.critique)
+  }, [phase, gradeResult, habitId, onCanalSpeak])
 
   if (!active || habitId == null) return null
+
+  const toggleMaterial = (id: number, hasText: boolean) => {
+    if (!hasText) return
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  const selectAllUsable = () => setSelectedIds(usableMaterials.map((m) => m.id))
+  const clearSelection = () => setSelectedIds([])
 
   const onUpload = async (file: File) => {
     setUploading(true)
@@ -141,7 +231,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
     try {
       await deleteHabitMaterial(habitId, mid)
       await refreshMaterials()
-      if (selectedMaterialId === mid) setSelectedMaterialId(null)
+      setSelectedIds((prev) => prev.filter((id) => id !== mid))
     } catch {
       setError(t('assess.deleteFail'))
     }
@@ -152,8 +242,8 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
       setError(t('chat.missingApiKey'))
       return
     }
-    if (usableMaterials.length === 0) {
-      setError(t('assess.needMaterial'))
+    if (selectedUsable.length === 0) {
+      setError(t('assess.needSelectMaterial'))
       return
     }
     setBusy(true)
@@ -166,6 +256,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
         baseUrl,
         model,
         language,
+        materialIds: selectedUsable.map((m) => m.id),
       })
       const normalized = data.questions.map((q) =>
         isShortQuestion(q) ? { ...q, type: 'short' } : { ...q, type: 'mcq' },
@@ -189,26 +280,6 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
       correct,
       correctOptionId: question.correctOptionId,
     })
-  }
-
-  const submitShort = async () => {
-    if (!question || !shortDraft.trim() || busy) return
-    const textAnswer = shortDraft.trim()
-    setAnswer(question.id, { textAnswer })
-    if (currentIndex < questions.length - 1) {
-      nextQuestion()
-    } else {
-      await finishGrade({ [question.id]: { textAnswer } })
-    }
-  }
-
-  const goNextOrFinish = async () => {
-    if (!question) return
-    if (currentIndex < questions.length - 1) {
-      nextQuestion()
-      return
-    }
-    await finishGrade()
   }
 
   const finishGrade = async (
@@ -259,7 +330,6 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
         t('assess.historyUser', { name: habitName }),
         `${result.critique}\n${result.summary}`,
       )
-      // Short answer highlights from last short item if any
       const lastShort = [...result.results].reverse().find((r) => (r.highlights?.length || 0) > 0)
       if (lastShort) {
         setShortResult({
@@ -270,6 +340,9 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
           maxScore: lastShort.maxScore,
         })
       }
+      if (result.results.some((r) => !r.correct)) {
+        void askCanalAboutWrongs(result, questions, latestAnswers)
+      }
     } catch (e) {
       setPhase('quiz')
       setError(e instanceof Error ? e.message : t('assess.gradeFail'))
@@ -278,7 +351,27 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
     }
   }
 
-  const selectedMaterial = materials.find((m) => m.id === selectedMaterialId)
+  const submitShort = async () => {
+    if (!question || !shortDraft.trim() || busy) return
+    const textAnswer = shortDraft.trim()
+    setAnswer(question.id, { textAnswer })
+    if (currentIndex < questions.length - 1) {
+      nextQuestion()
+    } else {
+      await finishGrade({ [question.id]: { textAnswer } })
+    }
+  }
+
+  const goNextOrFinish = async () => {
+    if (!question) return
+    if (currentIndex < questions.length - 1) {
+      nextQuestion()
+      return
+    }
+    await finishGrade()
+  }
+
+  const wrongCount = gradeResult?.results.filter((r) => !r.correct).length ?? 0
 
   return (
     <div className="assess-panel" role="complementary" aria-label={t('assess.title')}>
@@ -298,6 +391,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
       <div className="assess-body">
         <aside className="assess-sidebar">
           <div className="assess-sidebar-title">{t('assess.materials')}</div>
+          <p className="assess-select-hint">{t('assess.selectHint')}</p>
           <input
             ref={fileRef}
             type="file"
@@ -318,45 +412,54 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             {t('assess.upload')}
           </button>
-          <ul className="assess-file-list">
-            {materials.length === 0 && <li className="assess-empty">{t('assess.noMaterials')}</li>}
-            {materials.map((m) => (
-              <li key={m.id}>
-                <button
-                  type="button"
-                  className={`assess-file${selectedMaterialId === m.id ? ' active' : ''}${m.hasText ? '' : ' bad'}`}
-                  onClick={() => setSelectedMaterialId(m.id)}
-                >
-                  <FileText className="w-4 h-4" />
-                  <span>
-                    <strong data-kind={fileKind(m.fileName)}>{m.fileName}</strong>
-                    <small>
-                      {(m.size / 1024).toFixed(1)} KB
-                      {m.hasText ? ` · ${m.textLength} chars` : ` · ${t('assess.noText')}`}
-                    </small>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className="assess-file-del"
-                  title={t('assess.delete')}
-                  onClick={() => void onDeleteMaterial(m.id)}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </li>
-            ))}
-          </ul>
-          {selectedMaterial && (
-            <div className="assess-preview">
-              <div className="assess-preview-name">{selectedMaterial.fileName}</div>
-              <div className="assess-preview-meta">
-                {selectedMaterial.contentType || fileKind(selectedMaterial.fileName)} ·{' '}
-                {(selectedMaterial.size / 1024).toFixed(1)} KB
-              </div>
-              <p className="assess-preview-hint">{t('assess.previewHint')}</p>
+          {usableMaterials.length > 0 && (
+            <div className="assess-select-actions">
+              <button type="button" onClick={selectAllUsable}>{t('assess.selectAll')}</button>
+              <button type="button" onClick={clearSelection}>{t('assess.selectNone')}</button>
+              <span>{t('assess.selectedCount', { n: selectedUsable.length })}</span>
             </div>
           )}
+          <ul className="assess-file-list">
+            {materials.length === 0 && <li className="assess-empty">{t('assess.noMaterials')}</li>}
+            {materials.map((m) => {
+              const kind = fileKind(m.fileName)
+              const selected = selectedIds.includes(m.id)
+              return (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    className={`assess-file${selected ? ' selected' : ''}${m.hasText ? '' : ' bad'}`}
+                    onClick={() => toggleMaterial(m.id, m.hasText)}
+                    disabled={!m.hasText}
+                    aria-pressed={selected}
+                    title={m.hasText ? t('assess.toggleSelect') : t('assess.noText')}
+                  >
+                    <span className={`assess-file-badge kind-${kind}`} aria-hidden>
+                      {kind === 'pdf' ? 'PDF' : kind.toUpperCase()}
+                    </span>
+                    <span className="assess-file-copy">
+                      <strong>{m.fileName}</strong>
+                      <small>
+                        {(m.size / 1024).toFixed(1)} KB
+                        {m.hasText ? ` · ${m.textLength} chars` : ` · ${t('assess.noText')}`}
+                      </small>
+                    </span>
+                    <span className={`assess-file-check${selected ? ' on' : ''}`} aria-hidden>
+                      {selected ? <Check className="w-3.5 h-3.5" /> : null}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="assess-file-del"
+                    title={t('assess.delete')}
+                    onClick={() => void onDeleteMaterial(m.id)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
         </aside>
 
         <section className="assess-main">
@@ -368,11 +471,17 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
 
           {(phase === 'ready' || phase === 'idle') && (
             <div className="assess-ready">
-              <p>{usableMaterials.length ? t('assess.readyHint') : t('assess.needMaterial')}</p>
+              <p>
+                {usableMaterials.length === 0
+                  ? t('assess.needMaterial')
+                  : selectedUsable.length === 0
+                    ? t('assess.needSelectMaterial')
+                    : t('assess.readyHintSelected', { n: selectedUsable.length })}
+              </p>
               <button
                 type="button"
                 className="assess-primary"
-                disabled={busy || usableMaterials.length === 0}
+                disabled={busy || selectedUsable.length === 0}
                 onClick={() => void startGenerate()}
               >
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
@@ -397,78 +506,81 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
                 />
               </div>
               <div className="assess-qmeta">
-                {t('assess.questionOf', { current: currentIndex + 1, total: questions.length })}
+                {t('assess.questionOf', {
+                  current: currentIndex + 1,
+                  total: questions.length,
+                })}
+                {' · '}
+                {isShortQuestion(question) ? t('assess.typeShort') : t('assess.typeMcq')}
               </div>
               <h3 className="assess-prompt">{question.prompt}</h3>
 
-              {isShortQuestion(question) ? (
+              {!isShortQuestion(question) ? (
+                <div className="assess-options">
+                  {(question.options || []).map((o) => {
+                    const revealing = phase === 'revealing' && lastReveal?.questionId === question.id
+                    const picked = answers[question.id]?.selectedOptionId === o.id
+                    const isCorrect =
+                      revealing
+                      && (o.id.toLowerCase() === (lastReveal?.correctOptionId || '').toLowerCase())
+                    const isWrongPick = revealing && picked && !lastReveal?.correct
+                    return (
+                      <button
+                        key={o.id}
+                        type="button"
+                        className={`assess-option${picked ? ' selected' : ''}${isCorrect ? ' correct' : ''}${isWrongPick ? ' wrong' : ''}`}
+                        disabled={phase === 'revealing' || busy}
+                        onClick={() => submitMcq(o.id)}
+                      >
+                        <span className="assess-opt-id">{o.id.toUpperCase()}</span>
+                        <span>{o.text}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
                 <div className="assess-short">
                   <textarea
-                    className="assess-textarea"
-                    rows={6}
                     value={shortDraft}
-                    disabled={busy}
-                    placeholder={t('assess.shortPlaceholder')}
                     onChange={(e) => setShortDraft(e.target.value)}
+                    placeholder={t('assess.shortPlaceholder')}
+                    rows={5}
+                    disabled={busy}
                   />
                   <div className="assess-short-actions">
                     <button
                       type="button"
-                      className={`assess-mic ${shortListening ? 'listening' : ''}`}
-                      disabled={!speech.supported || busy}
-                      onClick={() => speech.toggle()}
-                      title={speech.supported ? t('chat.voice') : t('chat.voiceUnsupported')}
-                      aria-label={speech.supported ? t('chat.voice') : t('chat.voiceUnsupported')}
+                      className={`assess-mic${shortListening ? ' listening' : ''}`}
+                      onClick={() => (shortListening ? speech.stop() : speech.start())}
+                      title={t('chat.voice')}
                     >
-                      {shortListening ? (
-                        <VoiceVolumeIcon level={speech.volumeLevel} className="w-4 h-4" />
-                      ) : (
-                        <Mic className="w-4 h-4" />
-                      )}
+                      <VoiceVolumeIcon active={shortListening} />
+                      {!shortListening && <Mic className="w-4 h-4" />}
                     </button>
                     <button
                       type="button"
-                      className="assess-primary assess-submit"
-                      disabled={!shortDraft.trim() || busy}
+                      className="assess-primary"
+                      disabled={busy || !shortDraft.trim()}
                       onClick={() => void submitShort()}
                     >
-                      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                      {currentIndex < questions.length - 1 ? t('assess.submitAnswer') : t('assess.finish')}
+                      {t('assess.submitAnswer')}
                     </button>
                   </div>
                 </div>
-              ) : (
-                <div className="assess-options">
-                  {(question.options || []).map((opt) => {
-                    const reveal = phase === 'revealing' && lastReveal?.questionId === question.id
-                    const selected = answers[question.id]?.selectedOptionId === opt.id
-                    const isCorrect = (lastReveal?.correctOptionId || '').toLowerCase() === opt.id.toLowerCase()
-                    const cls = [
-                      'assess-option',
-                      selected ? 'selected' : '',
-                      reveal && isCorrect ? 'correct' : '',
-                      reveal && selected && !isCorrect ? 'wrong' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        className={cls}
-                        disabled={phase === 'revealing'}
-                        onClick={() => submitMcq(opt.id)}
-                      >
-                        <span className="assess-opt-id">{opt.id.toUpperCase()}</span>
-                        <span>{opt.text}</span>
-                      </button>
-                    )
-                  })}
-                  {phase === 'revealing' && (
-                    <button type="button" className="assess-primary" onClick={() => void goNextOrFinish()}>
-                      {currentIndex < questions.length - 1 ? t('assess.next') : t('assess.finish')}
-                    </button>
-                  )}
+              )}
+
+              {phase === 'revealing' && lastReveal?.questionId === question.id && (
+                <div className="assess-reveal-bar">
+                  <span>
+                    {lastReveal.correct
+                      ? t('assess.revealCorrect')
+                      : t('assess.revealWrong', {
+                          answer: (lastReveal.correctOptionId || '?').toUpperCase(),
+                        })}
+                  </span>
+                  <button type="button" className="assess-primary" onClick={() => void goNextOrFinish()}>
+                    {currentIndex < questions.length - 1 ? t('assess.next') : t('assess.finish')}
+                  </button>
                 </div>
               )}
             </div>
@@ -528,9 +640,22 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
                   })}
                 </p>
               )}
-              <button type="button" className="assess-primary" onClick={close}>
-                {t('assess.done')}
-              </button>
+              <div className="assess-result-actions">
+                {wrongCount > 0 && (
+                  <button
+                    type="button"
+                    className="assess-secondary"
+                    disabled={explaining || busy}
+                    onClick={() => void askCanalAboutWrongs(gradeResult, questions, answers)}
+                  >
+                    {explaining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    {t('assess.askCanalExplain')}
+                  </button>
+                )}
+                <button type="button" className="assess-primary" onClick={close}>
+                  {t('assess.done')}
+                </button>
+              </div>
             </div>
           )}
         </section>

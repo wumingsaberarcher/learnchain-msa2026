@@ -7,6 +7,8 @@ public class AssessmentGenerateRequest
     public string? BaseUrl { get; set; }
     public string? Model { get; set; }
     public string Language { get; set; } = "zh";
+    /// <summary>Optional subset of HabitMaterial ids to quiz from. Empty = all usable materials.</summary>
+    public List<int>? MaterialIds { get; set; }
 }
 
 public class AssessmentGradeRequest

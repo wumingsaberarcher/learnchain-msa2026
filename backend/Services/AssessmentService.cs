@@ -32,18 +32,34 @@ public class AssessmentService
         _logger = logger;
     }
 
-    public async Task<(Habit Habit, string MaterialText)> LoadHabitContextAsync(int userId, int habitId, CancellationToken ct)
+    public async Task<(Habit Habit, string MaterialText)> LoadHabitContextAsync(
+        int userId,
+        int habitId,
+        IReadOnlyList<int>? materialIds,
+        CancellationToken ct)
     {
         var habit = await _db.Habits.FirstOrDefaultAsync(h => h.Id == habitId && h.UserId == userId, ct)
             ?? throw new InvalidOperationException("Habit not found.");
 
-        var materials = await _db.HabitMaterials
-            .Where(m => m.HabitId == habitId && m.UserId == userId && m.ExtractedText != "")
+        var query = _db.HabitMaterials
+            .Where(m => m.HabitId == habitId && m.UserId == userId && m.ExtractedText != "");
+
+        if (materialIds is { Count: > 0 })
+        {
+            var idSet = materialIds.Where(id => id > 0).Distinct().ToList();
+            if (idSet.Count > 0)
+                query = query.Where(m => idSet.Contains(m.Id));
+        }
+
+        var materials = await query
             .OrderByDescending(m => m.CreatedAt)
             .ToListAsync(ct);
 
         if (materials.Count == 0)
-            throw new InvalidOperationException("No usable study materials. Upload at least one file with extractable text.");
+            throw new InvalidOperationException(
+                materialIds is { Count: > 0 }
+                    ? "No usable text in the selected materials. Select files with extractable text."
+                    : "No usable study materials. Upload at least one file with extractable text.");
 
         var combined = string.Join("\n\n---\n\n", materials.Select(m => $"[{m.FileName}]\n{m.ExtractedText}"));
         if (combined.Length > 28_000)
@@ -61,7 +77,7 @@ public class AssessmentService
         if (string.IsNullOrWhiteSpace(apiKey))
             throw new InvalidOperationException("missing_api_key");
 
-        var (habit, materialText) = await LoadHabitContextAsync(user.Id, request.HabitId, ct);
+        var (habit, materialText) = await LoadHabitContextAsync(user.Id, request.HabitId, request.MaterialIds, ct);
         var difficulty = NormalizeDifficulty(habit.AssessmentDifficulty);
         var zh = (request.Language ?? "zh").StartsWith("zh", StringComparison.OrdinalIgnoreCase);
         var (count, allowShort) = difficulty switch
