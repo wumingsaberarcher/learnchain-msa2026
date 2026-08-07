@@ -13,7 +13,8 @@ import {
 } from '../api/chatApi'
 import { useChatStore } from '../stores/chatStore'
 import { isValidPassword } from '../utils/authValidation'
-import { Save, Lock, Trash2 } from 'lucide-react'
+import { Save, Lock } from 'lucide-react'
+import MemoryVault from '../components/MemoryVault'
 
 export default function ProfilePage() {
     const { profile, fetchProfile, updateBio, changePassword } = useAchievementStore()
@@ -277,36 +278,12 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="profile-section">
-                    <label>{t('profile.memoryTitle')}</label>
-                    <p className="profile-hint">{t('profile.memoryHint')}</p>
-                    {memories.length === 0 ? (
-                        <p className="profile-hint">{t('profile.memoryEmpty')}</p>
-                    ) : (
-                        <ul className="profile-memory-list">
-                            {memories.map(m => (
-                                <li key={m.id} className="profile-memory-item">
-                                    <div>
-                                        <strong>[{m.type}] {m.key}</strong>
-                                        <p>{m.content}</p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        className="btn btn-secondary"
-                                        onClick={() => void handleDeleteMemory(m.id)}
-                                    >
-                                        <Trash2 className="w-4 h-4" /> {t('profile.memoryDelete')}
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                    <button
-                        type="button"
-                        className="btn btn-secondary profile-save-btn"
-                        onClick={() => void handleResetAllMemory()}
-                    >
-                        {t('profile.memoryResetAll')}
-                    </button>
+                    <MemoryVault
+                        memories={memories}
+                        t={t}
+                        onDelete={handleDeleteMemory}
+                        onResetAll={handleResetAllMemory}
+                    />
                 </div>
 
                 {msg && <div className="profile-msg success">{msg}</div>}
