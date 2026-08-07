@@ -1,6 +1,5 @@
 using backend.Data;
 using backend.Models;
-using backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,17 +13,10 @@ namespace backend.Controllers;
 public class HabitGroupController : ControllerBase
 {
     private readonly AppDbContext _db;
-    private readonly HabitMaterialTextExtractor _extractor;
-    private readonly IWebHostEnvironment _env;
 
-    public HabitGroupController(
-        AppDbContext db,
-        HabitMaterialTextExtractor extractor,
-        IWebHostEnvironment env)
+    public HabitGroupController(AppDbContext db)
     {
         _db = db;
-        _extractor = extractor;
-        _env = env;
     }
 
     private int GetCurrentUserId()
@@ -181,153 +173,6 @@ public class HabitGroupController : ControllerBase
 
         await _db.SaveChangesAsync();
         return Ok(new { habit.Id, habit.GroupId });
-    }
-
-    [HttpGet("{id:int}/materials")]
-    public async Task<ActionResult<IEnumerable<object>>> ListMaterials(int id)
-    {
-        var userId = GetCurrentUserId();
-        if (!await _db.HabitGroups.AnyAsync(g => g.Id == id && g.UserId == userId && g.IsActive))
-            return NotFound("组不存在");
-
-        var items = await _db.HabitGroupMaterials
-            .Where(m => m.GroupId == id && m.UserId == userId)
-            .OrderByDescending(m => m.CreatedAt)
-            .Select(m => new
-            {
-                m.Id,
-                m.GroupId,
-                m.FileName,
-                m.ContentType,
-                m.Size,
-                hasText = m.ExtractedText != "",
-                textLength = m.ExtractedText.Length,
-                source = "group",
-                m.CreatedAt
-            })
-            .ToListAsync();
-
-        return Ok(items);
-    }
-
-    [HttpPost("{id:int}/materials")]
-    [RequestSizeLimit(HabitMaterialTextExtractor.MaxUploadBytes)]
-    [RequestFormLimits(MultipartBodyLengthLimit = HabitMaterialTextExtractor.MaxUploadBytes)]
-    public async Task<ActionResult<object>> UploadMaterial(int id, [FromForm] IFormFile? file, CancellationToken ct)
-    {
-        var userId = GetCurrentUserId();
-        if (!await _db.HabitGroups.AnyAsync(g => g.Id == id && g.UserId == userId && g.IsActive))
-            return NotFound("组不存在");
-
-        // Some clients/proxies rename the field; accept first file if "file" is missing.
-        file ??= Request.Form.Files.GetFile("file") ?? Request.Form.Files.FirstOrDefault();
-
-        if (file == null || file.Length == 0)
-            return BadRequest("请选择文件");
-        if (file.Length > HabitMaterialTextExtractor.MaxUploadBytes)
-            return BadRequest("文件过大（上限 8MB）");
-        if (!_extractor.IsAllowed(file.FileName))
-            return BadRequest("仅支持 pdf / docx / doc / wps / md / txt");
-
-        // Buffer once so extract + disk write don't fight over a consumed stream.
-        await using var upload = file.OpenReadStream();
-        using var buffer = new MemoryStream(capacity: (int)Math.Min(file.Length, HabitMaterialTextExtractor.MaxUploadBytes));
-        await upload.CopyToAsync(buffer, ct);
-        var bytes = buffer.ToArray();
-
-        string extracted;
-        try
-        {
-            await using var read = new MemoryStream(bytes, writable: false);
-            extracted = await _extractor.ExtractAsync(file.FileName, read, ct);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest($"无法提取文本：{ex.Message}");
-        }
-
-        var hasText = !string.IsNullOrWhiteSpace(extracted);
-        var ext = Path.GetExtension(file.FileName ?? "").ToLowerInvariant();
-        string? warning = null;
-        if (!hasText)
-        {
-            warning = ext is ".doc" or ".wps"
-                ? "未能抽出文字。请另存为 .docx 或 PDF。"
-                : "未能抽出可用文字，已保存但无法用于出题";
-        }
-
-        var root = Path.Combine(_env.ContentRootPath, "App_Data", "habit-group-materials", userId.ToString(), id.ToString());
-        Directory.CreateDirectory(root);
-        var safeName = Path.GetFileName(file.FileName);
-        if (string.IsNullOrWhiteSpace(safeName))
-            safeName = $"upload-{DateTime.UtcNow:yyyyMMddHHmmss}";
-        var storedName = $"{Guid.NewGuid():N}_{safeName}";
-        var fullPath = Path.Combine(root, storedName);
-        await System.IO.File.WriteAllBytesAsync(fullPath, bytes, ct);
-
-        var material = new HabitGroupMaterial
-        {
-            GroupId = id,
-            UserId = userId,
-            FileName = safeName,
-            ContentType = string.IsNullOrWhiteSpace(file.ContentType)
-                ? _extractor.DetectContentType(safeName)
-                : file.ContentType,
-            Size = bytes.LongLength,
-            StoredPath = Path.Combine(userId.ToString(), id.ToString(), storedName).Replace('\\', '/'),
-            ExtractedText = extracted ?? "",
-            CreatedAt = DateTime.UtcNow
-        };
-        _db.HabitGroupMaterials.Add(material);
-        try
-        {
-            await _db.SaveChangesAsync(ct);
-        }
-        catch (Exception ex)
-        {
-            try { System.IO.File.Delete(fullPath); } catch { /* ignore */ }
-            return StatusCode(500, $"保存资料失败：{ex.InnerException?.Message ?? ex.Message}");
-        }
-
-        return Ok(new
-        {
-            material.Id,
-            material.GroupId,
-            material.FileName,
-            material.ContentType,
-            material.Size,
-            hasText,
-            textLength = material.ExtractedText.Length,
-            source = "group",
-            warning,
-            material.CreatedAt
-        });
-    }
-
-    [HttpDelete("{id:int}/materials/{materialId:int}")]
-    public async Task<IActionResult> DeleteMaterial(int id, int materialId)
-    {
-        var userId = GetCurrentUserId();
-        var material = await _db.HabitGroupMaterials
-            .FirstOrDefaultAsync(m => m.Id == materialId && m.GroupId == id && m.UserId == userId);
-        if (material == null) return NotFound();
-
-        if (!string.IsNullOrWhiteSpace(material.StoredPath))
-        {
-            var full = Path.Combine(
-                _env.ContentRootPath,
-                "App_Data",
-                "habit-group-materials",
-                material.StoredPath.Replace('/', Path.DirectorySeparatorChar));
-            if (System.IO.File.Exists(full))
-            {
-                try { System.IO.File.Delete(full); } catch { /* ignore */ }
-            }
-        }
-
-        _db.HabitGroupMaterials.Remove(material);
-        await _db.SaveChangesAsync();
-        return NoContent();
     }
 }
 

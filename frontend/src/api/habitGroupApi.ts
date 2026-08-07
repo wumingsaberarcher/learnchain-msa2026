@@ -97,14 +97,15 @@ export async function uploadGroupMaterial(
     async () => {
       onStatus?.('正在上传…')
       const form = new FormData()
-      form.append('file', file)
+      form.append('file', file, file.name || 'upload.bin')
       const res = await apiFetch(`/habit-group/${groupId}/materials`, {
         method: 'POST',
         body: form,
       })
       if (res.status === 401) throw new Error('登录已过期，请重新登录后再上传')
       if (res.status === 413) throw new Error('文件太大（请压缩到 8MB 以内）')
-      if (res.status === 404) throw new Error('组不存在，或后端尚未部署习惯组上传接口')
+      if (res.status === 404) throw new Error('组不存在，或后端尚未部署习惯组上传接口（请确认 Render 已更新）')
+      if (res.status === 415) throw new Error('上传格式被拒绝，请重试或换一个 PDF')
       if (!res.ok) {
         throw new Error(parseErrorBody(await res.text()) || `上传失败（HTTP ${res.status}）`)
       }
