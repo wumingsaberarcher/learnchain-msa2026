@@ -5,6 +5,7 @@ import { useCompanionStore } from '../../stores/companionStore'
 import { useAssessmentStore } from '../../stores/assessmentStore'
 import { useTranslation } from '../../stores/settingsStore'
 import { compressChatImage } from '../../utils/compressChatImage'
+import ChatMarkdown, { stripMarkdownLite } from './ChatMarkdown'
 import {
   buildEmotionTimeline,
   emotionAt,
@@ -45,6 +46,7 @@ export default function GalgameStage() {
   const chatImageInputRef = useRef<HTMLInputElement>(null)
   const [displayText, setDisplayText] = useState('')
   const [fullText, setFullText] = useState('')
+  const [rawMarkdown, setRawMarkdown] = useState('')
   const [typing, setTyping] = useState(false)
   const [introDone, setIntroDone] = useState(false)
   const [live2dFailed, setLive2dFailed] = useState(false)
@@ -94,15 +96,18 @@ export default function GalgameStage() {
   const playLine = useCallback(
     (text: string, options?: { forceEmotion?: Emotion; onComplete?: () => void }) => {
       stopTypewriter()
-      const line = text.trim()
-      if (!line) {
+      const raw = text.trim()
+      if (!raw) {
         options?.onComplete?.()
         return
       }
 
+      // Typewriter uses plain text; keep original markdown for final rich render.
+      const line = stripMarkdownLite(raw)
       forceEmotionRef.current = options?.forceEmotion ?? null
       timelineRef.current = buildEmotionTimeline(line)
       charIndexRef.current = 0
+      setRawMarkdown(raw)
       setFullText(line)
       setDisplayText('')
       setTyping(true)
@@ -461,7 +466,11 @@ export default function GalgameStage() {
                   className={`gal-history-bubble ${m.role}`}
                 >
                   <div className="gal-history-role">{m.role === 'assistant' ? 'Canal' : 'You'}</div>
-                  <p>{m.content}</p>
+                  {m.role === 'assistant' ? (
+                    <ChatMarkdown content={m.content} className="gal-history-md" />
+                  ) : (
+                    <p>{m.content}</p>
+                  )}
                 </div>
               ))
             )}
@@ -485,10 +494,14 @@ export default function GalgameStage() {
                 </div>
               )}
               <div className="gal-dialog-name">Canal</div>
-              <p className="gal-dialog-text" aria-live="polite">
-                {displayText || (isSending ? t('chat.thinking') : introDone ? '' : '…')}
-                {typing && <span className="gal-caret" />}
-              </p>
+              {!typing && rawMarkdown && /(?:^#{1,3}\s)|(?:```)|(?:^\s*[-*+]\s)|(?:^\s*\d+\.\s)/m.test(rawMarkdown) ? (
+                <ChatMarkdown content={rawMarkdown} className="gal-dialog-md" />
+              ) : (
+                <p className="gal-dialog-text" aria-live="polite">
+                  {displayText || (isSending ? t('chat.thinking') : introDone ? '' : '…')}
+                  {typing && <span className="gal-caret" />}
+                </p>
+              )}
               {fullText && !typing && displayText === fullText && (
                 <span className="gal-dialog-hint">{t('chat.galContinue')}</span>
               )}

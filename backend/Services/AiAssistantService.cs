@@ -72,13 +72,31 @@ public class AiAssistantService
                     out var mime,
                     out var b64,
                     out var imgErr))
-                throw new InvalidOperationException(imgErr);
+            {
+                var soft = VisionModelGuide.BuildImageSoftFailReply(zh, imgErr);
+                var sessionFail = await _memory.GetOrCreateSessionAsync(user.Id, request.ZoneType, request.HabitId, ct);
+                var failStore = string.IsNullOrWhiteSpace(userText)
+                    ? (zh ? "[图片]" : "[Image]")
+                    : $"{(zh ? "[图片]" : "[Image]")} {userText}";
+                await _memory.AppendMessageAsync(sessionFail, "user", failStore, ct);
+                await _memory.AppendMessageAsync(sessionFail, "assistant", soft, ct);
+                return new ChatResponse { Reply = soft, ActionsExecuted = [] };
+            }
+
             imageDataUrl = ChatImageHelper.NormalizeDataUrl(mime, b64);
 
-            if (ChatImageHelper.LikelyNonVisionModel(model))
-                throw new InvalidOperationException(zh
-                    ? "当前模型看起来不支持识图。请到「个人资料 → AI 助手」换成带视觉能力的模型（例如 gpt-4o-mini、gpt-4o，或名称含 vl/vision 的模型）。"
-                    : "Your current model likely cannot see images. Switch to a vision model in Profile → AI Assistant (e.g. gpt-4o-mini, gpt-4o, or a *-vl* / *vision* model).");
+            // Don't throw a cold 400 — Canal diagnoses the model in-character.
+            if (VisionModelGuide.Classify(model) == VisionModelGuide.VisionCapability.LikelyNo)
+            {
+                var diagnosis = VisionModelGuide.BuildDiagnosisReply(model, baseUrl, zh);
+                var sessionDiag = await _memory.GetOrCreateSessionAsync(user.Id, request.ZoneType, request.HabitId, ct);
+                var diagStore = string.IsNullOrWhiteSpace(userText)
+                    ? (zh ? "[图片]" : "[Image]")
+                    : $"{(zh ? "[图片]" : "[Image]")} {userText}";
+                await _memory.AppendMessageAsync(sessionDiag, "user", diagStore, ct);
+                await _memory.AppendMessageAsync(sessionDiag, "assistant", diagnosis, ct);
+                return new ChatResponse { Reply = diagnosis, ActionsExecuted = [] };
+            }
         }
 
         if (string.IsNullOrWhiteSpace(userText) && imageDataUrl == null)
@@ -146,6 +164,7 @@ public class AiAssistantService
         string? finalReply = null;
         // Some providers struggle with tools + images together; skip tools on vision turns.
         var useTools = imageDataUrl == null;
+        string? visionApiHint = null;
 
         try
         {
@@ -210,10 +229,21 @@ public class AiAssistantService
                 finalReply = ReadMessageContent(completion["choices"]?[0]?["message"]?["content"])?.Trim();
             }
         }
+        catch (VisionRejectedException vex)
+        {
+            visionApiHint = vex.ProviderBody;
+            finalReply = VisionModelGuide.BuildDiagnosisReply(model, baseUrl, zh, vex.ProviderBody);
+        }
         catch (Exception ex) when (actions.Count > 0)
         {
             // Tools already succeeded (e.g. habit created); still return a usable reply.
             _logger.LogWarning(ex, "Chat follow-up failed after {Count} tool action(s); returning action summary", actions.Count);
+        }
+        catch (Exception ex) when (imageDataUrl != null && actions.Count == 0)
+        {
+            // Image turn failed for other reasons — still answer as Canal with a checklist.
+            _logger.LogWarning(ex, "Vision chat failed; returning diagnosis reply");
+            finalReply = VisionModelGuide.BuildDiagnosisReply(model, baseUrl, zh, Truncate(ex.Message, 220));
         }
 
         if (string.IsNullOrWhiteSpace(finalReply))
@@ -221,6 +251,18 @@ public class AiAssistantService
             finalReply = actions.Count > 0
                 ? string.Join(zh ? "；" : "; ", actions.Select(a => a.Summary))
                 : (zh ? "我已经处理完相关操作，还有什么可以帮你的吗？" : "Done. Anything else I can help with?");
+        }
+
+        // If a "vision" model replied but clearly admits it cannot see, append a short guide once.
+        if (imageDataUrl != null
+            && visionApiHint == null
+            && LooksLikeBlindVisionReply(finalReply!)
+            && !finalReply!.Contains("通道自检", StringComparison.Ordinal)
+            && !finalReply.Contains("channel check", StringComparison.OrdinalIgnoreCase))
+        {
+            finalReply = finalReply!.TrimEnd()
+                + "\n\n---\n"
+                + VisionModelGuide.BuildDiagnosisReply(model, baseUrl, zh);
         }
 
         await _memory.AppendMessageAsync(session, "user", storeText, ct);
@@ -277,6 +319,10 @@ public class AiAssistantService
                 : "The user attached an image: recognize key content first, then answer using memories/study materials below when relevant; if materials are insufficient, answer from the image directly—do not invent study facts.")
             : "";
 
+        var formatLine = zh
+            ? "排版：界面支持 Markdown。步骤/对比/要点请用列表；代码用 fenced code block 并标注语言（如 ```ts）；需要时可用二级标题。闲聊保持短句；实用内容（编程、清单、框架）请结构清晰、便于扫读。"
+            : "Formatting: the UI renders Markdown. Use lists for steps/comparisons; fenced code blocks with language tags (e.g. ```ts); short headings when helpful. Keep chitchat short; for practical content (coding, checklists, frameworks) prefer scannable structure.";
+
         var knowledgeSection = string.IsNullOrWhiteSpace(knowledgeBlock)
             ? ""
             : (zh
@@ -293,6 +339,7 @@ public class AiAssistantService
                     请始终用简体中文回复。
                     {{bondLine}}
                     {{visionLine}}
+                    {{formatLine}}
 
                     闲聊人设：
                     - 就是闲聊：轻松、俏皮、短句为主，像朋友随口聊，不要端着导师腔。
@@ -313,6 +360,7 @@ public class AiAssistantService
                     Always reply in English.
                     {{bondLine}}
                     {{visionLine}}
+                    {{formatLine}}
 
                     Casual vibe:
                     - Keep it light, playful, mostly short replies — like a friend chatting, not a tutor lecture.
@@ -340,6 +388,7 @@ public class AiAssistantService
             You remember the user across sessions via long-term memories and a rolling conversation summary.
             {zoneLine}
             {visionLine}
+            {formatLine}
             Naturally weave in game progress (streaks, XP, levels, badges, chain continuity) when helpful — keep it encouraging, not robotic.
             {bondLine}
 
@@ -461,11 +510,7 @@ public class AiAssistantService
         {
             _logger.LogWarning("LLM error {Status}: {Body}", (int)res.StatusCode, text);
             if (ChatImageHelper.LooksLikeVisionApiError(text))
-            {
-                throw new InvalidOperationException(
-                    "Vision/LLM rejected the image. Use a vision-capable model (e.g. gpt-4o-mini) and keep the image under ~1MB. "
-                    + Truncate(text, 220));
-            }
+                throw new VisionRejectedException(text);
 
             throw new InvalidOperationException($"LLM API error ({(int)res.StatusCode}): {Truncate(text, 400)}");
         }
@@ -770,5 +815,34 @@ public class AiAssistantService
         if (lower is "weekly" or "每周") return "Weekly";
         if (lower is "onetime" or "one_time" or "一次性") return "OneTime";
         return "Daily";
+    }
+
+    private static bool LooksLikeBlindVisionReply(string reply)
+    {
+        var t = reply.ToLowerInvariant();
+        return t.Contains("占位", StringComparison.Ordinal)
+            || t.Contains("看不清", StringComparison.Ordinal)
+            || t.Contains("没收到", StringComparison.Ordinal)
+            || t.Contains("看不到图", StringComparison.Ordinal)
+            || t.Contains("无法查看", StringComparison.Ordinal)
+            || t.Contains("无法看到", StringComparison.Ordinal)
+            || t.Contains("can't see", StringComparison.Ordinal)
+            || t.Contains("cannot see", StringComparison.Ordinal)
+            || t.Contains("can't view", StringComparison.Ordinal)
+            || t.Contains("unable to see", StringComparison.Ordinal)
+            || t.Contains("no image", StringComparison.Ordinal)
+            || t.Contains("placeholder", StringComparison.Ordinal)
+            || t.Contains("empty stage", StringComparison.Ordinal);
+    }
+}
+
+public sealed class VisionRejectedException : Exception
+{
+    public string ProviderBody { get; }
+
+    public VisionRejectedException(string providerBody)
+        : base("Vision provider rejected the image")
+    {
+        ProviderBody = providerBody ?? "";
     }
 }

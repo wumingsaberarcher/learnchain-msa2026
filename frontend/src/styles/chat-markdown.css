@@ -1,0 +1,187 @@
+/* Canal chat typography + Markdown rendering */
+
+:root {
+	--font-chat: "Outfit", "Noto Sans SC", sans-serif;
+	--font-chat-code: "JetBrains Mono", ui-monospace, monospace;
+}
+
+.ai-panel,
+.gal-stage {
+	font-family: var(--font-chat);
+}
+
+.ai-bubble {
+	font-family: var(--font-chat);
+	font-size: 0.92rem;
+	line-height: 1.62;
+	letter-spacing: 0.01em;
+	font-weight: 450;
+}
+
+.ai-bubble-assistant {
+	white-space: normal;
+}
+
+.ai-bubble-user {
+	white-space: pre-wrap;
+}
+
+.chat-md {
+	display: block;
+	max-width: 100%;
+}
+
+.chat-md > :first-child {
+	margin-top: 0;
+}
+
+.chat-md > :last-child {
+	margin-bottom: 0;
+}
+
+.chat-md p {
+	margin: 0.35em 0;
+}
+
+.chat-md h1,
+.chat-md h2,
+.chat-md h3 {
+	margin: 0.7em 0 0.35em;
+	font-weight: 650;
+	line-height: 1.35;
+	letter-spacing: 0.01em;
+	color: inherit;
+}
+
+.chat-md h1 {
+	font-size: 1.12em;
+}
+
+.chat-md h2 {
+	font-size: 1.05em;
+}
+
+.chat-md h3 {
+	font-size: 1em;
+}
+
+.chat-md ul,
+.chat-md ol {
+	margin: 0.4em 0 0.5em;
+	padding-left: 1.25em;
+}
+
+.chat-md li {
+	margin: 0.22em 0;
+	line-height: 1.55;
+}
+
+.chat-md li > p {
+	margin: 0.15em 0;
+}
+
+.chat-md strong {
+	font-weight: 650;
+}
+
+.chat-md a {
+	color: #7dd3fc;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+	word-break: break-all;
+}
+
+.chat-md a:hover {
+	color: #bae6fd;
+}
+
+.chat-md hr {
+	border: none;
+	border-top: 1px solid rgba(255, 255, 255, 0.14);
+	margin: 0.75em 0;
+}
+
+.chat-md blockquote {
+	margin: 0.45em 0;
+	padding: 0.25em 0.75em;
+	border-left: 3px solid rgba(125, 211, 252, 0.55);
+	opacity: 0.92;
+}
+
+.chat-md-inline-code {
+	font-family: var(--font-chat-code);
+	font-size: 0.86em;
+	padding: 0.12em 0.38em;
+	border-radius: 6px;
+	background: rgba(0, 0, 0, 0.28);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.chat-md-codeblock {
+	margin: 0.55em 0;
+	border-radius: 12px;
+	overflow: hidden;
+	background: rgba(6, 10, 20, 0.72);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.chat-md-code-lang {
+	font-family: var(--font-chat-code);
+	font-size: 0.68rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	opacity: 0.65;
+	padding: 0.35rem 0.7rem 0;
+}
+
+.chat-md-codeblock pre {
+	margin: 0;
+	padding: 0.55rem 0.75rem 0.7rem;
+	overflow-x: auto;
+}
+
+.chat-md-codeblock code {
+	font-family: var(--font-chat-code);
+	font-size: 0.8rem;
+	line-height: 1.5;
+	white-space: pre;
+}
+
+.chat-md table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.85em;
+	margin: 0.5em 0;
+}
+
+.chat-md th,
+.chat-md td {
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	padding: 0.3em 0.45em;
+	text-align: left;
+}
+
+.gal-dialog-md,
+.gal-history-md {
+	font-family: var(--font-chat);
+	font-size: 0.95rem;
+	line-height: 1.6;
+}
+
+.gal-dialog-md {
+	max-height: min(42vh, 360px);
+	overflow-y: auto;
+	padding-right: 0.2rem;
+}
+
+.gal-dialog-text {
+	font-family: var(--font-chat);
+	font-size: 1rem;
+	line-height: 1.65;
+	letter-spacing: 0.015em;
+	font-weight: 450;
+}
+
+.gal-history-bubble {
+	font-family: var(--font-chat);
+}

@@ -9,6 +9,7 @@ import { useHabitStore } from '../../stores/habitStore'
 import { useTranslation } from '../../stores/settingsStore'
 import { compressChatImage } from '../../utils/compressChatImage'
 import CanalAvatar from '../character/CanalAvatar'
+import ChatMarkdown from './ChatMarkdown'
 import GalgameStage from './GalgameStage'
 import { useSpeechInput } from './useSpeechInput'
 import VoiceVolumeIcon from './VoiceVolumeIcon'
@@ -245,7 +246,7 @@ export default function AiAssistant() {
                                             {m.imageUrl && (
                                                 <img className="ai-msg-image" src={m.imageUrl} alt="" />
                                             )}
-                                            {m.content}
+                                            {isUser ? m.content : <ChatMarkdown content={m.content} />}
                                         </div>
                                         {isUser && (
                                             <div className="ai-msg-avatar user">
