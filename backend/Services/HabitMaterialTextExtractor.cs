@@ -12,7 +12,12 @@ public class HabitMaterialTextExtractor
 
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".pdf", ".docx", ".md", ".txt"
+        // Text / markdown
+        ".txt", ".md", ".markdown", ".text",
+        // PDF
+        ".pdf",
+        // Microsoft / WPS Word（WPS 常另存为 docx；原生 .wps 可能抽不出字）
+        ".docx", ".doc", ".wps",
     };
 
     public bool IsAllowed(string fileName)
@@ -27,8 +32,10 @@ public class HabitMaterialTextExtractor
         {
             ".pdf" => "application/pdf",
             ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ".md" => "text/markdown",
-            ".txt" => "text/plain",
+            ".doc" => "application/msword",
+            ".wps" => "application/vnd.ms-works",
+            ".md" or ".markdown" => "text/markdown",
+            ".txt" or ".text" => "text/plain",
             _ => "application/octet-stream"
         };
     }
@@ -38,10 +45,12 @@ public class HabitMaterialTextExtractor
         var ext = Path.GetExtension(fileName ?? "").ToLowerInvariant();
         return ext switch
         {
-            ".txt" or ".md" => await ExtractPlainAsync(stream, ct),
+            ".txt" or ".md" or ".markdown" or ".text" => await ExtractPlainAsync(stream, ct),
             ".pdf" => ExtractPdf(stream),
             ".docx" => ExtractDocx(stream),
-            _ => throw new InvalidOperationException("Unsupported file type. Use pdf, docx, md, or txt.")
+            // Legacy .doc / proprietary .wps: try OpenXML zip shape (some WPS exports), else empty.
+            ".doc" or ".wps" => TryExtractDocxLike(stream),
+            _ => throw new InvalidOperationException("Unsupported file type.")
         };
     }
 
@@ -82,6 +91,22 @@ public class HabitMaterialTextExtractor
             if (sb.Length >= MaxExtractedChars) break;
         }
         return Truncate(Normalize(sb.ToString()));
+    }
+
+    /// <summary>
+    /// Some WPS "compat" files are actually OOXML zip packages with a misleading extension.
+    /// True binary .doc / .wps will fail open and return empty (caller still saves the file).
+    /// </summary>
+    private static string TryExtractDocxLike(Stream stream)
+    {
+        try
+        {
+            return ExtractDocx(stream);
+        }
+        catch
+        {
+            return "";
+        }
     }
 
     private static string Normalize(string text)

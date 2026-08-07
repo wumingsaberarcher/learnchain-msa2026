@@ -20,8 +20,8 @@ import './AssessmentQuizPanel.css'
 function fileKind(name: string) {
   const ext = name.split('.').pop()?.toLowerCase() || ''
   if (ext === 'pdf') return 'pdf'
-  if (ext === 'docx') return 'docx'
-  if (ext === 'md') return 'md'
+  if (ext === 'docx' || ext === 'doc' || ext === 'wps') return 'docx'
+  if (ext === 'md' || ext === 'markdown') return 'md'
   return 'txt'
 }
 
@@ -235,7 +235,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
           failures.push(`${list[i].name}: ${reason}`)
         }
       }
-      await refreshMaterials()
+      // Always surface upload outcomes first — don't let list refresh hide them.
       if (failures.length > 0) {
         setError(
           failures.length === list.length
@@ -246,6 +246,13 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
         )
       } else if (warnings.length > 0) {
         setError(warnings.join('\n'))
+      }
+      try {
+        await refreshMaterials()
+      } catch {
+        if (failures.length === 0 && warnings.length === 0) {
+          setError(t('assess.uploadRefreshFail'))
+        }
       }
     } finally {
       setUploadProgress(null)
@@ -422,7 +429,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
             ref={fileRef}
             type="file"
             multiple
-            accept=".pdf,.docx,.md,.txt,application/pdf,text/plain,text/markdown"
+            accept=".pdf,.docx,.doc,.wps,.md,.markdown,.txt,.text,application/pdf,text/plain,text/markdown,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             hidden
             onChange={(e) => {
               const files = e.target.files

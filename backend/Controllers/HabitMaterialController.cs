@@ -66,48 +66,58 @@ public class HabitMaterialController : ControllerBase
     [HttpPost]
     [RequestSizeLimit(12 * 1024 * 1024)]
     [RequestFormLimits(MultipartBodyLengthLimit = 12 * 1024 * 1024)]
-    public async Task<ActionResult<object>> Upload(int habitId, [FromForm] IFormFile file, CancellationToken ct)
+    public async Task<ActionResult<object>> Upload(int habitId, [FromForm] IFormFile? file, CancellationToken ct)
     {
         var userId = GetCurrentUserId();
         if (await FindHabitAsync(habitId, userId) == null)
             return NotFound("习惯不存在或无权限");
 
-        if (file == null || file.Length == 0)
-            return BadRequest("请选择文件");
+        // Be tolerant of form field names (file / files / first attachment).
+        var upload = file
+            ?? Request.Form.Files.GetFile("file")
+            ?? Request.Form.Files.FirstOrDefault();
+        if (upload == null || upload.Length == 0)
+            return BadRequest("请选择文件（未收到上传内容）");
 
-        if (file.Length > HabitMaterialTextExtractor.MaxUploadBytes)
+        if (upload.Length > HabitMaterialTextExtractor.MaxUploadBytes)
             return BadRequest("文件过大（上限 8MB）");
 
-        if (!_extractor.IsAllowed(file.FileName))
-            return BadRequest("仅支持 pdf / docx / md / txt");
+        if (!_extractor.IsAllowed(upload.FileName))
+            return BadRequest("仅支持 pdf / docx / doc / wps / md / txt（WPS 建议另存为 .docx 或 .pdf）");
 
         string extracted;
         try
         {
-            await using var read = file.OpenReadStream();
-            extracted = await _extractor.ExtractAsync(file.FileName, read, ct);
+            await using var read = upload.OpenReadStream();
+            extracted = await _extractor.ExtractAsync(upload.FileName, read, ct);
         }
         catch (Exception ex)
         {
             return BadRequest($"无法提取文本：{ex.Message}");
         }
 
-        // Scanned / image-only PDFs often extract empty text — still save the file so upload
-        // doesn't look "broken"; UI marks hasText=false and blocks quiz selection.
+        var ext = Path.GetExtension(upload.FileName ?? "").ToLowerInvariant();
         var hasText = !string.IsNullOrWhiteSpace(extracted);
-        string? warning = hasText
-            ? null
-            : "未能抽出可用文字（可能是扫描版/图片 PDF），已保存但无法用于出题";
+        string? warning = null;
+        if (!hasText)
+        {
+            warning = ext is ".doc" or ".wps"
+                ? "未能抽出文字。请用 WPS/Word「另存为」.docx 或导出 PDF 后再上传，以便出题。"
+                : "未能抽出可用文字（可能是扫描版/图片 PDF），已保存但无法用于出题";
+        }
 
         var root = Path.Combine(_env.ContentRootPath, "App_Data", "habit-materials", userId.ToString(), habitId.ToString());
         Directory.CreateDirectory(root);
-        var safeName = Path.GetFileName(file.FileName);
+        var safeName = Path.GetFileName(upload.FileName);
+        if (string.IsNullOrWhiteSpace(safeName))
+            safeName = $"upload-{DateTime.UtcNow:yyyyMMddHHmmss}";
         var storedName = $"{Guid.NewGuid():N}_{safeName}";
         var fullPath = Path.Combine(root, storedName);
 
         await using (var fs = System.IO.File.Create(fullPath))
         {
-            await file.CopyToAsync(fs, ct);
+            await using var src = upload.OpenReadStream();
+            await src.CopyToAsync(fs, ct);
         }
 
         var material = new HabitMaterial
@@ -115,10 +125,10 @@ public class HabitMaterialController : ControllerBase
             HabitId = habitId,
             UserId = userId,
             FileName = safeName,
-            ContentType = string.IsNullOrWhiteSpace(file.ContentType)
+            ContentType = string.IsNullOrWhiteSpace(upload.ContentType)
                 ? _extractor.DetectContentType(safeName)
-                : file.ContentType,
-            Size = file.Length,
+                : upload.ContentType,
+            Size = upload.Length,
             StoredPath = Path.Combine(userId.ToString(), habitId.ToString(), storedName).Replace('\\', '/'),
             ExtractedText = extracted ?? "",
             CreatedAt = DateTime.UtcNow

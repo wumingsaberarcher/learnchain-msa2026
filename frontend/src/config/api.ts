@@ -3,16 +3,18 @@
 // Local Vite uses /api via vite.config proxy → localhost:5000.
 export const API_BASE = (import.meta.env.VITE_API_BASE ?? '/api').replace(/\/$/, '')
 
-/**
- * Absolute API base for large multipart uploads.
- * Vercel’s rewrite proxy caps request bodies (~4.5MB); PDFs often exceed that.
- * Browser → Render directly (CORS already AllowAnyOrigin).
- */
-export function resolveUploadApiBase(): string {
-  const explicit = import.meta.env.VITE_UPLOAD_API_BASE as string | undefined
-  if (explicit?.trim()) return explicit.replace(/\/$/, '')
+/** Absolute Render API — only used as fallback for large bodies (Vercel proxy ~4.5MB). */
+export const RENDER_API_BASE = (
+  (import.meta.env.VITE_UPLOAD_API_BASE as string | undefined)?.trim()
+  || 'https://learnchain-msa2026.onrender.com/api'
+).replace(/\/$/, '')
+
+/** Prefer same-origin; use direct Render only when the file may exceed Vercel’s proxy limit. */
+export function resolveUploadApiBase(fileSizeBytes: number): string {
+  const explicit = (import.meta.env.VITE_UPLOAD_API_BASE as string | undefined)?.trim()
+  if (explicit) return explicit.replace(/\/$/, '')
   if (API_BASE.startsWith('http')) return API_BASE
-  // Local vite proxy has no 4.5MB cap
-  if (import.meta.env.DEV) return API_BASE
-  return 'https://learnchain-msa2026.onrender.com/api'
+  // Stay on same-origin for normal docs (txt/md/small pdf) — this path was working before.
+  if (fileSizeBytes <= 3.5 * 1024 * 1024) return API_BASE
+  return RENDER_API_BASE
 }
