@@ -95,8 +95,11 @@ function loadLocalMessages(userId: number | null, scope: ChatScope): UiChatMessa
 
 function saveLocalMessages(userId: number | null, scope: ChatScope, messages: UiChatMessage[]) {
     if (!userId) return
-    // Never persist raw data-URL images to localStorage (quota + privacy).
-    const slim = messages.slice(-100).map(({ imageUrl: _ignore, ...rest }) => rest)
+    // Never persist raw data-URL images or ephemeral idle/focus asides.
+    const slim = messages
+        .filter((m) => m.kind !== 'aside')
+        .slice(-100)
+        .map(({ imageUrl: _ignore, ...rest }) => rest)
     localStorage.setItem(historyKey(userId, scope), JSON.stringify(slim))
 }
 
@@ -115,12 +118,10 @@ async function hydrateScope(userId: number, scope: ChatScope) {
     const msgKind = messageKindForScope(scope)
     try {
         const history = await getChatHistory(scope)
-        const asides = local.filter(m => m.kind === 'aside')
-        // Daily chatter is not formal conversation history — keep live continuity locally,
-        // but do not promote server rows into "对话记录" (kind: chat).
+        // Idle/focus asides are ephemeral peeks — never restore them into records.
         if (msgKind === 'chatter') {
             const localChatty = local.filter(m => m.kind !== 'aside')
-            const messages = [...localChatty, ...asides]
+            const messages = localChatty
                 .sort((a, b) => a.createdAt - b.createdAt)
                 .slice(-100)
             saveLocalMessages(userId, scope, messages)
@@ -135,9 +136,10 @@ async function hydrateScope(userId: number, scope: ChatScope) {
                 createdAt: Date.parse(m.createdAt) || Date.now(),
                 kind: 'chat' as const,
             }))
+        const durableLocal = local.filter(m => m.kind !== 'aside')
         const messages = mapped.length > 0
-            ? [...mapped, ...asides].sort((a, b) => a.createdAt - b.createdAt).slice(-100)
-            : local
+            ? mapped.slice(-100)
+            : durableLocal
         saveLocalMessages(userId, scope, messages)
         return messages
     } catch {
@@ -244,9 +246,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
             emotion,
         }
         const { userId, scope } = get()
-        const next = [...get().messages, msg]
+        // Keep at most one ephemeral aside on screen; never persist asides into history records.
+        const durable = get().messages.filter((m) => m.kind !== 'aside')
+        const next = [...durable, msg]
         set({ messages: next })
-        saveLocalMessages(userId, scope, next)
+        saveLocalMessages(userId, scope, durable)
         if (emotion) useCompanionStore.getState().setEmotion(emotion, true)
     },
 

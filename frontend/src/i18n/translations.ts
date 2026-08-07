@@ -358,8 +358,8 @@ const zh = {
     'chat.clearAvatar': '清除',
     'chat.avatarFailed': '头像上传失败，请换一张图片试试',
     'chat.you': '你',
-    'chat.asideIdle': 'Canal · 休息时',
-    'chat.asideFocus': 'Canal · 专注时',
+    'chat.asideIdle': 'Canal · 休息时（不计入记录）',
+    'chat.asideFocus': 'Canal · 专注时（不计入记录）',
 
     // Focus mode
     'focus.title': '专注模式',
@@ -959,8 +959,8 @@ const en: Record<keyof typeof zh, string> = {
     'chat.clearAvatar': 'Clear',
     'chat.avatarFailed': 'Avatar upload failed — try another image',
     'chat.you': 'You',
-    'chat.asideIdle': 'Canal · while resting',
-    'chat.asideFocus': 'Canal · during focus',
+    'chat.asideIdle': 'Canal · while resting (not saved)',
+    'chat.asideFocus': 'Canal · during focus (not saved)',
 
     'focus.title': 'Focus Mode',
     'focus.eyebrow': 'Locked focus',

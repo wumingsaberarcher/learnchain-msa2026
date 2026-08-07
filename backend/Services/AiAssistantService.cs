@@ -138,8 +138,9 @@ public class AiAssistantService
             session.Id, CompanionMemoryService.ShortTermMessageLimit, ct);
 
         var affection = CompanionAffectionService.Snapshot(user);
+        var coldFact = isDaily ? ColdFacts.Pick(zh, user.Id) : "";
         var systemPrompt = BuildSystemPrompt(
-            zh, contextJson, session.Summary, memories, affection, session.ZoneType, session.HabitId, knowledgeBlock, imageDataUrl != null);
+            zh, contextJson, session.Summary, memories, affection, session.ZoneType, session.HabitId, knowledgeBlock, imageDataUrl != null, coldFact);
 
         var messages = new JsonArray
         {
@@ -297,7 +298,8 @@ public class AiAssistantService
         string zoneType,
         int habitId,
         string knowledgeBlock,
-        bool hasImage)
+        bool hasImage,
+        string coldFact = "")
     {
         var lang = zh ? "Simplified Chinese" : "English";
         var memoryBlock = memories.Count == 0
@@ -329,6 +331,12 @@ public class AiAssistantService
                 ? $"\n检索到的记忆/知识库摘录（优先使用，可直接引用）：\n{knowledgeBlock}\n"
                 : $"\nRetrieved memories / knowledge excerpts (prefer these):\n{knowledgeBlock}\n");
 
+        var factLine = string.IsNullOrWhiteSpace(coldFact)
+            ? ""
+            : (zh
+                ? $"本轮可穿插的冷知识（请自然改写成你的口吻用上一句，勿生硬念稿、勿加「冷知识：」标签）：{coldFact}"
+                : $"Optional cold fact for this turn (rephrase naturally in one short beat; do not label it as a 'fact'): {coldFact}");
+
         var isHabitZone = zoneType == ChatZones.Habit && habitId > 0;
 
         if (!isHabitZone)
@@ -340,10 +348,11 @@ public class AiAssistantService
                     {{bondLine}}
                     {{visionLine}}
                     {{formatLine}}
+                    {{factLine}}
 
                     闲聊人设：
                     - 就是闲聊：轻松、俏皮、短句为主，像朋友随口聊，不要端着导师腔。
-                    - 可以主动或应景抛一点「冷知识」科普（地理、海洋、生物优先；也可天文/气象），每次一两句点到为止，别写成小作文或课堂讲义。
+                    - 几乎每次回复都要自然夹带一句「冷知识」（地理、海洋、生物优先；也可天文/气象），一两句即可；优先使用上面给出的本轮冷知识，改写口吻，不要连续两轮复读同一句。
                     - 用户想聊习惯/打卡时再帮忙；默认不要主动催作业、不要考试式追问。
                     - 不要把闲聊内容当成需要长期记住的「正式档案」。
                     - 不能替用户打卡；不能改已有习惯的类型/难度。
@@ -361,10 +370,11 @@ public class AiAssistantService
                     {{bondLine}}
                     {{visionLine}}
                     {{formatLine}}
+                    {{factLine}}
 
                     Casual vibe:
                     - Keep it light, playful, mostly short replies — like a friend chatting, not a tutor lecture.
-                    - Feel free to drop tiny "cold facts" (geography, ocean, biology preferred; astronomy/weather ok) — one or two sentences, never a lecture.
+                    - Almost every reply should weave in one tiny cold fact (geography, ocean, biology preferred; astronomy/weather ok). Prefer the fact suggested above, rephrased — never lecture, never repeat the same line two turns in a row.
                     - Help with habits only when the user asks; don't nag check-ins or quiz them by default.
                     - Do not treat this chitchat as lasting formal conversation archives.
                     - You cannot check in for the user; you cannot change habit type/difficulty after creation.
