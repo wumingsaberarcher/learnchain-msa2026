@@ -64,8 +64,9 @@ public class HabitMaterialController : ControllerBase
     }
 
     [HttpPost]
-    [RequestSizeLimit(HabitMaterialTextExtractor.MaxUploadBytes)]
-    public async Task<ActionResult<object>> Upload(int habitId, IFormFile file, CancellationToken ct)
+    [RequestSizeLimit(12 * 1024 * 1024)]
+    [RequestFormLimits(MultipartBodyLengthLimit = 12 * 1024 * 1024)]
+    public async Task<ActionResult<object>> Upload(int habitId, [FromForm] IFormFile file, CancellationToken ct)
     {
         var userId = GetCurrentUserId();
         if (await FindHabitAsync(habitId, userId) == null)
@@ -91,8 +92,12 @@ public class HabitMaterialController : ControllerBase
             return BadRequest($"无法提取文本：{ex.Message}");
         }
 
-        if (string.IsNullOrWhiteSpace(extracted))
-            return BadRequest("未能从文件中提取可用文本，请换一份资料");
+        // Scanned / image-only PDFs often extract empty text — still save the file so upload
+        // doesn't look "broken"; UI marks hasText=false and blocks quiz selection.
+        var hasText = !string.IsNullOrWhiteSpace(extracted);
+        string? warning = hasText
+            ? null
+            : "未能抽出可用文字（可能是扫描版/图片 PDF），已保存但无法用于出题";
 
         var root = Path.Combine(_env.ContentRootPath, "App_Data", "habit-materials", userId.ToString(), habitId.ToString());
         Directory.CreateDirectory(root);
@@ -115,7 +120,7 @@ public class HabitMaterialController : ControllerBase
                 : file.ContentType,
             Size = file.Length,
             StoredPath = Path.Combine(userId.ToString(), habitId.ToString(), storedName).Replace('\\', '/'),
-            ExtractedText = extracted,
+            ExtractedText = extracted ?? "",
             CreatedAt = DateTime.UtcNow
         };
 
@@ -129,8 +134,9 @@ public class HabitMaterialController : ControllerBase
             material.FileName,
             material.ContentType,
             material.Size,
-            hasText = true,
+            hasText,
             textLength = material.ExtractedText.Length,
+            warning,
             material.CreatedAt
         });
     }

@@ -1,5 +1,5 @@
-import { apiFetch, authHeaders, getAuthToken } from './http'
-import { API_BASE } from '../config/api'
+import { apiFetch, authHeaders, getAuthToken, handleUnauthorized } from './http'
+import { resolveUploadApiBase } from '../config/api'
 import type { AssessmentDifficulty } from '../utils/habitHelpers'
 
 export interface HabitMaterialDto {
@@ -11,6 +11,7 @@ export interface HabitMaterialDto {
   hasText: boolean
   textLength: number
   createdAt: string
+  warning?: string | null
 }
 
 export interface AssessmentOption {
@@ -68,6 +69,18 @@ export interface AssessmentGradeResult {
   }
 }
 
+const MAX_MATERIAL_BYTES = 8 * 1024 * 1024
+
+function parseErrorBody(text: string): string {
+  if (!text?.trim()) return ''
+  try {
+    const err = JSON.parse(text) as { error?: string; message?: string; title?: string }
+    return err.error || err.message || err.title || text
+  } catch {
+    return text
+  }
+}
+
 export async function listHabitMaterials(habitId: number): Promise<HabitMaterialDto[]> {
   const res = await apiFetch(`/habit/${habitId}/materials`)
   if (!res.ok) throw new Error(await res.text() || 'Failed to list materials')
@@ -76,23 +89,42 @@ export async function listHabitMaterials(habitId: number): Promise<HabitMaterial
 
 export async function uploadHabitMaterial(habitId: number, file: File): Promise<HabitMaterialDto> {
   const token = getAuthToken()
+  if (!token) {
+    handleUnauthorized()
+    throw new Error('登录已过期，请重新登录后再上传')
+  }
+  if (file.size > MAX_MATERIAL_BYTES) {
+    throw new Error(`文件过大（${(file.size / 1024 / 1024).toFixed(1)}MB），上限 8MB`)
+  }
+
   const form = new FormData()
-  form.append('file', file)
-  const res = await fetch(`${API_BASE}/habit/${habitId}/materials`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    body: form,
-  })
-  if (!res.ok) {
-    const text = await res.text()
-    let msg = text
-    try {
-      const err = JSON.parse(text) as { error?: string; message?: string }
-      msg = err.error || err.message || text
-    } catch {
-      /* plain text body */
+  form.append('file', file, file.name)
+
+  // Bypass Vercel rewrite body limit by posting straight to Render in production.
+  const base = resolveUploadApiBase()
+  let res: Response
+  try {
+    res = await fetch(`${base}/habit/${habitId}/materials`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    })
+  } catch (err) {
+    if (err instanceof TypeError) {
+      throw new Error('无法连接服务器上传文件。请确认后端已唤醒后重试。')
     }
-    throw new Error(msg || 'Upload failed')
+    throw err
+  }
+
+  if (res.status === 401) {
+    handleUnauthorized()
+    throw new Error('登录已过期，请重新登录后再上传')
+  }
+  if (res.status === 413) {
+    throw new Error('文件太大，上传被拦截（请压缩到 8MB 以内）')
+  }
+  if (!res.ok) {
+    throw new Error(parseErrorBody(await res.text()) || `Upload failed (${res.status})`)
   }
   return res.json()
 }

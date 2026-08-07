@@ -221,11 +221,15 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
     setUploading(true)
     setError(null)
     const failures: string[] = []
+    const warnings: string[] = []
     try {
       for (let i = 0; i < list.length; i++) {
         setUploadProgress(t('assess.uploadingProgress', { current: i + 1, total: list.length }))
         try {
-          await uploadHabitMaterial(habitId, list[i])
+          const dto = await uploadHabitMaterial(habitId, list[i])
+          if (!dto.hasText || dto.warning) {
+            warnings.push(`${list[i].name}: ${dto.warning || t('assess.noText')}`)
+          }
         } catch (e) {
           const reason = e instanceof Error ? e.message : t('assess.uploadFail')
           failures.push(`${list[i].name}: ${reason}`)
@@ -240,6 +244,8 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
               '\n' +
               failures.join('\n'),
         )
+      } else if (warnings.length > 0) {
+        setError(warnings.join('\n'))
       }
     } finally {
       setUploadProgress(null)
