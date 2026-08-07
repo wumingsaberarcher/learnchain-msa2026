@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronUp, History, LogOut, MessageSquare, Mic, Send, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, History, ImagePlus, LogOut, MessageSquare, Mic, Send, X } from 'lucide-react'
 import { useChatStore, type UiChatMessage } from '../../stores/chatStore'
 import { useCompanionStore } from '../../stores/companionStore'
 import { useAssessmentStore } from '../../stores/assessmentStore'
 import { useTranslation } from '../../stores/settingsStore'
+import { compressChatImage } from '../../utils/compressChatImage'
 import {
   buildEmotionTimeline,
   emotionAt,
@@ -39,6 +40,9 @@ export default function GalgameStage() {
   const closeAssessment = useAssessmentStore((s) => s.close)
 
   const [draft, setDraft] = useState('')
+  const [pendingImage, setPendingImage] = useState<string | null>(null)
+  const [imageErr, setImageErr] = useState('')
+  const chatImageInputRef = useRef<HTMLInputElement>(null)
   const [displayText, setDisplayText] = useState('')
   const [fullText, setFullText] = useState('')
   const [typing, setTyping] = useState(false)
@@ -254,13 +258,16 @@ export default function GalgameStage() {
   }
 
   const handleSend = async () => {
-    if (!draft.trim() || isSending || typing) return
+    if ((!draft.trim() && !pendingImage) || isSending || typing) return
     const text = draft.trim()
+    const image = pendingImage
     setDraft('')
+    setPendingImage(null)
+    setImageErr('')
     stopTypewriter()
     setEmotion('normal', true)
     setDisplayText(language.startsWith('zh') ? '……' : '...')
-    await sendMessage(text, language)
+    await sendMessage(text, language, { imageDataUrl: image })
     const msgs = useChatStore.getState().messages
     const lastAssistant = [...msgs].reverse().find((m) => m.role === 'assistant' && m.kind !== 'aside')
     if (lastAssistant?.content) {
@@ -272,6 +279,17 @@ export default function GalgameStage() {
           ? t('chat.missingApiKey')
           : err || t('chat.galFallback'),
       )
+    }
+  }
+
+  const onChatImage = async (file: File | undefined) => {
+    if (!file) return
+    setImageErr('')
+    try {
+      const { dataUrl } = await compressChatImage(file)
+      setPendingImage(dataUrl)
+    } catch {
+      setImageErr(t('chat.imageFailed'))
     }
   }
 
@@ -479,11 +497,39 @@ export default function GalgameStage() {
         )}
 
         <div className="gal-input-row" ref={inputRowRef}>
+          {pendingImage && (
+            <div className="gal-pending-image">
+              <img src={pendingImage} alt="" />
+              <button type="button" onClick={() => setPendingImage(null)} title={t('chat.imageRemove')}>
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+          {imageErr && <div className="gal-image-err">{imageErr}</div>}
+          <input
+            ref={chatImageInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            hidden
+            onChange={(e) => {
+              void onChatImage(e.target.files?.[0])
+              e.target.value = ''
+            }}
+          />
+          <button
+            type="button"
+            className="gal-icon-btn"
+            title={t('chat.attachImage')}
+            disabled={isSending}
+            onClick={() => chatImageInputRef.current?.click()}
+          >
+            <ImagePlus className="w-4 h-4" />
+          </button>
           <textarea
             className="gal-input"
             rows={1}
             value={draft}
-            placeholder={t('chat.galPlaceholder')}
+            placeholder={pendingImage ? t('chat.placeholderWithImage') : t('chat.galPlaceholder')}
             disabled={isSending}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -508,7 +554,7 @@ export default function GalgameStage() {
             type="button"
             className="gal-send-btn"
             title={t('chat.send')}
-            disabled={isSending || typing || !draft.trim()}
+            disabled={isSending || typing || (!draft.trim() && !pendingImage)}
             onClick={() => void handleSend()}
           >
             <Send className="w-4 h-4" />

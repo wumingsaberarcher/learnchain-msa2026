@@ -70,6 +70,7 @@ export async function sendChat(
     language: 'zh' | 'en',
     provider: AiProviderSettings,
     scope?: ChatScopeParam,
+    imageDataUrl?: string | null,
 ): Promise<ChatResponse> {
     const zone = scope?.zoneType === 'habit' && scope.habitId != null && scope.habitId > 0
         ? 'habit'
@@ -85,6 +86,7 @@ export async function sendChat(
             model: provider.model || undefined,
             zoneType: zone,
             habitId: zone === 'habit' ? scope?.habitId : undefined,
+            imageDataUrl: imageDataUrl || undefined,
         }),
     })
 

@@ -141,10 +141,13 @@ public class AiAssistantService
                 {
                     ["model"] = model,
                     ["messages"] = messages.DeepClone(),
-                    ["tools"] = BuildToolsSchema(),
-                    ["tool_choice"] = "auto",
-                    ["temperature"] = 0.4
+                    ["temperature"] = imageDataUrl != null ? 0.35 : 0.4
                 };
+                if (useTools)
+                {
+                    body["tools"] = BuildToolsSchema();
+                    body["tool_choice"] = "auto";
+                }
 
                 var completion = await CallChatCompletionsAsync(baseUrl, apiKey, body, ct);
                 var choice = completion["choices"]?[0]?["message"] as JsonObject
@@ -153,7 +156,7 @@ public class AiAssistantService
                 messages.Add(SanitizeAssistantMessage(choice));
 
                 var toolCalls = choice["tool_calls"] as JsonArray;
-                if (toolCalls == null || toolCalls.Count == 0)
+                if (!useTools || toolCalls == null || toolCalls.Count == 0)
                 {
                     finalReply = ReadMessageContent(choice["content"])?.Trim();
                     break;
@@ -166,7 +169,8 @@ public class AiAssistantService
                     var name = ReadStringNode(call["function"]?["name"]) ?? "";
                     var argsJson = ReadToolArguments(call["function"]?["arguments"]);
 
-                    var (resultText, action) = await ExecuteToolAsync(user, name, argsJson, zh, ct);
+                    var (resultText, action) = await ExecuteToolAsync(
+                        user, name, argsJson, zh, session.ZoneType, session.HabitId, ct);
                     if (action != null) actions.Add(action);
 
                     messages.Add(new JsonObject
@@ -232,7 +236,9 @@ public class AiAssistantService
         IReadOnlyList<UserMemory> memories,
         AffectionSnapshot affection,
         string zoneType,
-        int habitId)
+        int habitId,
+        string knowledgeBlock,
+        bool hasImage)
     {
         var lang = zh ? "Simplified Chinese" : "English";
         var memoryBlock = memories.Count == 0
@@ -248,16 +254,28 @@ public class AiAssistantService
             ? $"与用户的真实好感度：{affection.Points}/{affection.MaxPoints}（阶段 {affection.TierKey}，今日已获 {affection.GainedToday}/{affection.DailyCap}）。语气随羁绊自然亲近一些，但不要报出精确数字，除非用户问起。"
             : $"Real affection with the user: {affection.Points}/{affection.MaxPoints} (tier {affection.TierKey}, today {affection.GainedToday}/{affection.DailyCap}). Sound a bit closer as the bond grows; do not recite exact numbers unless asked.";
 
+        var visionLine = hasImage
+            ? (zh
+                ? "用户附带了一张图片：先识别图中关键内容（文字/物体/场景），再结合下方记忆与学习资料回答；资料不足时可以直接根据图片给出清楚说明，不要编造资料里没有的考点。"
+                : "The user attached an image: recognize key content first, then answer using memories/study materials below when relevant; if materials are insufficient, answer from the image directly—do not invent study facts.")
+            : "";
+
+        var knowledgeSection = string.IsNullOrWhiteSpace(knowledgeBlock)
+            ? ""
+            : (zh
+                ? $"\n检索到的记忆/知识库摘录（优先使用，可直接引用）：\n{knowledgeBlock}\n"
+                : $"\nRetrieved memories / knowledge excerpts (prefer these):\n{knowledgeBlock}\n");
+
         var isHabitZone = zoneType == ChatZones.Habit && habitId > 0;
 
         if (!isHabitZone)
         {
-            // Daily casual zone — chitchat + cold knowledge; not a formal conversation log.
             return zh
                 ? $$"""
                     你是 LearnChain 的伙伴 Canal。当前是【日常闲聊区】——轻松聊天，不是正式学习记录。
                     请始终用简体中文回复。
                     {{bondLine}}
+                    {{visionLine}}
 
                     闲聊人设：
                     - 就是闲聊：轻松、俏皮、短句为主，像朋友随口聊，不要端着导师腔。
@@ -265,10 +283,11 @@ public class AiAssistantService
                     - 用户想聊习惯/打卡时再帮忙；默认不要主动催作业、不要考试式追问。
                     - 不要把闲聊内容当成需要长期记住的「正式档案」。
                     - 不能替用户打卡；不能改已有习惯的类型/难度。
+                    - 若用户发了图片：可以识别并闲聊式讲解；有资料摘录时优先对照资料。
 
                     若用户明确要管习惯，可用工具；创建习惯时对方说「随便」就直接定 Daily 名与难度 1–3。
                     XP 仅由难度决定（1→10，2→20，3→30）。
-
+                    {{knowledgeSection}}
                     当前游戏状态（需要时再提，别每句汇报）：
                     {{contextJson}}
                     """
@@ -276,6 +295,7 @@ public class AiAssistantService
                     You are Canal, LearnChain's companion. This is the 【daily chitchat zone】 — casual talk, not a formal study log.
                     Always reply in English.
                     {{bondLine}}
+                    {{visionLine}}
 
                     Casual vibe:
                     - Keep it light, playful, mostly short replies — like a friend chatting, not a tutor lecture.
@@ -283,10 +303,11 @@ public class AiAssistantService
                     - Help with habits only when the user asks; don't nag check-ins or quiz them by default.
                     - Do not treat this chitchat as lasting formal conversation archives.
                     - You cannot check in for the user; you cannot change habit type/difficulty after creation.
+                    - If the user sent an image: recognize and chat about it; prefer study excerpts when provided.
 
                     Use tools when they clearly want habit help. If they say "whatever/any", create a Daily habit with difficulty 1–3 immediately.
                     XP maps from difficulty only (1→10, 2→20, 3→30).
-
+                    {{knowledgeSection}}
                     Current game state (mention only when useful):
                     {{contextJson}}
                     """;
@@ -301,10 +322,12 @@ public class AiAssistantService
             Always reply in {lang}.
             You remember the user across sessions via long-term memories and a rolling conversation summary.
             {zoneLine}
+            {visionLine}
             Naturally weave in game progress (streaks, XP, levels, badges, chain continuity) when helpful — keep it encouraging, not robotic.
             {bondLine}
 
             You help users understand their account, what they should do today, and create/rename/delete habits via tools.
+            You may call search_knowledge to look up study materials and memories by keyword.
             When creating a habit: if the user already said the essentials OR told you to decide freely (e.g. 随便 / any name / any XP), call create_habit immediately — pick a clear Daily name and difficulty 1–3. Do not keep asking clarifying questions when they said to choose for them.
             XP is determined by difficulty only (1→10 XP, 2→20 XP, 3→30 XP). If they ask for a specific XP, pick the closest difficulty. There is no free-form XP field.
             Otherwise ask briefly for missing name/type/difficulty, then call create_habit.
@@ -321,8 +344,23 @@ public class AiAssistantService
 
             Long-term memories for THIS zone only (use gently; do not dump as a list unless asked):
             {memoryBlock}
+            {knowledgeSection}
             """;
     }
+
+    private static JsonObject BuildVisionUserMessage(string text, string imageDataUrl) => new()
+    {
+        ["role"] = "user",
+        ["content"] = new JsonArray
+        {
+            new JsonObject { ["type"] = "text", ["text"] = text },
+            new JsonObject
+            {
+                ["type"] = "image_url",
+                ["image_url"] = new JsonObject { ["url"] = imageDataUrl }
+            }
+        }
+    };
 
     private static JsonArray BuildToolsSchema() =>
     [
@@ -365,6 +403,15 @@ public class AiAssistantService
         {
             ["type"] = "object",
             ["properties"] = new JsonObject()
+        }),
+        Tool("search_knowledge", "Search the user's study materials (habit uploads) and long-term memories by keyword. Use when answering questions about study content.", new JsonObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JsonObject
+            {
+                ["query"] = new JsonObject { ["type"] = "string", ["description"] = "Search keywords" }
+            },
+            ["required"] = new JsonArray("query")
         })
     ];
 
@@ -398,7 +445,7 @@ public class AiAssistantService
     }
 
     private async Task<(string Result, ChatActionResult? Action)> ExecuteToolAsync(
-        User user, string name, string argsJson, bool zh, CancellationToken ct)
+        User user, string name, string argsJson, bool zh, string zoneType, int habitId, CancellationToken ct)
     {
         JsonObject args;
         try
@@ -414,6 +461,17 @@ public class AiAssistantService
         {
             switch (name)
             {
+                case "search_knowledge":
+                {
+                    var query = ReadStringArg(args, "query")?.Trim() ?? "";
+                    var block = await _knowledge.SearchAsync(user.Id, zoneType, habitId, query, zh, ct);
+                    return (block, new ChatActionResult
+                    {
+                        Type = "search_knowledge",
+                        Summary = zh ? $"已检索知识库：{query}" : $"Searched knowledge: {query}",
+                        HabitId = habitId > 0 ? habitId : null
+                    });
+                }
                 case "get_account_overview":
                 {
                     var json = await _habitContext.BuildContextJsonAsync(user);
@@ -490,17 +548,17 @@ public class AiAssistantService
                 }
                 case "rename_habit":
                 {
-                    var habitId = ParsePositiveInt(args["habitId"]) ?? 0;
+                    var targetHabitId = ParsePositiveInt(args["habitId"]) ?? 0;
                     var newName = ReadStringArg(args, "newName")?.Trim();
-                    if (habitId <= 0 || string.IsNullOrWhiteSpace(newName))
+                    if (targetHabitId <= 0 || string.IsNullOrWhiteSpace(newName))
                         return (zh ? "需要 habitId 和新名称" : "habitId and newName required", null);
 
-                    var habit = await _context.Habits.FirstOrDefaultAsync(h => h.Id == habitId && h.UserId == user.Id && h.IsActive, ct);
+                    var habit = await _context.Habits.FirstOrDefaultAsync(h => h.Id == targetHabitId && h.UserId == user.Id && h.IsActive, ct);
                     if (habit == null)
                         return (zh ? "习惯不存在" : "Habit not found", null);
 
                     var conflict = await _context.Habits.AnyAsync(h =>
-                        h.UserId == user.Id && h.IsActive && h.Id != habitId && h.Name.ToLower() == newName.ToLower(), ct);
+                        h.UserId == user.Id && h.IsActive && h.Id != targetHabitId && h.Name.ToLower() == newName.ToLower(), ct);
                     if (conflict)
                         return (zh ? "已存在同名习惯" : "Name already taken", null);
 
@@ -518,8 +576,8 @@ public class AiAssistantService
                 }
                 case "delete_habit":
                 {
-                    var habitId = ParsePositiveInt(args["habitId"]) ?? 0;
-                    var habit = await _context.Habits.FirstOrDefaultAsync(h => h.Id == habitId && h.UserId == user.Id && h.IsActive, ct);
+                    var targetHabitId = ParsePositiveInt(args["habitId"]) ?? 0;
+                    var habit = await _context.Habits.FirstOrDefaultAsync(h => h.Id == targetHabitId && h.UserId == user.Id && h.IsActive, ct);
                     if (habit == null)
                         return (zh ? "习惯不存在" : "Habit not found", null);
 

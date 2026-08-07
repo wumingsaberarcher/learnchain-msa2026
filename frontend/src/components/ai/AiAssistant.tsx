@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ImagePlus, Mail, Mic, Send, Trash2, X } from 'lucide-react'
+import { ImagePlus, Mail, Mic, Paperclip, Send, Trash2, X } from 'lucide-react'
 import { sendTodayReminder } from '../../api/chatApi'
 import { useChatStore } from '../../stores/chatStore'
 import { useAiSettingsStore } from '../../stores/aiSettingsStore'
 import { useCompanionStore } from '../../stores/companionStore'
 import { useHabitStore } from '../../stores/habitStore'
 import { useTranslation } from '../../stores/settingsStore'
+import { compressChatImage } from '../../utils/compressChatImage'
 import CanalAvatar from '../character/CanalAvatar'
 import GalgameStage from './GalgameStage'
 import { useSpeechInput } from './useSpeechInput'
@@ -26,10 +27,13 @@ export default function AiAssistant() {
     } = useCompanionStore()
 
     const [draft, setDraft] = useState('')
+    const [pendingImage, setPendingImage] = useState<string | null>(null)
     const [reminderMsg, setReminderMsg] = useState('')
     const [avatarErr, setAvatarErr] = useState('')
+    const [imageErr, setImageErr] = useState('')
     const listRef = useRef<HTMLDivElement>(null)
     const avatarInputRef = useRef<HTMLInputElement>(null)
+    const chatImageInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
         hydrateForUser(isLoggedIn && currentUser ? currentUser.id : null)
@@ -63,10 +67,23 @@ export default function AiAssistant() {
     if (!isLoggedIn) return null
 
     const handleSend = async () => {
-        if (!draft.trim() || isSending) return
+        if ((!draft.trim() && !pendingImage) || isSending) return
         const text = draft
+        const image = pendingImage
         setDraft('')
-        await sendMessage(text, language)
+        setPendingImage(null)
+        await sendMessage(text, language, { imageDataUrl: image })
+    }
+
+    const onChatImage = async (file: File | undefined) => {
+        if (!file) return
+        setImageErr('')
+        try {
+            const { dataUrl } = await compressChatImage(file)
+            setPendingImage(dataUrl)
+        } catch {
+            setImageErr(t('chat.imageFailed'))
+        }
     }
 
     const handleReminder = async () => {
@@ -225,6 +242,9 @@ export default function AiAssistant() {
                                             {isChatter && !isUser && (
                                                 <span className="ai-aside-tag">{t('chat.chatterTag')}</span>
                                             )}
+                                            {m.imageUrl && (
+                                                <img className="ai-msg-image" src={m.imageUrl} alt="" />
+                                            )}
                                             {m.content}
                                         </div>
                                         {isUser && (
@@ -255,6 +275,16 @@ export default function AiAssistant() {
                         )}
                         {reminderMsg && <div className="ai-chat-info">{reminderMsg}</div>}
 
+                        {imageErr && <div className="ai-chat-error">{imageErr}</div>}
+                        {pendingImage && (
+                            <div className="ai-pending-image">
+                                <img src={pendingImage} alt="" />
+                                <button type="button" onClick={() => setPendingImage(null)} title={t('chat.imageRemove')}>
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        )}
+
                         <div className="ai-chat-input-row">
                             <button
                                 type="button"
@@ -265,11 +295,30 @@ export default function AiAssistant() {
                             >
                                 <Mail className="w-4 h-4" />
                             </button>
+                            <input
+                                ref={chatImageInputRef}
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,image/gif"
+                                hidden
+                                onChange={(e) => {
+                                    void onChatImage(e.target.files?.[0])
+                                    e.target.value = ''
+                                }}
+                            />
+                            <button
+                                type="button"
+                                className="ai-icon-btn"
+                                title={t('chat.attachImage')}
+                                disabled={isSending}
+                                onClick={() => chatImageInputRef.current?.click()}
+                            >
+                                <Paperclip className="w-4 h-4" />
+                            </button>
                             <textarea
                                 className="ai-chat-input"
                                 rows={1}
                                 value={draft}
-                                placeholder={t('chat.placeholder')}
+                                placeholder={pendingImage ? t('chat.placeholderWithImage') : t('chat.placeholder')}
                                 onChange={e => setDraft(e.target.value)}
                                 onKeyDown={e => {
                                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -294,7 +343,7 @@ export default function AiAssistant() {
                                 type="button"
                                 className="ai-send-btn"
                                 onClick={() => void handleSend()}
-                                disabled={isSending || !draft.trim()}
+                                disabled={isSending || (!draft.trim() && !pendingImage)}
                                 title={t('chat.send')}
                             >
                                 <Send className="w-4 h-4" />

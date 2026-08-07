@@ -883,6 +883,29 @@ p a:hover {
 	gap: 0.75rem;
 }
 
+.habit-edit-assess-diff {
+	grid-template-columns: repeat(3, 1fr);
+	gap: 0.5rem;
+	width: 100%;
+}
+
+.habit-edit-assess-diff .habits-difficulty-card {
+	padding: 0.65rem 0.75rem;
+	border-radius: 12px;
+	min-width: 0;
+}
+
+.habit-edit-assess-diff .habits-difficulty-name {
+	font-size: 0.88rem;
+}
+
+.habit-edit-assess-diff .habits-type-desc {
+	font-size: 0.7rem;
+	line-height: 1.25;
+	opacity: 0.75;
+	color: var(--light);
+}
+
 .habits-type-card,
 .habits-difficulty-card {
 	display: flex;
@@ -1224,6 +1247,10 @@ p a:hover {
 @media (max-width: 768px) {
 	.habits-type-grid,
 	.habits-difficulty-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.habit-edit-assess-diff {
 		grid-template-columns: 1fr;
 	}
 

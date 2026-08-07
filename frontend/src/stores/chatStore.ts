@@ -21,6 +21,8 @@ export interface UiChatMessage {
     kind?: 'chat' | 'aside' | 'chatter'
     scene?: CompanionScene
     emotion?: Emotion
+    /** Local preview data URL for attached image (not always persisted long-term). */
+    imageUrl?: string
 }
 
 export interface ChatScope {
@@ -53,7 +55,7 @@ interface ChatState {
     hydrateForUser: (userId: number | null) => void
     /** Switch daily ↔ habit learning zone (isolates transcript + server memory). */
     setScope: (scope: ChatScope) => Promise<void>
-    sendMessage: (text: string, language: 'zh' | 'en') => Promise<ChatActionResult[]>
+    sendMessage: (text: string, language: 'zh' | 'en', opts?: { imageDataUrl?: string | null }) => Promise<ChatActionResult[]>
     appendCompanionAside: (content: string, scene: 'idle' | 'focus', emotion?: Emotion) => void
     appendLocalExchange: (userContent: string, assistantContent: string) => void
 }
@@ -270,9 +272,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         saveLocalMessages(userId, scope, next)
     },
 
-    sendMessage: async (text, language) => {
+    sendMessage: async (text, language, opts) => {
         const trimmed = text.trim()
-        if (!trimmed) return []
+        const imageDataUrl = opts?.imageDataUrl?.trim() || null
+        if (!trimmed && !imageDataUrl) return []
 
         const provider = useAiSettingsStore.getState()
         if (!provider.apiKey.trim()) {
@@ -282,12 +285,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         const { userId, scope } = get()
         const kind = messageKindForScope(scope)
+        const displayContent = trimmed
+            || (language.startsWith('zh') ? '[图片]' : '[Image]')
         const userMsg: UiChatMessage = {
             id: uid(),
             role: 'user',
-            content: trimmed,
+            content: displayContent,
             createdAt: Date.now(),
             kind,
+            imageUrl: imageDataUrl || undefined,
         }
 
         const nextMessages = [...get().messages, userMsg]
@@ -304,7 +310,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 apiKey: provider.apiKey,
                 baseUrl: provider.baseUrl,
                 model: provider.model,
-            }, scope)
+            }, scope, imageDataUrl)
 
             const assistantMsg: UiChatMessage = {
                 id: uid(),

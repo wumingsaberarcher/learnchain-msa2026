@@ -336,15 +336,19 @@ export default function Habits() {
                                                     {t('habits.assessment')}
                                                 </label>
                                                 {editingHabit.assessmentEnabled && (
-                                                    <select
-                                                        className="habit-edit-input"
-                                                        value={editingHabit.assessmentDifficulty || 'easy'}
-                                                        onChange={e => setEditingHabit({ ...editingHabit, assessmentDifficulty: e.target.value })}
-                                                    >
-                                                        <option value="easy">{t('assess.diff.easy')}</option>
-                                                        <option value="medium">{t('assess.diff.medium')}</option>
-                                                        <option value="hard">{t('assess.diff.hard')}</option>
-                                                    </select>
+                                                    <div className="habits-difficulty-grid habit-edit-assess-diff">
+                                                        {(['easy', 'medium', 'hard'] as const).map((d) => (
+                                                            <button
+                                                                key={d}
+                                                                type="button"
+                                                                className={`habits-difficulty-card${(editingHabit.assessmentDifficulty || 'easy') === d ? ' selected' : ''}`}
+                                                                onClick={() => setEditingHabit({ ...editingHabit, assessmentDifficulty: d })}
+                                                            >
+                                                                <span className="habits-difficulty-name">{t(`assess.diff.${d}`)}</span>
+                                                                <span className="habits-type-desc">{t(`assess.diff.${d}Desc`)}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 )}
                                             </div>
                                         ) : (

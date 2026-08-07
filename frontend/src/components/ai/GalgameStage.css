@@ -465,12 +465,46 @@
 
 .gal-input-row {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: flex-end;
 	gap: 0.45rem;
 	padding: 0.55rem 0.65rem;
 	border-radius: 14px;
 	background: rgba(12, 16, 28, 0.85);
 	border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.gal-pending-image {
+	flex: 1 1 100%;
+	display: flex;
+	align-items: flex-start;
+	gap: 0.4rem;
+}
+
+.gal-pending-image img {
+	max-height: 72px;
+	max-width: 140px;
+	border-radius: 10px;
+	object-fit: cover;
+	border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.gal-pending-image button {
+	border: none;
+	background: rgba(0, 0, 0, 0.5);
+	color: #fff;
+	border-radius: 8px;
+	width: 24px;
+	height: 24px;
+	display: grid;
+	place-items: center;
+	cursor: pointer;
+}
+
+.gal-image-err {
+	flex: 1 1 100%;
+	font-size: 0.75rem;
+	color: #ffb0b8;
 }
 
 .gal-input {
