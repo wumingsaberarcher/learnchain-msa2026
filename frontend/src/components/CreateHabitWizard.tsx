@@ -50,7 +50,14 @@ export default function CreateHabitWizard({ onClose, onSubmit, existingNames }: 
 
     useEffect(() => {
         void listHabitGroups()
-            .then(setGroups)
+            .then((list) =>
+                setGroups(
+                    list.map((g) => ({
+                        ...g,
+                        name: g.name || (g as HabitGroup & { Name?: string }).Name || '',
+                    })),
+                ),
+            )
             .catch(() => setGroups([]))
     }, [])
 
@@ -255,19 +262,29 @@ export default function CreateHabitWizard({ onClose, onSubmit, existingNames }: 
                         </div>
                         <div className="habits-assessment-block" style={{ marginTop: '1rem' }}>
                             <label className="habits-wizard-label">{t('wizard.addToGroup')}</label>
-                            <select
-                                className="habits-wizard-group-select"
-                                value={groupId ?? ''}
-                                onChange={(e) => {
-                                    const v = e.target.value
-                                    setGroupId(v ? Number(v) : null)
-                                }}
-                            >
-                                <option value="">{t('wizard.noGroup')}</option>
+                            <div className="habits-wizard-group-picker" role="listbox" aria-label={t('wizard.addToGroup')}>
+                                <button
+                                    type="button"
+                                    role="option"
+                                    aria-selected={groupId == null}
+                                    className={`habits-wizard-group-option${groupId == null ? ' selected' : ''}`}
+                                    onClick={() => setGroupId(null)}
+                                >
+                                    {t('wizard.noGroup')}
+                                </button>
                                 {groups.map((g) => (
-                                    <option key={g.id} value={g.id}>{g.name}</option>
+                                    <button
+                                        key={g.id}
+                                        type="button"
+                                        role="option"
+                                        aria-selected={groupId === g.id}
+                                        className={`habits-wizard-group-option${groupId === g.id ? ' selected' : ''}`}
+                                        onClick={() => setGroupId(g.id)}
+                                    >
+                                        {g.name}
+                                    </button>
                                 ))}
-                            </select>
+                            </div>
                         </div>
                     </div>
                 )}

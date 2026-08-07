@@ -3641,7 +3641,7 @@ footer p a:hover {
 .habits-groups-board {
 	display: flex;
 	flex-direction: column;
-	gap: 0.85rem;
+	gap: 1rem;
 }
 
 .habits-groups-loading {
@@ -3665,65 +3665,101 @@ footer p a:hover {
 	gap: 0.5rem;
 	padding: 0.85rem;
 	border-radius: 12px;
-	border: 1px dashed rgba(255, 255, 255, 0.18);
+	border: 1px dashed rgba(255, 255, 255, 0.22);
 	background: rgba(255, 255, 255, 0.04);
 }
 
 .habits-group-card {
-	border-radius: 14px;
-	border: 1px solid rgba(255, 255, 255, 0.12);
-	background: rgba(12, 18, 28, 0.35);
+	border-radius: 16px;
+	border: 1px solid rgba(0, 255, 255, 0.18);
+	background: rgba(8, 14, 24, 0.72);
 	overflow: visible;
 	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .habits-group-card.drop-active {
-	border-color: rgba(110, 180, 255, 0.55);
-	box-shadow: 0 0 0 2px rgba(110, 180, 255, 0.2);
+	border-color: rgba(110, 180, 255, 0.65);
+	box-shadow: 0 0 0 2px rgba(110, 180, 255, 0.22);
 }
 
 .habits-group-head {
 	display: flex;
-	align-items: center;
+	align-items: flex-start;
 	justify-content: space-between;
 	gap: 0.5rem;
-	padding: 0.55rem 0.65rem;
+	padding: 0.75rem 0.85rem;
 	flex-wrap: wrap;
+	background: linear-gradient(180deg, rgba(0, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .habits-group-toggle {
 	display: inline-flex;
-	align-items: center;
-	gap: 0.35rem;
+	align-items: flex-start;
+	gap: 0.45rem;
 	background: transparent;
 	border: none;
-	color: inherit;
+	color: var(--light, #f2f6ff);
 	cursor: pointer;
 	font: inherit;
 	text-align: left;
 	min-width: 0;
 	flex: 1;
+	padding: 0.15rem 0;
+}
+
+.habits-group-chevron {
+	flex-shrink: 0;
+	margin-top: 0.2rem;
+	opacity: 0.85;
+	color: var(--primary, #00e5ff);
+}
+
+.habits-group-toggle-text {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+	min-width: 0;
 }
 
 .habits-group-title {
 	display: inline-flex;
 	align-items: baseline;
-	gap: 0.45rem;
+	gap: 0.5rem;
 	flex-wrap: wrap;
 	font-weight: 600;
+	color: var(--light, #f2f6ff);
+}
+
+.habits-group-name {
+	font-size: 1.05rem;
+	font-weight: 700;
+	letter-spacing: 0.01em;
+	color: var(--light, #f2f6ff);
 }
 
 .habits-group-title small {
 	font-weight: 400;
-	opacity: 0.65;
+	opacity: 0.7;
 	font-size: 0.78em;
+	color: rgba(242, 246, 255, 0.75);
+}
+
+.habits-group-desc {
+	display: block;
+	font-size: 0.82rem;
+	line-height: 1.35;
+	color: rgba(242, 246, 255, 0.65);
+	font-weight: 400;
 }
 
 .habits-group-actions {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.2rem;
+	gap: 0.25rem;
 	flex-shrink: 0;
+	padding-top: 0.1rem;
 }
 
 .habits-group-icon-btn {
@@ -3733,14 +3769,15 @@ footer p a:hover {
 	width: 2rem;
 	height: 2rem;
 	border-radius: 8px;
-	border: 1px solid rgba(255, 255, 255, 0.12);
-	background: rgba(255, 255, 255, 0.05);
-	color: inherit;
+	border: 1px solid rgba(255, 255, 255, 0.16);
+	background: rgba(255, 255, 255, 0.06);
+	color: var(--light, #f2f6ff);
 	cursor: pointer;
 }
 
 .habits-group-icon-btn:hover {
-	background: rgba(255, 255, 255, 0.1);
+	background: rgba(0, 255, 255, 0.12);
+	border-color: rgba(0, 255, 255, 0.35);
 }
 
 .habits-group-icon-btn.danger:hover {
@@ -3749,10 +3786,36 @@ footer p a:hover {
 }
 
 .habits-group-body {
-	padding: 0 0.55rem 0.65rem;
+	padding: 0.65rem 0.7rem 0.75rem;
 	display: flex;
 	flex-direction: column;
 	gap: 0.55rem;
+	background: rgba(0, 0, 0, 0.18);
+}
+
+/* Compact: hide habit action buttons until group expanded */
+.habits-group-card.is-compact .habit-card-actions {
+	display: none !important;
+}
+
+.habits-group-card.is-compact .habit-card {
+	padding: 0.85rem 1rem;
+	gap: 0.75rem;
+}
+
+.habits-group-card.is-compact .habit-card-avatar {
+	width: 40px;
+	height: 40px;
+	border-radius: 12px;
+}
+
+.habits-group-card.is-compact .habit-card-name {
+	font-size: 1rem;
+	margin-bottom: 0.25rem;
+}
+
+.habits-group-card.is-compact .habit-milestones-panel {
+	display: none;
 }
 
 .habits-group-habit {
@@ -3769,6 +3832,7 @@ footer p a:hover {
 	cursor: grab;
 	padding: 0.35rem 0.1rem;
 	flex-shrink: 0;
+	color: var(--light, #f2f6ff);
 }
 
 .habits-group-habit-main {
@@ -3821,9 +3885,10 @@ footer p a:hover {
 
 .habits-empty-hint {
 	margin: 0;
-	opacity: 0.6;
+	opacity: 0.65;
 	font-size: 0.85rem;
-	padding: 0.35rem 0.15rem;
+	padding: 0.45rem 0.25rem;
+	color: rgba(242, 246, 255, 0.7);
 }
 
 .habits-group-mat-list {
@@ -3851,20 +3916,62 @@ footer p a:hover {
 	font-size: 0.75rem;
 }
 
+.habits-wizard-group-picker {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+	margin-top: 0.45rem;
+	padding: 0.4rem;
+	border-radius: 12px;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	background: rgba(0, 0, 0, 0.35);
+	max-height: 12rem;
+	overflow-y: auto;
+}
+
+.habits-wizard-group-option {
+	text-align: left;
+	width: 100%;
+	padding: 0.55rem 0.7rem;
+	border-radius: 8px;
+	border: 1px solid transparent;
+	background: transparent;
+	color: var(--light, #f2f6ff);
+	font: inherit;
+	font-size: 0.92rem;
+	cursor: pointer;
+}
+
+.habits-wizard-group-option:hover {
+	background: rgba(255, 255, 255, 0.08);
+}
+
+.habits-wizard-group-option.selected {
+	background: rgba(0, 255, 255, 0.14);
+	border-color: rgba(0, 255, 255, 0.35);
+	color: #fff;
+	font-weight: 600;
+}
+
 .habits-wizard-group-select {
 	width: 100%;
 	margin-top: 0.35rem;
 	padding: 0.45rem 0.55rem;
 	border-radius: 8px;
 	border: 1px solid rgba(255, 255, 255, 0.18);
-	background: rgba(0, 0, 0, 0.2);
-	color: inherit;
+	background: rgba(0, 0, 0, 0.45);
+	color: var(--light, #f2f6ff);
 	font: inherit;
 }
 
+.habits-wizard-group-select option {
+	background: #121820;
+	color: #f2f6ff;
+}
+
 .app-shell.theme-day .habits-group-card {
-	background: rgba(255, 255, 255, 0.55);
-	border-color: rgba(76, 120, 68, 0.2);
+	background: rgba(255, 255, 255, 0.72);
+	border-color: rgba(76, 120, 68, 0.28);
 }
 
 .app-shell.theme-day .habits-group-card.drop-active {
@@ -3872,14 +3979,56 @@ footer p a:hover {
 	box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.15);
 }
 
+.app-shell.theme-day .habits-group-head {
+	background: linear-gradient(180deg, rgba(76, 120, 68, 0.12), rgba(255, 255, 255, 0.35));
+	border-bottom-color: rgba(76, 120, 68, 0.2);
+}
+
+.app-shell.theme-day .habits-group-toggle,
+.app-shell.theme-day .habits-group-name,
+.app-shell.theme-day .habits-group-title,
+.app-shell.theme-day .habits-group-icon-btn {
+	color: #1a2e1a;
+}
+
+.app-shell.theme-day .habits-group-title small,
+.app-shell.theme-day .habits-group-desc,
+.app-shell.theme-day .habits-empty-hint {
+	color: rgba(26, 46, 26, 0.7);
+}
+
+.app-shell.theme-day .habits-group-body {
+	background: rgba(255, 255, 255, 0.35);
+}
+
+.app-shell.theme-day .habits-group-chevron {
+	color: #2E7D32;
+}
+
 .app-shell.theme-day .habits-move-menu {
 	background: #fff;
 	border-color: rgba(76, 120, 68, 0.25);
+	color: #1a2e1a;
 }
 
 .app-shell.theme-day .habits-group-create {
 	border-color: rgba(76, 120, 68, 0.3);
 	background: rgba(255, 255, 255, 0.45);
+}
+
+.app-shell.theme-day .habits-wizard-group-picker {
+	background: rgba(255, 255, 255, 0.85);
+	border-color: rgba(76, 120, 68, 0.28);
+}
+
+.app-shell.theme-day .habits-wizard-group-option {
+	color: #1a2e1a;
+}
+
+.app-shell.theme-day .habits-wizard-group-option.selected {
+	background: rgba(46, 125, 50, 0.12);
+	border-color: rgba(46, 125, 50, 0.35);
+	color: #1a2e1a;
 }
 
 .app-shell.theme-day .habits-wizard-group-select {

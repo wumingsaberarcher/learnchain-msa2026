@@ -33,11 +33,25 @@ type Props = {
   renderHabit: (habit: Habit) => ReactNode
 }
 
+function normalizeGroup(raw: HabitGroup & { Name?: string; Description?: string | null }): HabitGroup {
+  return {
+    id: raw.id,
+    name: raw.name || raw.Name || '',
+    description: raw.description ?? raw.Description ?? null,
+    createdAt: raw.createdAt,
+    habitCount: raw.habitCount ?? 0,
+    materialCount: raw.materialCount ?? 0,
+  }
+}
+
 export default function HabitGroupsBoard({ habits, onHabitsChanged, renderHabit }: Props) {
   const { t } = useTranslation()
   const [groups, setGroups] = useState<HabitGroup[]>([])
   const [loading, setLoading] = useState(true)
-  const [collapsed, setCollapsed] = useState<Partial<Record<number | 'ungrouped', boolean>>>({})
+  /** Groups start compact (collapsed). Ungrouped stays expanded. */
+  const [expanded, setExpanded] = useState<Partial<Record<number | 'ungrouped', boolean>>>({
+    ungrouped: true,
+  })
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
@@ -54,7 +68,8 @@ export default function HabitGroupsBoard({ habits, onHabitsChanged, renderHabit 
   const refreshGroups = useCallback(async () => {
     setLoading(true)
     try {
-      setGroups(await listHabitGroups())
+      const list = await listHabitGroups()
+      setGroups(list.map((g) => normalizeGroup(g as HabitGroup & { Name?: string })))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load groups')
     } finally {
@@ -94,11 +109,17 @@ export default function HabitGroupsBoard({ habits, onHabitsChanged, renderHabit 
     if (!newName.trim()) return
     setBusyId(-1)
     try {
-      await createHabitGroup({ name: newName.trim(), description: newDesc.trim() || undefined })
+      const created = normalizeGroup(
+        (await createHabitGroup({
+          name: newName.trim(),
+          description: newDesc.trim() || undefined,
+        })) as HabitGroup & { Name?: string },
+      )
       setNewName('')
       setNewDesc('')
       setCreating(false)
       await refreshGroups()
+      setExpanded((e) => ({ ...e, [created.id]: false }))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'create failed')
     } finally {
@@ -171,12 +192,18 @@ export default function HabitGroupsBoard({ habits, onHabitsChanged, renderHabit 
     )
   }
 
-  const renderDropZone = (key: number | 'ungrouped', title: ReactNode, body: ReactNode, actions?: ReactNode) => {
-    const isOpen = !collapsed[key]
+  const renderDropZone = (
+    key: number | 'ungrouped',
+    title: ReactNode,
+    body: ReactNode,
+    actions?: ReactNode,
+    subtitle?: ReactNode,
+  ) => {
+    const isOpen = !!expanded[key]
     const isDrop = dropTarget === key
     return (
       <section
-        className={`habits-group-card${isDrop ? ' drop-active' : ''}`}
+        className={`habits-group-card${isOpen ? ' is-expanded' : ' is-compact'}${isDrop ? ' drop-active' : ''}`}
         onDragOver={(e) => {
           e.preventDefault()
           setDropTarget(key)
@@ -191,17 +218,66 @@ export default function HabitGroupsBoard({ habits, onHabitsChanged, renderHabit 
           <button
             type="button"
             className="habits-group-toggle"
-            onClick={() => setCollapsed((c) => ({ ...c, [key]: !c[key] }))}
+            onClick={() => setExpanded((c) => ({ ...c, [key]: !c[key] }))}
+            aria-expanded={isOpen}
           >
-            {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-            {title}
+            {isOpen ? <ChevronDown className="w-4 h-4 habits-group-chevron" /> : <ChevronRight className="w-4 h-4 habits-group-chevron" />}
+            <span className="habits-group-toggle-text">
+              {title}
+              {subtitle}
+            </span>
           </button>
           {actions}
         </header>
-        {isOpen && <div className="habits-group-body">{body}</div>}
+        <div className="habits-group-body">{body}</div>
       </section>
     )
   }
+
+  const renderHabitRow = (h: Habit, currentGroupId: number | null) => (
+    <div
+      key={h.id}
+      className="habits-group-habit"
+      draggable
+      onDragStart={() => setDragHabitId(h.id)}
+      onDragEnd={() => {
+        setDragHabitId(null)
+        setDropTarget(null)
+      }}
+    >
+      <span className="habits-drag-handle" title={t('groups.dragHint')}>
+        <GripVertical className="w-4 h-4" />
+      </span>
+      <div className="habits-group-habit-main">{renderHabit(h)}</div>
+      <div className="habits-move-wrap">
+        <button
+          type="button"
+          className="habits-group-icon-btn"
+          onClick={() => setMenuHabitId(menuHabitId === h.id ? null : h.id)}
+          title={t('groups.move')}
+        >
+          <MoreHorizontal className="w-4 h-4" />
+        </button>
+        {menuHabitId === h.id && (
+          <div className="habits-move-menu">
+            {currentGroupId != null && (
+              <button type="button" onClick={() => void handleMove(h.id, null)}>
+                {t('groups.ungroup')}
+              </button>
+            )}
+            {groups
+              .filter((x) => x.id !== currentGroupId)
+              .map((x) => (
+                <button key={x.id} type="button" onClick={() => void handleMove(h.id, x.id)}>
+                  {t('groups.moveTo', { name: x.name })}
+                </button>
+              ))}
+            {groups.length === 0 && <span className="habits-empty-hint">{t('groups.createFirst')}</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 
   return (
     <div className="habits-groups-board">
@@ -258,54 +334,14 @@ export default function HabitGroupsBoard({ habits, onHabitsChanged, renderHabit 
             {renderDropZone(
               g.id,
               <span className="habits-group-title">
-                {g.name}
+                <span className="habits-group-name">{g.name || t('groups.unnamed')}</span>
                 <small>
                   {t('groups.counts', { habits: members.length, mats: g.materialCount })}
                 </small>
               </span>,
               <>
                 {members.length === 0 && <p className="habits-empty-hint">{t('groups.emptyHabits')}</p>}
-                {members.map((h) => (
-                  <div
-                    key={h.id}
-                    className="habits-group-habit"
-                    draggable
-                    onDragStart={() => setDragHabitId(h.id)}
-                    onDragEnd={() => {
-                      setDragHabitId(null)
-                      setDropTarget(null)
-                    }}
-                  >
-                    <span className="habits-drag-handle" title={t('groups.dragHint')}>
-                      <GripVertical className="w-4 h-4" />
-                    </span>
-                    <div className="habits-group-habit-main">{renderHabit(h)}</div>
-                    <div className="habits-move-wrap">
-                      <button
-                        type="button"
-                        className="habits-group-icon-btn"
-                        onClick={() => setMenuHabitId(menuHabitId === h.id ? null : h.id)}
-                        title={t('groups.move')}
-                      >
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
-                      {menuHabitId === h.id && (
-                        <div className="habits-move-menu">
-                          <button type="button" onClick={() => void handleMove(h.id, null)}>
-                            {t('groups.ungroup')}
-                          </button>
-                          {groups
-                            .filter((x) => x.id !== g.id)
-                            .map((x) => (
-                              <button key={x.id} type="button" onClick={() => void handleMove(h.id, x.id)}>
-                                {t('groups.moveTo', { name: x.name })}
-                              </button>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                {members.map((h) => renderHabitRow(h, g.id))}
               </>,
               <div className="habits-group-actions">
                 <button type="button" className="habits-group-icon-btn" title={t('groups.practice')} onClick={() => void triggerGroupPractice(g)}>
@@ -321,6 +357,7 @@ export default function HabitGroupsBoard({ habits, onHabitsChanged, renderHabit 
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>,
+              g.description ? <span className="habits-group-desc">{g.description}</span> : null,
             )}
           </div>
         )
@@ -329,48 +366,12 @@ export default function HabitGroupsBoard({ habits, onHabitsChanged, renderHabit 
       {renderDropZone(
         'ungrouped',
         <span className="habits-group-title">
-          {t('groups.ungrouped')}
+          <span className="habits-group-name">{t('groups.ungrouped')}</span>
           <small>{grouped.ungrouped.length}</small>
         </span>,
         <>
           {grouped.ungrouped.length === 0 && <p className="habits-empty-hint">{t('groups.emptyUngrouped')}</p>}
-          {grouped.ungrouped.map((h) => (
-            <div
-              key={h.id}
-              className="habits-group-habit"
-              draggable
-              onDragStart={() => setDragHabitId(h.id)}
-              onDragEnd={() => {
-                setDragHabitId(null)
-                setDropTarget(null)
-              }}
-            >
-              <span className="habits-drag-handle" title={t('groups.dragHint')}>
-                <GripVertical className="w-4 h-4" />
-              </span>
-              <div className="habits-group-habit-main">{renderHabit(h)}</div>
-              <div className="habits-move-wrap">
-                <button
-                  type="button"
-                  className="habits-group-icon-btn"
-                  onClick={() => setMenuHabitId(menuHabitId === h.id ? null : h.id)}
-                  title={t('groups.move')}
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
-                {menuHabitId === h.id && (
-                  <div className="habits-move-menu">
-                    {groups.map((x) => (
-                      <button key={x.id} type="button" onClick={() => void handleMove(h.id, x.id)}>
-                        {t('groups.moveTo', { name: x.name })}
-                      </button>
-                    ))}
-                    {groups.length === 0 && <span className="habits-empty-hint">{t('groups.createFirst')}</span>}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+          {grouped.ungrouped.map((h) => renderHabitRow(h, null))}
         </>,
       )}
 
