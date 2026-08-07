@@ -22,6 +22,10 @@ public class ChatRequest
     public int? HabitId { get; set; }
     /// <summary>Optional image as data URL (data:image/jpeg;base64,...).</summary>
     public string? ImageDataUrl { get; set; }
+    /// <summary>Optional raw base64 (preferred over ImageDataUrl for large payloads).</summary>
+    public string? ImageBase64 { get; set; }
+    /// <summary>MIME for ImageBase64, e.g. image/jpeg.</summary>
+    public string? ImageMime { get; set; }
 }
 
 public class ChatActionResult

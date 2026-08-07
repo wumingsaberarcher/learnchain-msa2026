@@ -311,6 +311,15 @@
 	display: grid;
 	place-items: center;
 	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.ai-pending-hint {
+	flex: 1;
+	font-size: 0.72rem;
+	line-height: 1.35;
+	opacity: 0.72;
+	padding-top: 0.15rem;
 }
 
 .ai-msg-image {

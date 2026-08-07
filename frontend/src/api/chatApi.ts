@@ -75,6 +75,20 @@ export async function sendChat(
     const zone = scope?.zoneType === 'habit' && scope.habitId != null && scope.habitId > 0
         ? 'habit'
         : 'daily'
+
+    let imageBase64: string | undefined
+    let imageMime: string | undefined
+    if (imageDataUrl) {
+        const comma = imageDataUrl.indexOf(',')
+        const header = comma > 0 ? imageDataUrl.slice(0, comma) : ''
+        const payload = comma > 0 ? imageDataUrl.slice(comma + 1) : ''
+        const mimeMatch = /^data:(image\/[a-zA-Z0-9.+-]+);base64$/i.exec(header)
+        if (mimeMatch && payload) {
+            imageMime = mimeMatch[1]!.toLowerCase() === 'image/jpg' ? 'image/jpeg' : mimeMatch[1]!.toLowerCase()
+            imageBase64 = payload
+        }
+    }
+
     const res = await apiFetch('/chat', {
         method: 'POST',
         headers: authHeaders(true),
@@ -86,7 +100,9 @@ export async function sendChat(
             model: provider.model || undefined,
             zoneType: zone,
             habitId: zone === 'habit' ? scope?.habitId : undefined,
-            imageDataUrl: imageDataUrl || undefined,
+            // Prefer raw base64 (avoids fragile full-data-URL regex / double encoding issues).
+            imageBase64: imageBase64 || undefined,
+            imageMime: imageBase64 ? (imageMime || 'image/jpeg') : undefined,
         }),
     })
 

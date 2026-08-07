@@ -61,18 +61,33 @@ public class AiAssistantService
             .LastOrDefault(m => m.Role == "user");
         var userText = latestUser?.Content?.Trim() ?? "";
         string? imageDataUrl = null;
-        if (!string.IsNullOrWhiteSpace(request.ImageDataUrl))
+        var hasImageInput = !string.IsNullOrWhiteSpace(request.ImageDataUrl)
+            || !string.IsNullOrWhiteSpace(request.ImageBase64);
+        if (hasImageInput)
         {
-            if (!ChatImageHelper.TryParse(request.ImageDataUrl, out var mime, out var b64, out var imgErr))
+            if (!ChatImageHelper.TryParse(
+                    request.ImageDataUrl,
+                    request.ImageBase64,
+                    request.ImageMime,
+                    out var mime,
+                    out var b64,
+                    out var imgErr))
                 throw new InvalidOperationException(imgErr);
             imageDataUrl = ChatImageHelper.NormalizeDataUrl(mime, b64);
+
+            if (ChatImageHelper.LikelyNonVisionModel(model))
+                throw new InvalidOperationException(zh
+                    ? "当前模型看起来不支持识图。请到「个人资料 → AI 助手」换成带视觉能力的模型（例如 gpt-4o-mini、gpt-4o，或名称含 vl/vision 的模型）。"
+                    : "Your current model likely cannot see images. Switch to a vision model in Profile → AI Assistant (e.g. gpt-4o-mini, gpt-4o, or a *-vl* / *vision* model).");
         }
 
         if (string.IsNullOrWhiteSpace(userText) && imageDataUrl == null)
             throw new InvalidOperationException("A user message or image is required.");
 
         if (string.IsNullOrWhiteSpace(userText) && imageDataUrl != null)
-            userText = zh ? "请识别这张图片，并结合可用的记忆与学习资料回答；若资料不够就直接根据图片说明。" : "Please recognize this image and answer using available memories/study materials when relevant; otherwise answer from the image directly.";
+            userText = zh
+                ? "请仔细查看我发送的这张图片，识别图中内容并结合可用的记忆与学习资料回答；若资料不够就直接根据图片说明。"
+                : "Please carefully look at the image I sent, recognize its content, and answer using available memories/study materials when relevant; otherwise answer from the image directly.";
 
         var session = await _memory.GetOrCreateSessionAsync(user.Id, request.ZoneType, request.HabitId, ct);
         var storeText = imageDataUrl != null
@@ -80,7 +95,8 @@ public class AiAssistantService
                 ? (zh ? "[图片]" : "[Image]")
                 : $"{(zh ? "[图片]" : "[Image]")} {latestUser!.Content.Trim()}")
             : userText;
-        await _memory.AppendMessageAsync(session, "user", storeText, ct);
+        // Persist user turn only after a successful model reply (below), so failed vision
+        // calls do not leave a bare "[图片]" placeholder in history.
 
         var isDaily = session.ZoneType != ChatZones.Habit || session.HabitId <= 0;
         var contextJson = await _habitContext.BuildContextJsonAsync(user);
@@ -112,9 +128,9 @@ public class AiAssistantService
             new JsonObject { ["role"] = "system", ["content"] = systemPrompt }
         };
 
-        // Prior turns as text; latest turn may be multimodal (vision).
-        var prior = recent.Count > 0 ? recent.Take(recent.Count - 1) : recent;
-        foreach (var m in prior)
+        // Prior turns as text; current turn may be multimodal (vision).
+        // Current user message is not yet persisted, so use the full recent history as prior.
+        foreach (var m in recent)
         {
             var role = m.Role is "assistant" or "user" ? m.Role : "user";
             if (string.IsNullOrWhiteSpace(m.Content)) continue;
@@ -207,6 +223,7 @@ public class AiAssistantService
                 : (zh ? "我已经处理完相关操作，还有什么可以帮你的吗？" : "Done. Anything else I can help with?");
         }
 
+        await _memory.AppendMessageAsync(session, "user", storeText, ct);
         await _memory.AppendMessageAsync(session, "assistant", finalReply!, ct);
         // Daily chatter stays short-term only — do not fold into lasting conversation records / memories.
         if (!isDaily)
@@ -357,7 +374,12 @@ public class AiAssistantService
             new JsonObject
             {
                 ["type"] = "image_url",
-                ["image_url"] = new JsonObject { ["url"] = imageDataUrl }
+                ["image_url"] = new JsonObject
+                {
+                    ["url"] = imageDataUrl,
+                    // Lower token cost / better acceptance on many compatible gateways.
+                    ["detail"] = "low"
+                }
             }
         }
     };
@@ -438,6 +460,13 @@ public class AiAssistantService
         if (!res.IsSuccessStatusCode)
         {
             _logger.LogWarning("LLM error {Status}: {Body}", (int)res.StatusCode, text);
+            if (ChatImageHelper.LooksLikeVisionApiError(text))
+            {
+                throw new InvalidOperationException(
+                    "Vision/LLM rejected the image. Use a vision-capable model (e.g. gpt-4o-mini) and keep the image under ~1MB. "
+                    + Truncate(text, 220));
+            }
+
             throw new InvalidOperationException($"LLM API error ({(int)res.StatusCode}): {Truncate(text, 400)}");
         }
 

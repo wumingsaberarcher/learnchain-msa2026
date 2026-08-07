@@ -499,6 +499,16 @@
 	display: grid;
 	place-items: center;
 	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.gal-pending-hint {
+	flex: 1;
+	font-size: 0.72rem;
+	line-height: 1.35;
+	opacity: 0.75;
+	color: rgba(255, 255, 255, 0.85);
+	padding-top: 0.1rem;
 }
 
 .gal-image-err {

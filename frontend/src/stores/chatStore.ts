@@ -95,7 +95,9 @@ function loadLocalMessages(userId: number | null, scope: ChatScope): UiChatMessa
 
 function saveLocalMessages(userId: number | null, scope: ChatScope, messages: UiChatMessage[]) {
     if (!userId) return
-    localStorage.setItem(historyKey(userId, scope), JSON.stringify(messages.slice(-100)))
+    // Never persist raw data-URL images to localStorage (quota + privacy).
+    const slim = messages.slice(-100).map(({ imageUrl: _ignore, ...rest }) => rest)
+    localStorage.setItem(historyKey(userId, scope), JSON.stringify(slim))
 }
 
 function messageKindForScope(scope: ChatScope): 'chat' | 'chatter' {
@@ -346,7 +348,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
             return res.actionsExecuted
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Chat failed'
-            set({ isSending: false, error: message })
+            // Drop the optimistic user bubble on failure so the user can retry cleanly.
+            const rolled = get().messages.filter(m => m.id !== userMsg.id)
+            set({ messages: rolled, isSending: false, error: message })
+            saveLocalMessages(userId, scope, rolled)
             if (!useCompanionStore.getState().galModeOpen) {
                 useCompanionStore.getState().setEmotion('sorrow', false)
             }

@@ -27,6 +27,15 @@ try
         Console.WriteLine($"[LearnChain] Binding to PORT={port}");
     }
 
+    // Chat vision payloads send ~0.5–1MB base64 JSON; raise defaults so proxies aren't the only limit.
+    builder.WebHost.ConfigureKestrel(options =>
+    {
+        options.Limits.MaxRequestBodySize = 12 * 1024 * 1024;
+    });
+    builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
+    {
+        options.MultipartBodyLengthLimit = 12 * 1024 * 1024;
+    });
     builder.Services.AddControllers();
     builder.Services.AddOpenApi();
 
@@ -88,7 +97,7 @@ try
     builder.Services.AddSingleton<EmailService>();
     builder.Services.AddHttpClient("OpenAiCompatible", client =>
     {
-        client.Timeout = TimeSpan.FromSeconds(90);
+        client.Timeout = TimeSpan.FromSeconds(120);
     });
     builder.Services.AddHttpClient("Brevo", client =>
     {

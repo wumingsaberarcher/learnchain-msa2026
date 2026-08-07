@@ -503,6 +503,7 @@ export default function GalgameStage() {
               <button type="button" onClick={() => setPendingImage(null)} title={t('chat.imageRemove')}>
                 <X className="w-3.5 h-3.5" />
               </button>
+              <span className="gal-pending-hint">{t('chat.imageVisionHint')}</span>
             </div>
           )}
           {imageErr && <div className="gal-image-err">{imageErr}</div>}
