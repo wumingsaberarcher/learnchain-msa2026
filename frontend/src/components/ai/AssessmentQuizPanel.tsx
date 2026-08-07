@@ -124,6 +124,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
   const sendMessage = useChatStore((s) => s.sendMessage)
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [shortDraft, setShortDraft] = useState('')
   const [busy, setBusy] = useState(false)
@@ -214,15 +215,34 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
   const selectAllUsable = () => setSelectedIds(usableMaterials.map((m) => m.id))
   const clearSelection = () => setSelectedIds([])
 
-  const onUpload = async (file: File) => {
+  const onUpload = async (files: FileList | File[]) => {
+    const list = Array.from(files)
+    if (list.length === 0) return
     setUploading(true)
     setError(null)
+    const failures: string[] = []
     try {
-      await uploadHabitMaterial(habitId, file)
+      for (let i = 0; i < list.length; i++) {
+        setUploadProgress(t('assess.uploadingProgress', { current: i + 1, total: list.length }))
+        try {
+          await uploadHabitMaterial(habitId, list[i])
+        } catch (e) {
+          const reason = e instanceof Error ? e.message : t('assess.uploadFail')
+          failures.push(`${list[i].name}: ${reason}`)
+        }
+      }
       await refreshMaterials()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('assess.uploadFail'))
+      if (failures.length > 0) {
+        setError(
+          failures.length === list.length
+            ? failures.join('\n')
+            : t('assess.uploadPartial', { ok: list.length - failures.length, fail: failures.length }) +
+              '\n' +
+              failures.join('\n'),
+        )
+      }
     } finally {
+      setUploadProgress(null)
       setUploading(false)
     }
   }
@@ -395,12 +415,13 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
           <input
             ref={fileRef}
             type="file"
+            multiple
             accept=".pdf,.docx,.md,.txt,application/pdf,text/plain,text/markdown"
             hidden
             onChange={(e) => {
-              const f = e.target.files?.[0]
+              const files = e.target.files
               e.target.value = ''
-              if (f) void onUpload(f)
+              if (files?.length) void onUpload(files)
             }}
           />
           <button
@@ -410,7 +431,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
             onClick={() => fileRef.current?.click()}
           >
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            {t('assess.upload')}
+            {uploading && uploadProgress ? uploadProgress : t('assess.upload')}
           </button>
           {usableMaterials.length > 0 && (
             <div className="assess-select-actions">
@@ -432,7 +453,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
                     onClick={() => toggleMaterial(m.id, m.hasText)}
                     disabled={!m.hasText}
                     aria-pressed={selected}
-                    title={m.hasText ? t('assess.toggleSelect') : t('assess.noText')}
+                    title={m.hasText ? `${m.fileName}\n${t('assess.toggleSelect')}` : t('assess.noText')}
                   >
                     <span className={`assess-file-badge kind-${kind}`} aria-hidden>
                       {kind === 'pdf' ? 'PDF' : kind.toUpperCase()}

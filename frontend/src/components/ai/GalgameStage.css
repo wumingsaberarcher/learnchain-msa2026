@@ -297,7 +297,7 @@
 }
 
 .gal-stage.has-assess .gal-tick-rail {
-	right: min(580px, calc(50% + 40px));
+	right: min(780px, calc(50% + 40px));
 }
 
 @media (max-width: 640px) {

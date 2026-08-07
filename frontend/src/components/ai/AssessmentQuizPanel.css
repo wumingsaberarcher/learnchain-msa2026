@@ -4,7 +4,9 @@
 	top: 3.5rem;
 	right: 0.75rem;
 	bottom: 0.75rem;
-	width: min(560px, calc(100% - 1.5rem));
+	/* Use the empty mid-screen gap instead of a cramped 560px strip */
+	width: min(760px, calc(100% - 1.25rem));
+	max-width: calc(100vw - 1.5rem);
 	display: flex;
 	flex-direction: column;
 	border-radius: 18px;
@@ -60,7 +62,8 @@
 	flex: 1;
 	min-height: 0;
 	display: grid;
-	grid-template-columns: 168px 1fr;
+	/* Was 168px — filenames collapsed to one char per line */
+	grid-template-columns: minmax(300px, 1.15fr) minmax(280px, 1fr);
 }
 
 .assess-sidebar {
@@ -70,6 +73,7 @@
 	display: flex;
 	flex-direction: column;
 	gap: 0.55rem;
+	min-width: 0;
 }
 
 .assess-sidebar-title {
@@ -135,14 +139,15 @@
 
 .assess-file-list li {
 	display: grid;
-	grid-template-columns: 1fr auto;
+	grid-template-columns: minmax(0, 1fr) auto;
 	gap: 0.25rem;
 	align-items: stretch;
+	min-width: 0;
 }
 
 .assess-file {
 	display: grid;
-	grid-template-columns: auto 1fr auto;
+	grid-template-columns: auto minmax(0, 1fr) auto;
 	gap: 0.55rem;
 	align-items: center;
 	text-align: left;
@@ -154,6 +159,7 @@
 	cursor: pointer;
 	transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 	min-width: 0;
+	width: 100%;
 }
 
 .assess-file:hover:not(:disabled) {
@@ -207,13 +213,16 @@
 
 .assess-file-copy {
 	min-width: 0;
+	overflow: hidden;
 }
 
 .assess-file strong {
 	display: block;
 	font-size: 0.78rem;
-	line-height: 1.3;
-	word-break: break-word;
+	line-height: 1.35;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .assess-file small {
@@ -221,6 +230,9 @@
 	font-size: 0.65rem;
 	opacity: 0.65;
 	margin-top: 0.15rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .assess-file-check {
@@ -583,6 +595,16 @@
 	75% { transform: translateX(5px); }
 }
 
+@media (max-width: 1100px) {
+	.assess-panel {
+		width: min(640px, calc(100% - 1.25rem));
+	}
+
+	.assess-body {
+		grid-template-columns: minmax(240px, 1fr) minmax(240px, 1fr);
+	}
+}
+
 @media (max-width: 860px) {
 	.assess-panel {
 		top: auto;
@@ -590,7 +612,7 @@
 		right: 0.5rem;
 		bottom: 0.5rem;
 		width: auto;
-		height: min(58vh, 520px);
+		height: min(62vh, 560px);
 	}
 
 	.assess-body {
@@ -601,6 +623,15 @@
 	.assess-sidebar {
 		border-right: none;
 		border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-		max-height: 140px;
+		max-height: 200px;
+	}
+
+	.assess-file strong {
+		white-space: normal;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		word-break: break-word;
 	}
 }
