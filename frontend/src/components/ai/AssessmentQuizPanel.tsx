@@ -554,8 +554,9 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
                       onClick={() => (shortListening ? speech.stop() : speech.start())}
                       title={t('chat.voice')}
                     >
-                      <VoiceVolumeIcon active={shortListening} />
-                      {!shortListening && <Mic className="w-4 h-4" />}
+                      {shortListening
+                        ? <VoiceVolumeIcon level={speech.volumeLevel} className="w-4 h-4" />
+                        : <Mic className="w-4 h-4" />}
                     </button>
                     <button
                       type="button"
