@@ -314,6 +314,11 @@
 	}
 }
 
+@media (max-width: 860px) {
+	.gal-stage.has-assess .gal-tick-rail {
+		display: none;
+	}
+
 	.gal-stage.has-assess .gal-dialog-stack {
 		margin: 0 auto 0.75rem;
 		width: calc(100% - 1.25rem);
