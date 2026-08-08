@@ -3,10 +3,55 @@ import { apiFetch, authHeaders } from './http'
 async function readError(res: Response) {
   const text = await res.text()
   try {
-    const j = JSON.parse(text)
-    return j.message || j.title || text
+    const j = JSON.parse(text) as Record<string, unknown>
+    const stage = typeof j.stage === 'string' ? `[${j.stage}] ` : ''
+    const msg =
+      (typeof j.message === 'string' && j.message)
+      || (typeof j.detail === 'string' && j.detail)
+      || (typeof j.title === 'string' && j.title)
+      || text
+    const file = typeof j.fileName === 'string' ? ` · ${j.fileName}` : ''
+    return `${stage}${msg}${file} (HTTP ${res.status})`
   } catch {
-    return text || res.statusText
+    return (text || res.statusText || 'request_failed') + ` (HTTP ${res.status})`
+  }
+}
+
+export type CanalUploadResult = {
+  ok: boolean
+  stage: string
+  message: string
+  fileName?: string
+  fileSize?: number
+  textLength?: number
+  entry: CanalKnowledgeEntry
+}
+
+function parseUploadPayload(data: unknown): CanalUploadResult {
+  if (data && typeof data === 'object' && 'entry' in data) {
+    const d = data as CanalUploadResult
+    return {
+      ok: d.ok !== false,
+      stage: d.stage || 'done',
+      message: d.message || '上传完成',
+      fileName: d.fileName,
+      fileSize: d.fileSize,
+      textLength: d.textLength,
+      entry: d.entry,
+    }
+  }
+  // Legacy flat entry response
+  const entry = data as CanalKnowledgeEntry
+  return {
+    ok: true,
+    stage: 'done',
+    message: entry.fileName
+      ? `已挂载「${entry.fileName}」，抽取 ${entry.textLength ?? 0} 字`
+      : '上传完成',
+    fileName: entry.fileName,
+    fileSize: entry.fileSize,
+    textLength: entry.textLength,
+    entry,
   }
 }
 
@@ -218,7 +263,7 @@ export async function fetchCnCanalKnowledge(): Promise<{
 export async function uploadCanalKnowledgeFile(
   file: File,
   opts?: { category?: string; titleZh?: string; titleEn?: string; minTrustLevel?: number },
-): Promise<CanalKnowledgeEntry> {
+): Promise<CanalUploadResult> {
   const form = new FormData()
   form.append('file', file)
   if (opts?.category) form.append('category', opts.category)
@@ -230,13 +275,13 @@ export async function uploadCanalKnowledgeFile(
     body: form,
   })
   if (!res.ok) throw new Error(await readError(res))
-  return res.json()
+  return parseUploadPayload(await res.json())
 }
 
 export async function uploadCanalKnowledgeToEntry(
   id: number,
   file: File,
-): Promise<CanalKnowledgeEntry> {
+): Promise<CanalUploadResult> {
   const form = new FormData()
   form.append('file', file)
   const res = await apiFetch(`/admin/canal/knowledge/${id}/upload`, {
@@ -244,5 +289,5 @@ export async function uploadCanalKnowledgeToEntry(
     body: form,
   })
   if (!res.ok) throw new Error(await readError(res))
-  return res.json()
+  return parseUploadPayload(await res.json())
 }

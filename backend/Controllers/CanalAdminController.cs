@@ -22,6 +22,7 @@ public class CanalAdminController : ControllerBase
     private readonly IConfiguration _config;
     private readonly HabitMaterialTextExtractor _extractor;
     private readonly IWebHostEnvironment _env;
+    private readonly ILogger<CanalAdminController> _logger;
 
     public CanalAdminController(
         AppDbContext db,
@@ -30,7 +31,8 @@ public class CanalAdminController : ControllerBase
         CurriculumSourceCatalog sources,
         IConfiguration config,
         HabitMaterialTextExtractor extractor,
-        IWebHostEnvironment env)
+        IWebHostEnvironment env,
+        ILogger<CanalAdminController> logger)
     {
         _db = db;
         _trust = trust;
@@ -39,6 +41,7 @@ public class CanalAdminController : ControllerBase
         _config = config;
         _extractor = extractor;
         _env = env;
+        _logger = logger;
     }
 
     private int? CallerId
@@ -305,18 +308,26 @@ public class CanalAdminController : ControllerBase
 
     /// <summary>Upload PDF/docx/md/txt; extract text into the entry so Canal can recall it.</summary>
     [HttpPost("knowledge/{id:int}/upload")]
-    [RequestSizeLimit(HabitMaterialTextExtractor.MaxUploadBytes)]
+    [RequestSizeLimit(HabitMaterialTextExtractor.MaxCanalImportBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = HabitMaterialTextExtractor.MaxCanalImportBytes)]
     public async Task<IActionResult> UploadKnowledgeDocument(int id, IFormFile file, CancellationToken ct)
     {
         var entry = await _knowledge.GetAsync(id, ct);
-        if (entry == null) return NotFound("知识条目不存在");
+        if (entry == null)
+            return NotFound(new { ok = false, stage = "lookup", message = "知识条目不存在", entryId = id });
 
         if (file == null || file.Length == 0)
-            return BadRequest("请选择文件");
-        if (file.Length > HabitMaterialTextExtractor.MaxUploadBytes)
-            return BadRequest("文件过大（上限 8MB）");
+            return BadRequest(new { ok = false, stage = "validate", message = "请选择文件" });
+        if (file.Length > HabitMaterialTextExtractor.MaxCanalImportBytes)
+            return BadRequest(new
+            {
+                ok = false,
+                stage = "validate",
+                message = $"文件过大（上限 {HabitMaterialTextExtractor.MaxCanalImportBytes / (1024 * 1024)}MB）",
+                fileSize = file.Length,
+            });
         if (!_extractor.IsAllowed(file.FileName))
-            return BadRequest("仅支持 pdf / docx / md / txt");
+            return BadRequest(new { ok = false, stage = "validate", message = "仅支持 pdf / docx / md / txt", fileName = file.FileName });
 
         var safeName = Path.GetFileName(file.FileName);
         var dir = Path.Combine(_env.ContentRootPath, "App_Data", "canal-knowledge", id.ToString());
@@ -324,23 +335,56 @@ public class CanalAdminController : ControllerBase
         var storedName = $"{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}{Path.GetExtension(safeName)}";
         var fullPath = Path.Combine(dir, storedName);
 
-        await using (var fs = System.IO.File.Create(fullPath))
-            await file.CopyToAsync(fs, ct);
+        try
+        {
+            await using (var fs = System.IO.File.Create(fullPath))
+                await file.CopyToAsync(fs, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Canal knowledge save failed for entry {Id} file {File}", id, safeName);
+            return StatusCode(500, new { ok = false, stage = "save", message = $"保存文件失败：{ex.Message}", fileName = safeName });
+        }
 
         string extracted;
-        await using (var read = System.IO.File.OpenRead(fullPath))
+        try
+        {
+            await using var read = System.IO.File.OpenRead(fullPath);
             extracted = await _extractor.ExtractAsync(safeName, read, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Canal knowledge extract failed for entry {Id} file {File}", id, safeName);
+            return BadRequest(new { ok = false, stage = "extract", message = $"抽取正文失败：{ex.Message}", fileName = safeName });
+        }
 
         if (string.IsNullOrWhiteSpace(extracted))
-            return BadRequest("未能抽取到可用文本（扫描版 PDF 可能需要 OCR）");
+            return BadRequest(new
+            {
+                ok = false,
+                stage = "extract",
+                message = "未能抽取到可用文本（扫描版 PDF 可能需要 OCR，或文件损坏）",
+                fileName = safeName,
+                fileSize = file.Length,
+            });
 
         var updated = await _knowledge.AttachDocumentAsync(
             id, safeName, _extractor.DetectContentType(safeName), file.Length, fullPath, extracted, ct);
-        return Ok(MapKnowledge(updated!));
+        return Ok(new
+        {
+            ok = true,
+            stage = "done",
+            message = $"已挂载「{safeName}」，抽取 {extracted.Length} 字",
+            fileName = safeName,
+            fileSize = file.Length,
+            textLength = extracted.Length,
+            entry = MapKnowledge(updated!),
+        });
     }
 
     [HttpPost("knowledge/upload")]
-    [RequestSizeLimit(HabitMaterialTextExtractor.MaxUploadBytes)]
+    [RequestSizeLimit(HabitMaterialTextExtractor.MaxCanalImportBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = HabitMaterialTextExtractor.MaxCanalImportBytes)]
     public async Task<IActionResult> UploadNewKnowledgeDocument(
         IFormFile file,
         [FromForm] string? category,
@@ -350,50 +394,97 @@ public class CanalAdminController : ControllerBase
         CancellationToken ct = default)
     {
         if (file == null || file.Length == 0)
-            return BadRequest("请选择文件");
-        if (file.Length > HabitMaterialTextExtractor.MaxUploadBytes)
-            return BadRequest("文件过大（上限 8MB）");
+            return BadRequest(new { ok = false, stage = "validate", message = "请选择文件" });
+        if (file.Length > HabitMaterialTextExtractor.MaxCanalImportBytes)
+            return BadRequest(new
+            {
+                ok = false,
+                stage = "validate",
+                message = $"文件过大（上限 {HabitMaterialTextExtractor.MaxCanalImportBytes / (1024 * 1024)}MB）",
+                fileSize = file.Length,
+            });
         if (!_extractor.IsAllowed(file.FileName))
-            return BadRequest("仅支持 pdf / docx / md / txt");
+            return BadRequest(new { ok = false, stage = "validate", message = "仅支持 pdf / docx / md / txt", fileName = file.FileName });
 
         var safeName = Path.GetFileName(file.FileName);
         var cat = CanalKnowledgeService.NormalizeCategory(category ?? "military");
         var title = string.IsNullOrWhiteSpace(titleZh) ? Path.GetFileNameWithoutExtension(safeName) : titleZh.Trim();
 
-        var entry = await _knowledge.CreateAsync(new AdminCanalKnowledgeDto
+        CanalKnowledgeEntry entry;
+        try
         {
-            EntryKey = $"upload.{Guid.NewGuid():N}",
-            Category = cat,
-            TitleZh = title,
-            TitleEn = string.IsNullOrWhiteSpace(titleEn) ? title : titleEn.Trim(),
-            BodyZh = "",
-            BodyEn = "",
-            MinTrustLevel = Math.Clamp(minTrustLevel, 0, CanalTrustService.MaxTrustLevel),
-            Section = "upload",
-            IsActive = true,
-            SortOrder = 5000,
-        }, ct);
+            entry = await _knowledge.CreateAsync(new AdminCanalKnowledgeDto
+            {
+                EntryKey = $"upload.{Guid.NewGuid():N}",
+                Category = cat,
+                TitleZh = title,
+                TitleEn = string.IsNullOrWhiteSpace(titleEn) ? title : titleEn.Trim(),
+                BodyZh = "",
+                BodyEn = "",
+                MinTrustLevel = Math.Clamp(minTrustLevel, 0, CanalTrustService.MaxTrustLevel),
+                Section = "upload",
+                IsActive = true,
+                SortOrder = 5000,
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Canal knowledge create failed for upload {File}", safeName);
+            return StatusCode(500, new { ok = false, stage = "create", message = $"创建条目失败：{ex.Message}", fileName = safeName });
+        }
 
         var dir = Path.Combine(_env.ContentRootPath, "App_Data", "canal-knowledge", entry.Id.ToString());
         Directory.CreateDirectory(dir);
         var storedName = $"{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}{Path.GetExtension(safeName)}";
         var fullPath = Path.Combine(dir, storedName);
-        await using (var fs = System.IO.File.Create(fullPath))
-            await file.CopyToAsync(fs, ct);
+        try
+        {
+            await using (var fs = System.IO.File.Create(fullPath))
+                await file.CopyToAsync(fs, ct);
+        }
+        catch (Exception ex)
+        {
+            await _knowledge.DeleteAsync(entry.Id, ct);
+            return StatusCode(500, new { ok = false, stage = "save", message = $"保存文件失败：{ex.Message}", fileName = safeName });
+        }
 
         string extracted;
-        await using (var read = System.IO.File.OpenRead(fullPath))
+        try
+        {
+            await using var read = System.IO.File.OpenRead(fullPath);
             extracted = await _extractor.ExtractAsync(safeName, read, ct);
+        }
+        catch (Exception ex)
+        {
+            await _knowledge.DeleteAsync(entry.Id, ct);
+            return BadRequest(new { ok = false, stage = "extract", message = $"抽取正文失败：{ex.Message}", fileName = safeName });
+        }
 
         if (string.IsNullOrWhiteSpace(extracted))
         {
             await _knowledge.DeleteAsync(entry.Id, ct);
-            return BadRequest("未能抽取到可用文本（扫描版 PDF 可能需要 OCR）");
+            return BadRequest(new
+            {
+                ok = false,
+                stage = "extract",
+                message = "未能抽取到可用文本（扫描版 PDF 可能需要 OCR，或文件损坏）",
+                fileName = safeName,
+                fileSize = file.Length,
+            });
         }
 
         var updated = await _knowledge.AttachDocumentAsync(
             entry.Id, safeName, _extractor.DetectContentType(safeName), file.Length, fullPath, extracted, ct);
-        return Ok(MapKnowledge(updated!));
+        return Ok(new
+        {
+            ok = true,
+            stage = "done",
+            message = $"已新建并挂载「{safeName}」，抽取 {extracted.Length} 字",
+            fileName = safeName,
+            fileSize = file.Length,
+            textLength = extracted.Length,
+            entry = MapKnowledge(updated!),
+        });
     }
 
     [HttpPost("knowledge/reseed")]

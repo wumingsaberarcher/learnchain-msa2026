@@ -27,14 +27,15 @@ try
         Console.WriteLine($"[LearnChain] Binding to PORT={port}");
     }
 
-    // Chat vision payloads send ~0.5–1MB base64 JSON; raise defaults so proxies aren't the only limit.
+    // Canal admin literature uploads + chat vision; allow larger multiparts for doctrine PDFs.
     builder.WebHost.ConfigureKestrel(options =>
     {
-        options.Limits.MaxRequestBodySize = 12 * 1024 * 1024;
+        options.Limits.MaxRequestBodySize = HabitMaterialTextExtractor.MaxCanalImportBytes;
     });
     builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(options =>
     {
-        options.MultipartBodyLengthLimit = 12 * 1024 * 1024;
+        options.MultipartBodyLengthLimit = HabitMaterialTextExtractor.MaxCanalImportBytes;
+        options.ValueLengthLimit = (int)Math.Min(int.MaxValue, HabitMaterialTextExtractor.MaxCanalImportBytes);
     });
     builder.Services.AddControllers();
     builder.Services.AddOpenApi();

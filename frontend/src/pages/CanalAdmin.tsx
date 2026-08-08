@@ -4,6 +4,8 @@ import {
   ArrowLeft,
   BookOpen,
   Cpu,
+  ChevronDown,
+  FileText,
   Loader2,
   Plus,
   RefreshCw,
@@ -62,6 +64,16 @@ function categoryLabel(cat: string, zh: boolean) {
   return zh ? '其他类型' : 'Other'
 }
 
+function formatBytes(n?: number) {
+  if (n == null || n <= 0) return ''
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+type StatusTone = 'info' | 'ok' | 'err'
+type StatusLine = { id: number; tone: StatusTone; text: string; at: number }
+
 function TipLabel({
   label,
   tip,
@@ -93,6 +105,8 @@ export default function CanalAdmin() {
   const [tab, setTab] = useState<Tab>('bond')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [statusLog, setStatusLog] = useState<StatusLine[]>([])
+  const statusSeq = useRef(0)
   const [debug, setDebug] = useState<CanalDebugSnapshot | null>(null)
 
   const [q, setQ] = useState('')
@@ -109,11 +123,23 @@ export default function CanalAdmin() {
   const [editing, setEditing] = useState<CanalKnowledgeEntry | null>(null)
   const [form, setForm] = useState(emptyForm())
   const [formOpen, setFormOpen] = useState(false)
+  const [ingestOpen, setIngestOpen] = useState(false)
   const uploadRef = useRef<HTMLInputElement>(null)
   const attachRef = useRef<HTMLInputElement>(null)
-  const [attachId, setAttachId] = useState<number | null>(null)
+  /** Sync ref — file picker onChange can fire before React commits setState(attachId). */
+  const attachIdRef = useRef<number | null>(null)
 
   const zh = language.startsWith('zh')
+
+  const pushStatus = useCallback((tone: StatusTone, text: string) => {
+    statusSeq.current += 1
+    const line: StatusLine = { id: statusSeq.current, tone, text, at: Date.now() }
+    setStatusLog((prev) => [...prev.slice(-40), line])
+    if (tone === 'err') setError(text)
+    else setError(null)
+    if (tone === 'err') console.error('[CanalAdmin]', text)
+    else console.info('[CanalAdmin]', text)
+  }, [])
 
   const loadDebug = useCallback(async () => {
     const d = await fetchCanalDebug()
@@ -253,12 +279,15 @@ export default function CanalAdmin() {
 
   const reseed = async () => {
     setBusy(true)
+    setIngestOpen(false)
+    pushStatus('info', zh ? '同步目录中…' : 'Syncing catalog…')
     try {
-      await reseedCanalKnowledge()
+      const r = await reseedCanalKnowledge()
+      pushStatus('ok', zh ? `目录同步完成（${r.count} 条）` : `Catalog synced (${r.count})`)
       await loadKb()
       await loadDebug()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'reseed_failed')
+      pushStatus('err', e instanceof Error ? e.message : 'reseed_failed')
     } finally {
       setBusy(false)
     }
@@ -266,19 +295,25 @@ export default function CanalAdmin() {
 
   const importLocal = async () => {
     setBusy(true)
-    setError(null)
+    setIngestOpen(false)
+    pushStatus('info', zh ? '正在导入 App_Data/canal-pdfs…' : 'Importing App_Data/canal-pdfs…')
     try {
       const report = await importLocalCanalKnowledge()
       const failed = report.results.filter((r) => !r.ok)
       if (failed.length) {
-        setError(
-          `本地导入：成功 ${report.imported}；未成功 ${failed.map((f) => `${f.docId}(${f.reason})`).join(', ')}`,
+        pushStatus(
+          'err',
+          zh
+            ? `本机导入部分失败：成功 ${report.imported}；失败 ${failed.map((f) => `${f.docId}(${f.reason})`).join(', ')}`
+            : `Local import partial fail: ok ${report.imported}; failed ${failed.map((f) => `${f.docId}(${f.reason})`).join(', ')}`,
         )
+      } else {
+        pushStatus('ok', zh ? `本机导入完成：${report.imported} 条` : `Local import done: ${report.imported}`)
       }
       await loadKb()
       await loadDebug()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'import_local_failed')
+      pushStatus('err', e instanceof Error ? e.message : 'import_local_failed')
     } finally {
       setBusy(false)
     }
@@ -286,17 +321,23 @@ export default function CanalAdmin() {
 
   const fetchCn = async () => {
     setBusy(true)
-    setError(null)
+    setIngestOpen(false)
+    pushStatus('info', zh ? '正在抓取中国公开文献…' : 'Fetching CN open sources…')
     try {
       const report = await fetchCnCanalKnowledge()
       const failNote = report.failedCount
-        ? `；失败 ${report.failedUrls.map((f) => `${f.docId}(${f.reason})`).join(', ')}`
+        ? (zh ? `；失败 ${report.failedUrls.map((f) => `${f.docId}(${f.reason})`).join(', ')}` : `; failed ${report.failedUrls.map((f) => `${f.docId}(${f.reason})`).join(', ')}`)
         : ''
-      setError(`中国文献：新增抓取 ${report.newlyFetched} / 成功 ${report.successCount} / 尝试 ${report.cnSourcesAttempted}${failNote}`)
+      pushStatus(
+        report.failedCount ? 'err' : 'ok',
+        zh
+          ? `中国文献：新增 ${report.newlyFetched} / 成功 ${report.successCount} / 尝试 ${report.cnSourcesAttempted}${failNote}`
+          : `CN sources: new ${report.newlyFetched} / ok ${report.successCount} / tried ${report.cnSourcesAttempted}${failNote}`,
+      )
       await loadKb()
       await loadDebug()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'fetch_cn_failed')
+      pushStatus('err', e instanceof Error ? e.message : 'fetch_cn_failed')
     } finally {
       setBusy(false)
     }
@@ -305,37 +346,83 @@ export default function CanalAdmin() {
   const onUploadLit = async (files: FileList | null) => {
     if (!files?.length) return
     setBusy(true)
-    setError(null)
+    setIngestOpen(false)
+    const list = Array.from(files)
+    pushStatus('info', zh ? `已选择 ${list.length} 个文件，开始上传…` : `Selected ${list.length} file(s), uploading…`)
     try {
-      for (const file of Array.from(files)) {
-        await uploadCanalKnowledgeFile(file, {
+      for (let i = 0; i < list.length; i++) {
+        const file = list[i]!
+        pushStatus(
+          'info',
+          zh
+            ? `(${i + 1}/${list.length}) 上传「${file.name}」(${formatBytes(file.size)}) → 服务器抽取正文…`
+            : `(${i + 1}/${list.length}) Uploading "${file.name}" (${formatBytes(file.size)}) → extracting…`,
+        )
+        const result = await uploadCanalKnowledgeFile(file, {
           category: kbGroup === 'all' ? 'military' : kbGroup,
           titleZh: file.name.replace(/\.[^.]+$/, ''),
           minTrustLevel: 1,
         })
+        pushStatus(
+          'ok',
+          result.message
+            || (zh
+              ? `成功：${result.fileName} · ${result.textLength ?? 0} 字`
+              : `OK: ${result.fileName} · ${result.textLength ?? 0} chars`),
+        )
       }
       await loadKb()
       await loadDebug()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'upload_failed')
+      pushStatus('err', e instanceof Error ? e.message : 'upload_failed')
     } finally {
       setBusy(false)
     }
   }
 
   const onAttach = async (files: FileList | null) => {
-    if (!files?.length || attachId == null) return
+    const entryId = attachIdRef.current
+    if (!files?.length || entryId == null) {
+      pushStatus(
+        'err',
+        zh
+          ? '挂载失败：未绑定目标条目（请重新点「挂载/更换」再选文件）'
+          : 'Attach failed: no target entry (click Attach again)',
+      )
+      return
+    }
+    const file = files[0]!
+    const target = kb.find((r) => r.id === entryId)
     setBusy(true)
-    setError(null)
+    pushStatus(
+      'info',
+      zh
+        ? `挂载到「${target?.titleZh || target?.entryKey || entryId}」：已选 ${file.name} (${formatBytes(file.size)})，上传并抽取中…`
+        : `Attach to "${target?.titleEn || target?.entryKey || entryId}": ${file.name} (${formatBytes(file.size)})…`,
+    )
     try {
-      await uploadCanalKnowledgeToEntry(attachId, files[0])
-      setAttachId(null)
+      const result = await uploadCanalKnowledgeToEntry(entryId, file)
+      pushStatus('ok', result.message || (zh ? '挂载成功' : 'Attached'))
+      attachIdRef.current = null
       await loadKb()
+      await loadDebug()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'attach_failed')
+      pushStatus('err', e instanceof Error ? e.message : 'attach_failed')
     } finally {
       setBusy(false)
     }
+  }
+
+  const startAttach = (row: CanalKnowledgeEntry) => {
+    attachIdRef.current = row.id
+    pushStatus(
+      'info',
+      zh
+        ? `准备挂载到「${row.titleZh || row.entryKey}」— 请选择 pdf/docx/md/txt（上限约 40MB）`
+        : `Ready to attach to "${row.titleEn || row.entryKey}" — pick pdf/docx/md/txt (max ~40MB)`,
+    )
+    // Defer so the status paint happens before the native picker blocks the main thread.
+    requestAnimationFrame(() => attachRef.current?.click())
   }
 
   if (!currentUser) return <Navigate to="/" replace />
@@ -388,6 +475,22 @@ export default function CanalAdmin() {
         </header>
 
         {error && <div className="canal-admin-error" role="alert">{error}</div>}
+        {statusLog.length > 0 && tab === 'knowledge' && (
+          <div className="canal-admin-status-log" aria-live="polite">
+            <div className="canal-admin-status-log-head">
+              <strong>{t('canalAdmin.statusLog')}</strong>
+              <button type="button" className="ghost" onClick={() => setStatusLog([])}>{t('canalAdmin.clearLog')}</button>
+            </div>
+            <ul>
+              {statusLog.slice(-12).map((line) => (
+                <li key={line.id} className={`tone-${line.tone}`}>
+                  <span className="canal-admin-status-time">{new Date(line.at).toLocaleTimeString()}</span>
+                  {line.text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <nav className="canal-admin-tabs">
           {(
@@ -517,21 +620,67 @@ export default function CanalAdmin() {
                 void onAttach(files)
               }}
             />
-            <div className="canal-admin-actions">
-              <button type="button" onClick={openCreate}><Plus className="w-4 h-4" /> {t('canalAdmin.addEntry')}</button>
-              <button type="button" onClick={() => uploadRef.current?.click()}><Upload className="w-4 h-4" /> {t('canalAdmin.uploadLit')}</button>
-              <button type="button" onClick={() => void reseed()}><RefreshCw className="w-4 h-4" /> {t('canalAdmin.reseed')}</button>
-              <button type="button" onClick={() => void importLocal()} title={t('canalAdmin.importLocalHint')}>
-                <Upload className="w-4 h-4" /> {t('canalAdmin.importLocal')}
-              </button>
-              <button type="button" onClick={() => void fetchCn()} title={t('canalAdmin.fetchCnHint')}>
-                <BookOpen className="w-4 h-4" /> {t('canalAdmin.fetchCn')}
-              </button>
-              <input
-                value={kbFilter}
-                onChange={(e) => setKbFilter(e.target.value)}
-                placeholder={t('canalAdmin.filterKb')}
-              />
+            <div className="canal-admin-toolbar">
+              <div className="canal-admin-actions canal-admin-toolbar-primary">
+                <button type="button" onClick={openCreate}><Plus className="w-4 h-4" /> {t('canalAdmin.addEntry')}</button>
+                <div className={`canal-admin-ingest ${ingestOpen ? 'open' : ''}`}>
+                  <button
+                    type="button"
+                    className="canal-admin-ingest-trigger"
+                    disabled={busy}
+                    onClick={() => setIngestOpen((v) => !v)}
+                    aria-expanded={ingestOpen}
+                  >
+                    <Upload className="w-4 h-4" /> {t('canalAdmin.ingestMenu')}
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                  {ingestOpen && (
+                    <div className="canal-admin-ingest-panel" role="menu">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={busy}
+                        onClick={() => {
+                          setIngestOpen(false)
+                          uploadRef.current?.click()
+                        }}
+                      >
+                        <Upload className="w-4 h-4" />
+                        <span>
+                          <strong>{t('canalAdmin.uploadLit')}</strong>
+                          <small>{t('canalAdmin.uploadLitHint')}</small>
+                        </span>
+                      </button>
+                      <button type="button" role="menuitem" disabled={busy} onClick={() => void reseed()}>
+                        <RefreshCw className="w-4 h-4" />
+                        <span>
+                          <strong>{t('canalAdmin.reseed')}</strong>
+                          <small>{t('canalAdmin.reseedHint')}</small>
+                        </span>
+                      </button>
+                      <button type="button" role="menuitem" disabled={busy} onClick={() => void importLocal()} title={t('canalAdmin.importLocalHint')}>
+                        <FileText className="w-4 h-4" />
+                        <span>
+                          <strong>{t('canalAdmin.importLocal')}</strong>
+                          <small>{t('canalAdmin.importLocalHint')}</small>
+                        </span>
+                      </button>
+                      <button type="button" role="menuitem" disabled={busy} onClick={() => void fetchCn()} title={t('canalAdmin.fetchCnHint')}>
+                        <BookOpen className="w-4 h-4" />
+                        <span>
+                          <strong>{t('canalAdmin.fetchCn')}</strong>
+                          <small>{t('canalAdmin.fetchCnHint')}</small>
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <input
+                  value={kbFilter}
+                  onChange={(e) => setKbFilter(e.target.value)}
+                  placeholder={t('canalAdmin.filterKb')}
+                />
+              </div>
             </div>
             <div className="canal-admin-tabs canal-admin-subtabs">
               {([
@@ -606,24 +755,36 @@ export default function CanalAdmin() {
                   <ul className="canal-admin-kb-list">
                     {rows.map((row) => (
                       <li key={row.id} className={!row.isActive ? 'off' : ''}>
-                        <div>
+                        <div className="canal-admin-kb-main">
                           <strong>{zh ? (row.titleZh || row.titleEn) : (row.titleEn || row.titleZh)}</strong>
                           <span>
                             T≥{row.minTrustLevel} · {row.section || '—'}
                             {row.isBuiltin ? ' · builtin' : ''}
-                            {row.hasDocument ? ` · ${t('canalAdmin.hasDoc', { n: row.textLength ?? 0 })}` : ''}
                           </span>
-                          <small>{row.entryKey}{row.fileName ? ` · ${row.fileName}` : ''}</small>
+                          <small>{row.entryKey}</small>
+                          {row.hasDocument || row.fileName ? (
+                            <div className="canal-admin-file-chip" title={row.contentType || ''}>
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>
+                                <em>{row.fileName || t('canalAdmin.attachedUnknown')}</em>
+                                {' · '}
+                                {formatBytes(row.fileSize)}
+                                {row.textLength != null && row.textLength > 0
+                                  ? ` · ${t('canalAdmin.hasDoc', { n: row.textLength })}`
+                                  : ` · ${t('canalAdmin.noExtract')}`}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="canal-admin-file-chip empty">
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>{t('canalAdmin.noAttachment')}</span>
+                            </div>
+                          )}
                         </div>
                         <div className="canal-admin-actions">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAttachId(row.id)
-                              attachRef.current?.click()
-                            }}
-                          >
-                            <Upload className="w-3.5 h-3.5" /> {t('canalAdmin.attachFile')}
+                          <button type="button" disabled={busy} onClick={() => startAttach(row)}>
+                            <Upload className="w-3.5 h-3.5" />
+                            {row.hasDocument || row.fileName ? t('canalAdmin.replaceFile') : t('canalAdmin.attachFile')}
                           </button>
                           <button type="button" onClick={() => openEdit(row)}>{t('canalAdmin.edit')}</button>
                           <button type="button" className="danger" onClick={() => void removeKb(row)}><Trash2 className="w-3.5 h-3.5" /></button>
