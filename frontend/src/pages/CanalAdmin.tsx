@@ -343,20 +343,19 @@ export default function CanalAdmin() {
     }
   }
 
-  const onUploadLit = async (files: FileList | null) => {
-    if (!files?.length) return
+  const onUploadLit = async (files: File[]) => {
+    if (!files.length) return
     setBusy(true)
     setIngestOpen(false)
-    const list = Array.from(files)
-    pushStatus('info', zh ? `已选择 ${list.length} 个文件，开始上传…` : `Selected ${list.length} file(s), uploading…`)
+    pushStatus('info', zh ? `已选择 ${files.length} 个文件，开始上传…` : `Selected ${files.length} file(s), uploading…`)
     try {
-      for (let i = 0; i < list.length; i++) {
-        const file = list[i]!
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]!
         pushStatus(
           'info',
           zh
-            ? `(${i + 1}/${list.length}) 上传「${file.name}」(${formatBytes(file.size)}) → 服务器抽取正文…`
-            : `(${i + 1}/${list.length}) Uploading "${file.name}" (${formatBytes(file.size)}) → extracting…`,
+            ? `(${i + 1}/${files.length}) 上传「${file.name}」(${formatBytes(file.size)}) → 服务器抽取正文…`
+            : `(${i + 1}/${files.length}) Uploading "${file.name}" (${formatBytes(file.size)}) → extracting…`,
         )
         const result = await uploadCanalKnowledgeFile(file, {
           category: kbGroup === 'all' ? 'military' : kbGroup,
@@ -380,9 +379,11 @@ export default function CanalAdmin() {
     }
   }
 
-  const onAttach = async (files: FileList | null) => {
-    const entryId = attachIdRef.current
-    if (!files?.length || entryId == null) {
+  const onAttach = async (files: File[], entryIdExplicit?: number | null) => {
+    const entryId = entryIdExplicit ?? attachIdRef.current
+    // Empty = user cancelled, or a spurious change after clearing input.value — ignore silently.
+    if (!files.length) return
+    if (entryId == null) {
       pushStatus(
         'err',
         zh
@@ -414,15 +415,15 @@ export default function CanalAdmin() {
   }
 
   const startAttach = (row: CanalKnowledgeEntry) => {
+    // Must open the file picker in the same user-gesture stack (no rAF/setTimeout).
     attachIdRef.current = row.id
+    attachRef.current?.click()
     pushStatus(
       'info',
       zh
         ? `准备挂载到「${row.titleZh || row.entryKey}」— 请选择 pdf/docx/md/txt（上限约 40MB）`
         : `Ready to attach to "${row.titleEn || row.entryKey}" — pick pdf/docx/md/txt (max ~40MB)`,
     )
-    // Defer so the status paint happens before the native picker blocks the main thread.
-    requestAnimationFrame(() => attachRef.current?.click())
   }
 
   if (!currentUser) return <Navigate to="/" replace />
@@ -604,9 +605,10 @@ export default function CanalAdmin() {
               multiple
               hidden
               onChange={(e) => {
-                const files = e.target.files
+                const picked = e.target.files?.length ? Array.from(e.target.files) : []
                 e.target.value = ''
-                void onUploadLit(files)
+                if (!picked.length) return
+                void onUploadLit(picked)
               }}
             />
             <input
@@ -615,9 +617,11 @@ export default function CanalAdmin() {
               accept=".pdf,.docx,.doc,.md,.txt,application/pdf,text/plain"
               hidden
               onChange={(e) => {
-                const files = e.target.files
+                const picked = e.target.files?.length ? Array.from(e.target.files) : []
+                const entryId = attachIdRef.current
                 e.target.value = ''
-                void onAttach(files)
+                if (!picked.length) return
+                void onAttach(picked, entryId)
               }}
             />
             <div className="canal-admin-toolbar">
