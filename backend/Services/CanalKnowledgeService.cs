@@ -33,6 +33,7 @@ public class CanalKnowledgeService
     {
         await MigrateLegacyCategoriesAsync(ct);
         await SeedIdentityFromJsonAsync(ct);
+        await SyncMilitaryCoreCatalogAsync(ct);
         await SyncSourceCatalogEntriesAsync(ct);
     }
 
@@ -318,6 +319,89 @@ public class CanalKnowledgeService
         return set;
     }
 
+    private async Task SyncMilitaryCoreCatalogAsync(CancellationToken ct)
+    {
+        var paths = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "Data", "curriculum", "military_core_catalog.json"),
+            Path.Combine(Directory.GetCurrentDirectory(), "Data", "curriculum", "military_core_catalog.json"),
+        };
+
+        MilitaryCoreFile? file = null;
+        foreach (var path in paths)
+        {
+            if (!File.Exists(path)) continue;
+            try
+            {
+                file = JsonSerializer.Deserialize<MilitaryCoreFile>(await File.ReadAllTextAsync(path, ct), JsonOpts);
+                if (file?.Documents is { Count: > 0 })
+                {
+                    _logger.LogInformation("Loaded military core catalog ({Count}) from {Path}", file.Documents.Count, path);
+                    break;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load military_core_catalog from {Path}", path);
+            }
+        }
+
+        if (file?.Documents is not { Count: > 0 }) return;
+
+        var sort = 200;
+        foreach (var portal in file.Portals ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(portal.Id)) continue;
+            await UpsertSourceRowAsync(
+                $"portal.core.{portal.Id}",
+                "military",
+                portal.Name ?? portal.Id,
+                portal.Name ?? portal.Id,
+                zhBody: $"【B 检索入口】{portal.Name}\nURL：{portal.Url}\n访问：{portal.AccessNote}",
+                enBody: $"[Portal B] {portal.Name}\nURL: {portal.Url}\nAccess: {portal.AccessNote}",
+                minTrust: 1,
+                section: "B",
+                sortOrder: sort++,
+                ct);
+        }
+
+        sort = 300;
+        foreach (var doc in file.Documents)
+        {
+            if (string.IsNullOrWhiteSpace(doc.Id)) continue;
+            var topics = string.Join(", ", doc.Topics ?? []);
+            var echelons = string.Join(", ", doc.Echelons ?? []);
+            var year = doc.Year?.ToString() ?? "n/a";
+            var zhBody =
+                $"【A 核心文献 · {doc.Group}】优先入库登记（来源向）。\n" +
+                $"编号：{doc.Id}\n年份：{year}\n链接：{doc.Url}\n" +
+                $"摘要：{doc.SummaryZh}\n" +
+                $"主题 topic：{topics}\n梯队 echelon：{echelons}\n访问：{doc.AccessNote}\n" +
+                "说明：完整条文需在本条「挂载文献」上传可抽取文本的 PDF；上传后凯娜尔可引用正文。";
+            var enBody =
+                $"[Core literature · {doc.Group}] provenance registry.\n" +
+                $"Id: {doc.Id}\nYear: {year}\nURL: {doc.Url}\n" +
+                $"Summary: {doc.SummaryEn}\n" +
+                $"Topics: {topics}\nEchelons: {echelons}\nAccess: {doc.AccessNote}\n" +
+                "Attach an extractable PDF on this entry so Canal can cite body text.";
+
+            await UpsertSourceRowAsync(
+                $"military.core.{doc.Id}",
+                "military",
+                doc.Title ?? doc.Id,
+                doc.Title ?? doc.Id,
+                zhBody,
+                enBody,
+                minTrust: 1,
+                section: doc.Group ?? "A",
+                sortOrder: sort + (doc.Priority ?? 1) * 10,
+                ct);
+            sort++;
+        }
+
+        await _db.SaveChangesAsync(ct);
+    }
+
     private async Task SeedIdentityFromJsonAsync(CancellationToken ct)
     {
         var paths = new[]
@@ -438,13 +522,15 @@ public class CanalKnowledgeService
         var existing = await _db.CanalKnowledgeEntries.FirstOrDefaultAsync(e => e.EntryKey == key, ct);
         if (existing != null)
         {
-            existing.IsBuiltin = true;
             // Refresh catalog text for military registry rows (do not wipe uploaded ExtractedText).
-            if (existing.IsBuiltin && string.IsNullOrWhiteSpace(existing.ExtractedText)
+            if (string.IsNullOrWhiteSpace(existing.ExtractedText)
                 && (existing.Category is "military" or "source" or "portal"
                     || existing.EntryKey.StartsWith("source.", StringComparison.OrdinalIgnoreCase)
-                    || existing.EntryKey.StartsWith("portal.", StringComparison.OrdinalIgnoreCase)))
+                    || existing.EntryKey.StartsWith("portal.", StringComparison.OrdinalIgnoreCase)
+                    || existing.EntryKey.StartsWith("military.core.", StringComparison.OrdinalIgnoreCase)
+                    || existing.EntryKey.StartsWith("portal.core.", StringComparison.OrdinalIgnoreCase)))
             {
+                existing.IsBuiltin = true;
                 existing.Category = "military";
                 existing.TitleZh = titleZh;
                 existing.TitleEn = titleEn;
@@ -454,6 +540,10 @@ public class CanalKnowledgeService
                 existing.MinTrustLevel = minTrust;
                 existing.SortOrder = sortOrder;
                 existing.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                existing.IsBuiltin = true;
             }
             return;
         }
@@ -499,5 +589,34 @@ public class CanalKnowledgeService
         public int MinTrustLevel { get; set; }
         public string? Section { get; set; }
         public int SortOrder { get; set; }
+    }
+
+    private sealed class MilitaryCoreFile
+    {
+        public List<MilitaryPortal>? Portals { get; set; }
+        public List<MilitaryDoc>? Documents { get; set; }
+    }
+
+    private sealed class MilitaryPortal
+    {
+        public string? Id { get; set; }
+        public string? Name { get; set; }
+        public string? Url { get; set; }
+        public string? AccessNote { get; set; }
+    }
+
+    private sealed class MilitaryDoc
+    {
+        public string? Id { get; set; }
+        public string? Group { get; set; }
+        public string? Title { get; set; }
+        public int? Year { get; set; }
+        public string? Url { get; set; }
+        public string? SummaryZh { get; set; }
+        public string? SummaryEn { get; set; }
+        public List<string>? Topics { get; set; }
+        public List<string>? Echelons { get; set; }
+        public string? AccessNote { get; set; }
+        public int? Priority { get; set; }
     }
 }

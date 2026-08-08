@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -58,6 +58,28 @@ function categoryLabel(cat: string, zh: boolean) {
   if (cat === 'identity') return zh ? '角色身份' : 'Identity'
   if (cat === 'military') return zh ? '军事知识贮备' : 'Military'
   return zh ? '其他类型' : 'Other'
+}
+
+function TipLabel({
+  label,
+  tip,
+  children,
+  className,
+}: {
+  label: string
+  tip: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <label className={className} title={tip}>
+      <span className="canal-admin-field-name">
+        {label}
+        <abbr className="canal-admin-tip" title={tip} aria-label={tip}>?</abbr>
+      </span>
+      {children}
+    </label>
+  )
 }
 
 export default function CanalAdmin() {
@@ -485,23 +507,42 @@ export default function CanalAdmin() {
               <div className="canal-admin-form">
                 <h3>{editing ? t('canalAdmin.editEntry') : t('canalAdmin.addEntry')}</h3>
                 <div className="canal-admin-form-grid">
-                  <label>entryKey<input value={form.entryKey || ''} disabled={!!editing?.isBuiltin} onChange={(e) => setForm({ ...form, entryKey: e.target.value })} /></label>
-                  <label>category
+                  <TipLabel label={t('canalAdmin.field.entryKey')} tip={t('canalAdmin.tip.entryKey')}>
+                    <input value={form.entryKey || ''} disabled={!!editing?.isBuiltin} onChange={(e) => setForm({ ...form, entryKey: e.target.value })} />
+                  </TipLabel>
+                  <TipLabel label={t('canalAdmin.field.category')} tip={t('canalAdmin.tip.category')}>
                     <select value={form.category || 'military'} onChange={(e) => setForm({ ...form, category: e.target.value })}>
                       <option value="identity">{t('canalAdmin.groupIdentity')}</option>
                       <option value="military">{t('canalAdmin.groupMilitary')}</option>
                       <option value="other">{t('canalAdmin.groupOther')}</option>
                     </select>
-                  </label>
-                  <label>minTrust<input type="number" min={0} max={4} value={form.minTrustLevel ?? 0} onChange={(e) => setForm({ ...form, minTrustLevel: Number(e.target.value) })} /></label>
-                  <label>section<input value={form.section || ''} onChange={(e) => setForm({ ...form, section: e.target.value })} /></label>
-                  <label>sortOrder<input type="number" value={form.sortOrder ?? 0} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) })} /></label>
-                  <label className="check"><input type="checkbox" checked={form.isActive !== false} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} /> active</label>
+                  </TipLabel>
+                  <TipLabel label={t('canalAdmin.field.minTrust')} tip={t('canalAdmin.tip.minTrust')}>
+                    <input type="number" min={0} max={4} value={form.minTrustLevel ?? 0} onChange={(e) => setForm({ ...form, minTrustLevel: Number(e.target.value) })} />
+                  </TipLabel>
+                  <TipLabel label={t('canalAdmin.field.section')} tip={t('canalAdmin.tip.section')}>
+                    <input value={form.section || ''} onChange={(e) => setForm({ ...form, section: e.target.value })} placeholder="A1 / lore / B" />
+                  </TipLabel>
+                  <TipLabel label={t('canalAdmin.field.sortOrder')} tip={t('canalAdmin.tip.sortOrder')}>
+                    <input type="number" value={form.sortOrder ?? 0} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) })} />
+                  </TipLabel>
+                  <TipLabel label={t('canalAdmin.field.active')} tip={t('canalAdmin.tip.active')} className="check">
+                    <input type="checkbox" checked={form.isActive !== false} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />
+                  </TipLabel>
                 </div>
-                <label>titleZh<input value={form.titleZh || ''} onChange={(e) => setForm({ ...form, titleZh: e.target.value })} /></label>
-                <label>titleEn<input value={form.titleEn || ''} onChange={(e) => setForm({ ...form, titleEn: e.target.value })} /></label>
-                <label>bodyZh<textarea rows={4} value={form.bodyZh || ''} onChange={(e) => setForm({ ...form, bodyZh: e.target.value })} /></label>
-                <label>bodyEn<textarea rows={4} value={form.bodyEn || ''} onChange={(e) => setForm({ ...form, bodyEn: e.target.value })} /></label>
+                <TipLabel label={t('canalAdmin.field.titleZh')} tip={t('canalAdmin.tip.titleZh')}>
+                  <input value={form.titleZh || ''} onChange={(e) => setForm({ ...form, titleZh: e.target.value })} />
+                </TipLabel>
+                <TipLabel label={t('canalAdmin.field.titleEn')} tip={t('canalAdmin.tip.titleEn')}>
+                  <input value={form.titleEn || ''} onChange={(e) => setForm({ ...form, titleEn: e.target.value })} />
+                </TipLabel>
+                <TipLabel label={t('canalAdmin.field.bodyZh')} tip={t('canalAdmin.tip.bodyZh')}>
+                  <textarea rows={4} value={form.bodyZh || ''} onChange={(e) => setForm({ ...form, bodyZh: e.target.value })} />
+                </TipLabel>
+                <TipLabel label={t('canalAdmin.field.bodyEn')} tip={t('canalAdmin.tip.bodyEn')}>
+                  <textarea rows={4} value={form.bodyEn || ''} onChange={(e) => setForm({ ...form, bodyEn: e.target.value })} />
+                </TipLabel>
+                <p className="canal-admin-muted">{t('canalAdmin.formHint')}</p>
                 <div className="canal-admin-actions">
                   <button type="button" disabled={busy} onClick={() => void saveKb()}>{t('canalAdmin.saveEntry')}</button>
                   <button type="button" className="ghost" onClick={() => { setEditing(null); setForm(emptyForm()); setFormOpen(false) }}>{t('canalAdmin.cancel')}</button>
