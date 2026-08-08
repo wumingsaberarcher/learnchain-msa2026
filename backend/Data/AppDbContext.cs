@@ -20,4 +20,5 @@ public class AppDbContext : DbContext
     public DbSet<HabitMaterial> HabitMaterials { get; set; }
     public DbSet<HabitGroup> HabitGroups { get; set; }
     public DbSet<HabitGroupMaterial> HabitGroupMaterials { get; set; }
+    public DbSet<CanalKnowledgeEntry> CanalKnowledgeEntries { get; set; }
 }

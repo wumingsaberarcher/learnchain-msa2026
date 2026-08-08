@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronDown, User, Award, LogOut, Shield } from 'lucide-react'
+import { ChevronDown, User, Award, LogOut, Shield, Sparkles } from 'lucide-react'
 import { useHabitStore } from '../stores/habitStore'
 import { useAchievementStore } from '../stores/achievementStore'
 import { useTranslation } from '../stores/settingsStore'
 import { BADGE_DEFINITIONS } from '../badges/badgeDefinitions'
-import { isStaffRole } from '../api/adminApi'
+import { isStaffRole, isSuperAdminRole } from '../api/adminApi'
 import BadgeCard from './BadgeCard'
 
 export default function UserProfileMenu() {
@@ -78,6 +78,12 @@ export default function UserProfileMenu() {
                     {isStaffRole(currentUser.role) && (
                         <Link to="/admin" className="user-profile-link" onClick={() => setOpen(false)}>
                             <Shield className="w-4 h-4" /> {t('nav.admin')}
+                        </Link>
+                    )}
+
+                    {isSuperAdminRole(currentUser.role) && (
+                        <Link to="/admin/canal" className="user-profile-link" onClick={() => setOpen(false)}>
+                            <Sparkles className="w-4 h-4" /> {t('nav.canal')}
                         </Link>
                     )}
 

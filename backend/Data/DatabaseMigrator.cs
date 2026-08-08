@@ -127,6 +127,28 @@ public static class DatabaseMigrator
                 """;
             groupMatsCmd.ExecuteNonQuery();
 
+            using var canalKbCmd = connection.CreateCommand();
+            canalKbCmd.CommandText = """
+                CREATE TABLE IF NOT EXISTS CanalKnowledgeEntries (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    EntryKey TEXT NOT NULL,
+                    Category TEXT NOT NULL DEFAULT 'custom',
+                    TitleZh TEXT NOT NULL DEFAULT '',
+                    TitleEn TEXT NOT NULL DEFAULT '',
+                    BodyZh TEXT NOT NULL DEFAULT '',
+                    BodyEn TEXT NOT NULL DEFAULT '',
+                    MinTrustLevel INTEGER NOT NULL DEFAULT 0,
+                    Section TEXT NOT NULL DEFAULT '',
+                    IsBuiltin INTEGER NOT NULL DEFAULT 0,
+                    IsActive INTEGER NOT NULL DEFAULT 1,
+                    SortOrder INTEGER NOT NULL DEFAULT 0,
+                    CreatedAt TEXT NOT NULL,
+                    UpdatedAt TEXT NOT NULL
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS IX_CanalKnowledgeEntries_EntryKey ON CanalKnowledgeEntries(EntryKey);
+                """;
+            canalKbCmd.ExecuteNonQuery();
+
             using var chatSessionCmd = connection.CreateCommand();
             chatSessionCmd.CommandText = """
                 CREATE TABLE IF NOT EXISTS ChatSessions (
@@ -267,6 +289,30 @@ public static class DatabaseMigrator
                     );
                     """;
                 groupMatsCmd.ExecuteNonQuery();
+            }
+
+            using (var canalKbCmd = connection.CreateCommand())
+            {
+                canalKbCmd.CommandText = """
+                    CREATE TABLE IF NOT EXISTS "CanalKnowledgeEntries" (
+                        "Id" serial PRIMARY KEY,
+                        "EntryKey" text NOT NULL,
+                        "Category" text NOT NULL DEFAULT 'custom',
+                        "TitleZh" text NOT NULL DEFAULT '',
+                        "TitleEn" text NOT NULL DEFAULT '',
+                        "BodyZh" text NOT NULL DEFAULT '',
+                        "BodyEn" text NOT NULL DEFAULT '',
+                        "MinTrustLevel" integer NOT NULL DEFAULT 0,
+                        "Section" text NOT NULL DEFAULT '',
+                        "IsBuiltin" boolean NOT NULL DEFAULT false,
+                        "IsActive" boolean NOT NULL DEFAULT true,
+                        "SortOrder" integer NOT NULL DEFAULT 0,
+                        "CreatedAt" timestamp with time zone NOT NULL,
+                        "UpdatedAt" timestamp with time zone NOT NULL
+                    );
+                    CREATE UNIQUE INDEX IF NOT EXISTS "IX_CanalKnowledgeEntries_EntryKey" ON "CanalKnowledgeEntries" ("EntryKey");
+                    """;
+                canalKbCmd.ExecuteNonQuery();
             }
 
             using (var chatSessionCmd = connection.CreateCommand())

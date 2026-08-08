@@ -95,3 +95,4 @@ D:\learnchain-msa2026\backend\bin\Debug\net10.0\Data\curriculum\source_catalog.j
 D:\learnchain-msa2026\backend\bin\Debug\net10.0\Data\curriculum\company_stage4.json
 D:\learnchain-msa2026\backend\bin\Debug\net10.0\Data\curriculum\platoon_stage3.json
 D:\learnchain-msa2026\backend\bin\Debug\net10.0\Data\curriculum\squad_stage2.json
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\Data\curriculum\canal_knowledge_seed.json

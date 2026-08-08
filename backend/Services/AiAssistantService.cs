@@ -20,6 +20,7 @@ public class AiAssistantService
     private readonly KnowledgeRetrievalService _knowledge;
     private readonly EmailService _email;
     private readonly CanalTrustService _trust;
+    private readonly CanalKnowledgeService _canalKnowledge;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<AiAssistantService> _logger;
 
@@ -36,6 +37,7 @@ public class AiAssistantService
         KnowledgeRetrievalService knowledge,
         EmailService email,
         CanalTrustService trust,
+        CanalKnowledgeService canalKnowledge,
         IHttpClientFactory httpClientFactory,
         ILogger<AiAssistantService> logger)
     {
@@ -45,6 +47,7 @@ public class AiAssistantService
         _knowledge = knowledge;
         _email = email;
         _trust = trust;
+        _canalKnowledge = canalKnowledge;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
@@ -142,9 +145,12 @@ public class AiAssistantService
 
         var affection = CompanionAffectionService.Snapshot(user);
         var trust = _trust.SnapshotConfigured(user);
+        var canalKbBlock = await _canalKnowledge.BuildPromptBlockAsync(trust.Level, zh, ct);
+        var mergedKnowledge = string.Join("\n\n", new[] { canalKbBlock, knowledgeBlock }
+            .Where(s => !string.IsNullOrWhiteSpace(s)));
         var coldFact = isDaily ? ColdFacts.Pick(zh, user.Id) : "";
         var systemPrompt = BuildSystemPrompt(
-            zh, contextJson, session.Summary, memories, affection, trust, session.ZoneType, session.HabitId, knowledgeBlock, imageDataUrl != null, coldFact);
+            zh, contextJson, session.Summary, memories, affection, trust, session.ZoneType, session.HabitId, mergedKnowledge, imageDataUrl != null, coldFact);
 
         var messages = new JsonArray
         {

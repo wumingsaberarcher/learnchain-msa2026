@@ -8,6 +8,7 @@ import Habits from './pages/Habits'
 import Profile from './pages/Profile'
 import Achievements from './pages/Achievements'
 import Admin from './pages/Admin'
+import CanalAdmin from './pages/CanalAdmin'
 import LoginModal from './components/LoginModal'
 import BackgroundAnimation from './components/BackgroundAnimation'
 import ThemeLocaleToggle from './components/ThemeLocaleToggle'
@@ -144,8 +145,9 @@ function App() {
                         <Route path="/about" element={<About />} />
                         <Route path="/profile" element={<Profile />} />
                         <Route path="/achievements" element={<Achievements />} />
-                        <Route path="/admin" element={<Admin />} />
-                    </Routes>
+                    <Route path="/admin" element={<Admin />} />
+                    <Route path="/admin/canal" element={<CanalAdmin />} />
+                </Routes>
                 </main>
 
                 <BadgeUnlockModal />

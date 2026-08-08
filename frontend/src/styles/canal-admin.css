@@ -1,0 +1,320 @@
+.canal-admin-page {
+	max-width: 1180px;
+	margin: 0 auto;
+	padding: 6.5rem 1rem 3rem;
+	color: #e8eef5;
+}
+
+.canal-admin-card {
+	padding: 1.35rem 1.5rem 2rem;
+	border-radius: 20px;
+	background: linear-gradient(145deg, rgba(12, 16, 28, 0.94), rgba(22, 28, 44, 0.9));
+	border: 1px solid rgba(120, 180, 220, 0.18);
+	box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+}
+
+.canal-admin-header {
+	display: flex;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-bottom: 1rem;
+}
+
+.canal-admin-header h1 {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0.35rem 0 0.25rem;
+	font-size: 1.45rem;
+}
+
+.canal-admin-header p {
+	margin: 0;
+	opacity: 0.75;
+	font-size: 0.9rem;
+	max-width: 52rem;
+	line-height: 1.45;
+}
+
+.canal-admin-back {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	color: #7fd4ff;
+	text-decoration: none;
+	font-size: 0.85rem;
+}
+
+.canal-admin-spin { opacity: 0.7; }
+
+.canal-admin-error {
+	margin-bottom: 0.85rem;
+	padding: 0.65rem 0.85rem;
+	border-radius: 10px;
+	background: rgba(180, 40, 60, 0.2);
+	border: 1px solid rgba(255, 100, 120, 0.35);
+}
+
+.canal-admin-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	margin-bottom: 1.1rem;
+}
+
+.canal-admin-tabs button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	border: 1px solid rgba(140, 180, 230, 0.25);
+	background: rgba(40, 60, 100, 0.25);
+	color: inherit;
+	border-radius: 999px;
+	padding: 0.4rem 0.85rem;
+	cursor: pointer;
+	font: inherit;
+	font-size: 0.85rem;
+}
+
+.canal-admin-tabs button.on {
+	background: rgba(0, 180, 220, 0.22);
+	border-color: rgba(0, 220, 255, 0.45);
+}
+
+.canal-admin-split {
+	display: grid;
+	grid-template-columns: minmax(220px, 0.9fr) 1.4fr;
+	gap: 1rem;
+}
+
+@media (max-width: 800px) {
+	.canal-admin-split { grid-template-columns: 1fr; }
+}
+
+.canal-admin-pane {
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 14px;
+	padding: 0.85rem;
+	background: rgba(0, 0, 0, 0.18);
+}
+
+.canal-admin-row {
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 0.65rem;
+}
+
+.canal-admin-row input,
+.canal-admin-pane input,
+.canal-admin-pane textarea,
+.canal-admin-form input,
+.canal-admin-form textarea,
+.canal-admin-form select,
+.canal-admin-actions input {
+	flex: 1;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	background: rgba(8, 12, 22, 0.75);
+	color: inherit;
+	padding: 0.45rem 0.65rem;
+	font: inherit;
+}
+
+.canal-admin-pane label,
+.canal-admin-form label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+	font-size: 0.8rem;
+	opacity: 0.92;
+	margin-bottom: 0.65rem;
+}
+
+.canal-admin-form label.check {
+	flex-direction: row;
+	align-items: center;
+	gap: 0.45rem;
+}
+
+.canal-admin-user-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	max-height: 28rem;
+	overflow: auto;
+}
+
+.canal-admin-user-list button {
+	width: 100%;
+	text-align: left;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	padding: 0.55rem 0.45rem;
+	border-radius: 8px;
+	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	font: inherit;
+}
+
+.canal-admin-user-list button span {
+	font-size: 0.75rem;
+	opacity: 0.65;
+}
+
+.canal-admin-user-list button.on,
+.canal-admin-user-list button:hover {
+	background: rgba(0, 180, 220, 0.14);
+}
+
+.canal-admin-eval {
+	font-size: 0.85rem;
+	line-height: 1.45;
+	opacity: 0.85;
+	padding: 0.55rem 0.65rem;
+	border-radius: 10px;
+	background: rgba(40, 80, 120, 0.2);
+}
+
+.canal-admin-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	align-items: center;
+	margin: 0.65rem 0;
+}
+
+.canal-admin-actions button,
+.canal-admin-row button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	border-radius: 10px;
+	border: 1px solid rgba(0, 200, 255, 0.35);
+	background: rgba(0, 160, 200, 0.18);
+	color: inherit;
+	padding: 0.4rem 0.75rem;
+	cursor: pointer;
+	font: inherit;
+	font-size: 0.85rem;
+}
+
+.canal-admin-actions button.ghost {
+	border-color: rgba(255, 255, 255, 0.2);
+	background: transparent;
+}
+
+.canal-admin-actions button.danger {
+	border-color: rgba(255, 100, 120, 0.4);
+	background: rgba(160, 40, 60, 0.2);
+}
+
+.canal-admin-muted { opacity: 0.65; font-size: 0.85rem; }
+
+.canal-admin-form {
+	margin: 0.75rem 0 1rem;
+	padding: 0.85rem;
+	border-radius: 12px;
+	border: 1px solid rgba(120, 180, 255, 0.22);
+	background: rgba(20, 40, 70, 0.25);
+}
+
+.canal-admin-form-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	gap: 0.55rem;
+}
+
+.canal-admin-kb-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+	max-height: 36rem;
+	overflow: auto;
+}
+
+.canal-admin-kb-list li {
+	display: flex;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.65rem 0.75rem;
+	border-radius: 12px;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	background: rgba(0, 0, 0, 0.2);
+}
+
+.canal-admin-kb-list li.off { opacity: 0.45; }
+
+.canal-admin-kb-list strong { display: block; }
+.canal-admin-kb-list span,
+.canal-admin-kb-list small {
+	display: block;
+	font-size: 0.75rem;
+	opacity: 0.7;
+}
+
+.canal-admin-expr-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	margin-bottom: 0.75rem;
+}
+
+.canal-admin-expr-row button {
+	border-radius: 999px;
+	border: 1px solid rgba(255, 255, 255, 0.18);
+	background: rgba(60, 80, 120, 0.3);
+	color: inherit;
+	padding: 0.35rem 0.75rem;
+	cursor: pointer;
+	font: inherit;
+}
+
+.canal-admin-pre {
+	overflow: auto;
+	max-height: 22rem;
+	padding: 0.75rem;
+	border-radius: 10px;
+	background: rgba(0, 0, 0, 0.35);
+	font-size: 0.75rem;
+	line-height: 1.4;
+}
+
+.canal-admin-stats {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+	gap: 0.55rem;
+	margin-bottom: 1rem;
+}
+
+.canal-admin-stats div {
+	padding: 0.75rem;
+	border-radius: 12px;
+	background: rgba(0, 140, 180, 0.12);
+	border: 1px solid rgba(0, 200, 255, 0.2);
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+}
+
+.canal-admin-stats strong { font-size: 1.25rem; }
+.canal-admin-stats span { font-size: 0.75rem; opacity: 0.7; }
+
+.canal-admin-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.85rem;
+	margin-bottom: 1rem;
+}
+
+.canal-admin-table th,
+.canal-admin-table td {
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	padding: 0.4rem 0.5rem;
+	text-align: left;
+}

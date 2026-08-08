@@ -93,6 +93,7 @@ try
     builder.Services.AddScoped<CompanionAffectionService>();
     builder.Services.AddScoped<CanalTrustService>();
     builder.Services.AddSingleton<CurriculumSourceCatalog>();
+    builder.Services.AddScoped<CanalKnowledgeService>();
     builder.Services.AddScoped<HabitMaterialTextExtractor>();
     builder.Services.AddScoped<AssessmentService>();
     builder.Services.AddScoped<HabitGroupDescriptionService>();
@@ -130,6 +131,13 @@ try
 
     var bootstrapLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("AdminBootstrap");
     await AdminBootstrap.EnsureAdminAsync(app.Services, app.Configuration, bootstrapLogger);
+
+    using (var scope = app.Services.CreateScope())
+    {
+        var kb = scope.ServiceProvider.GetRequiredService<CanalKnowledgeService>();
+        await kb.EnsureSeededAsync();
+        Console.WriteLine("[LearnChain] Canal knowledge base seeded.");
+    }
 
     if (app.Environment.IsDevelopment())
     {
