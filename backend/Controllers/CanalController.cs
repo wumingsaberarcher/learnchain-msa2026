@@ -30,12 +30,17 @@ public class CanalController : ControllerBase
     }
 
     [HttpGet("trust")]
-    public async Task<IActionResult> GetTrust()
+    public async Task<IActionResult> GetTrust(CancellationToken ct = default)
     {
         var user = await _db.Users.FindAsync(GetUserId());
         if (user == null) return NotFound();
+
+        // Stage 2+ must never sit on an empty curriculum: sweep any stage that was skipped
+        // (admin trust jumps bypass the chat-driven inject path).
+        var backfill = await _trust.BackfillCurriculumAsync(user, zh: true, force: false, ct);
+
         var snap = _trust.SnapshotConfigured(user);
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(ct);
         return Ok(new
         {
             level = snap.Level,
@@ -50,9 +55,43 @@ public class CanalController : ControllerBase
             evaluation = snap.Evaluation,
             unifiedWithAffection = true,
             currentEchelon = snap.CurrentEchelon,
-            lessonsNeededToAdvance = snap.LessonsNeededToAdvance
+            lessonsNeededToAdvance = snap.LessonsNeededToAdvance,
+            backfill = MapBackfill(backfill)
         });
     }
+
+    /// <summary>Manual catch-up: dispatch every lesson of the current stage and below that is missing.</summary>
+    [HttpPost("curriculum/backfill")]
+    public async Task<IActionResult> BackfillCurriculum(
+        [FromQuery] bool force = false,
+        [FromQuery] string? language = null,
+        CancellationToken ct = default)
+    {
+        var user = await _db.Users.FindAsync([GetUserId()], ct);
+        if (user == null) return NotFound();
+        var zh = string.IsNullOrWhiteSpace(language)
+                 || language.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
+
+        var result = await _trust.BackfillCurriculumAsync(user, zh, force, ct);
+        return Ok(MapBackfill(result));
+    }
+
+    private static object MapBackfill(CurriculumBackfillResult r) => new
+    {
+        ran = r.Ran,
+        reason = r.Reason,
+        stage = r.Stage,
+        created = r.Created,
+        createdLessonIds = r.CreatedLessonIds,
+        gaps = r.Gaps.Select(g => new
+        {
+            stage = g.Stage,
+            echelon = g.Echelon,
+            total = g.Total,
+            dispatched = g.Dispatched,
+            missing = g.Missing
+        })
+    };
 
     [HttpGet("lore")]
     public async Task<IActionResult> GetLore([FromQuery] string? language)

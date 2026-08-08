@@ -244,17 +244,38 @@ public class CanalAdminController : ControllerBase
             await _trust.RefreshEvaluationAsync(user, zh: true, ct);
 
         await _db.SaveChangesAsync(ct);
+
+        // A trust jump here skips every stage's chat-driven inject, so hand out the backlog now.
+        var backfill = await _trust.BackfillCurriculumAsync(user, zh: true, force: false, ct);
+
         var snap = _trust.SnapshotConfigured(user);
         var aff = CompanionAffectionService.Snapshot(user);
         return Ok(new
         {
-            message = "Canal 绑定已更新",
+            message = backfill.Created > 0
+                ? $"Canal 绑定已更新，并补发 {backfill.Created} 项课程习惯"
+                : "Canal 绑定已更新",
             user.Id,
             trustLevel = snap.Level,
             trustStageKey = snap.StageKey,
             companionAffection = aff.Points,
             affectionTierKey = aff.TierKey,
             canalEvaluation = user.CanalEvaluation,
+            backfill = new
+            {
+                ran = backfill.Ran,
+                reason = backfill.Reason,
+                created = backfill.Created,
+                createdLessonIds = backfill.CreatedLessonIds,
+                gaps = backfill.Gaps.Select(g => new
+                {
+                    stage = g.Stage,
+                    echelon = g.Echelon,
+                    total = g.Total,
+                    dispatched = g.Dispatched,
+                    missing = g.Missing
+                })
+            }
         });
     }
 

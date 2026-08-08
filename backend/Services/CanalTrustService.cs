@@ -41,6 +41,22 @@ public record CurriculumCompleteResult(
     bool LeveledUp,
     string? LessonId = null);
 
+/// <summary>Per-stage dispatch coverage used by the catch-up sweep.</summary>
+public record CurriculumStageGap(
+    int Stage,
+    string Echelon,
+    int Total,
+    int Dispatched,
+    int Missing);
+
+public record CurriculumBackfillResult(
+    bool Ran,
+    string Reason,
+    int Stage,
+    int Created,
+    IReadOnlyList<string> CreatedLessonIds,
+    IReadOnlyList<CurriculumStageGap> Gaps);
+
 public class CurriculumLesson
 {
     public string LessonId { get; set; } = "";
@@ -100,6 +116,14 @@ public class CanalTrustService
     /// <summary>Lessons of the current echelon required to advance to the next stage.</summary>
     public int LessonsToAdvance =>
         Math.Max(1, _config.GetValue("CanalCurriculum:LessonsToAdvance", 3));
+
+    /// <summary>From this stage on, missing lessons of this stage and below are dispatched in one sweep.</summary>
+    public int BackfillMinStage =>
+        Math.Clamp(_config.GetValue("CanalCurriculum:BackfillMinStage", 2), 1, MaxTrustLevel);
+
+    /// <summary>Safety valve so a corrupted state cannot flood the habit list.</summary>
+    public int BackfillMaxPerRun =>
+        Math.Clamp(_config.GetValue("CanalCurriculum:BackfillMaxPerRun", 32), 1, 100);
 
     public IReadOnlyList<CurriculumLesson> AllLessons => _lessons.Value;
 
@@ -308,6 +332,26 @@ public class CanalTrustService
         }
 
         var title = zh ? lesson.TitleZh : lesson.TitleEn;
+        var habit = await CreateLessonHabitAsync(user, lesson, zh, dueDays: 7, ct);
+
+        if (!state.Injected.Contains(lesson.LessonId, StringComparer.OrdinalIgnoreCase))
+            state.Injected.Add(lesson.LessonId);
+        user.CurriculumStateJson = JsonSerializer.Serialize(state, JsonOpts);
+        await RefreshEvaluationAsync(user, zh, ct);
+        await _db.SaveChangesAsync(ct);
+
+        return new CurriculumInjectResult(true, "ok", habit, lesson.LessonId, title);
+    }
+
+    /// <summary>Builds and tracks the assessment habit for a lesson. Caller owns SaveChanges.</summary>
+    private async Task<Habit> CreateLessonHabitAsync(
+        User user,
+        CurriculumLesson lesson,
+        bool zh,
+        int dueDays,
+        CancellationToken ct)
+    {
+        var title = zh ? lesson.TitleZh : lesson.TitleEn;
         var criteria = (zh ? lesson.CriteriaZh : lesson.CriteriaEn).Take(4).ToList();
         var desc = string.Join("\n", criteria.Select((c, i) => $"{i + 1}. {c}"))
                    + $"\n\n[{lesson.DocumentId}]";
@@ -316,7 +360,7 @@ public class CanalTrustService
         var exists = await _db.Habits.AnyAsync(h =>
             h.UserId == user.Id && h.IsActive && h.Name.ToLower() == habitName.ToLower(), ct);
         if (exists)
-            habitName = $"{habitName} {DateTime.UtcNow:HHmmss}";
+            habitName = $"{habitName} {DateTime.UtcNow:HHmmssfff}";
 
         var habit = new Habit
         {
@@ -327,7 +371,7 @@ public class CanalTrustService
             Frequency = HabitXpService.GetFrequencyLabel("OneTime"),
             Difficulty = 1,
             BaseXP = HabitXpService.GetBaseXP(1),
-            DueDate = DateTime.UtcNow.Date.AddDays(7),
+            DueDate = DateTime.UtcNow.Date.AddDays(dueDays),
             CompletionType = 1,
             IsActive = true,
             IsCompleted = false,
@@ -339,13 +383,84 @@ public class CanalTrustService
         };
 
         _db.Habits.Add(habit);
-        if (!state.Injected.Contains(lesson.LessonId, StringComparer.OrdinalIgnoreCase))
-            state.Injected.Add(lesson.LessonId);
+        return habit;
+    }
+
+    /// <summary>
+    /// Catch-up sweep for stage &gt;= BackfillMinStage (default 2): audits every stage up to the
+    /// current one and dispatches all lessons that were never handed out. Admin trust jumps skip
+    /// the chat-driven inject path entirely, so without this a T4 account can hold zero lessons.
+    /// Ignores the daily inject cap and the stage-1 RNG.
+    /// </summary>
+    public async Task<CurriculumBackfillResult> BackfillCurriculumAsync(
+        User user,
+        bool zh = true,
+        bool force = false,
+        CancellationToken ct = default)
+    {
+        var stage = CurriculumStage(user);
+        var empty = Array.Empty<string>();
+
+        if (stage < 1)
+            return new CurriculumBackfillResult(false, "trust_blocked", stage, 0, empty, []);
+        if (!force && stage < BackfillMinStage)
+            return new CurriculumBackfillResult(false, "stage_below_threshold", stage, 0, empty, []);
+
+        await PruneStaleInjectsAsync(user, ct);
+        var state = ParseState(user.CurriculumStateJson);
+
+        // "Dispatched" = tracked in progress state OR a habit row exists (even completed/archived),
+        // so a re-run never duplicates lessons the user already received.
+        var habitLessonIds = await _db.Habits
+            .AsNoTracking()
+            .Where(h => h.UserId == user.Id
+                        && h.Source == CurriculumSource
+                        && h.CurriculumLessonId != null)
+            .Select(h => h.CurriculumLessonId!)
+            .ToListAsync(ct);
+
+        var dispatched = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var id in habitLessonIds)
+            if (!string.IsNullOrWhiteSpace(id)) dispatched.Add(id.Trim());
+        foreach (var id in state.Injected) dispatched.Add(id);
+        foreach (var id in state.Completed) dispatched.Add(id);
+
+        var gaps = new List<CurriculumStageGap>();
+        var missing = new List<CurriculumLesson>();
+        for (var s = 1; s <= stage; s++)
+        {
+            var echelon = EchelonForStage(s);
+            var lessons = AllLessons
+                .Where(l => l.Echelon.Equals(echelon, StringComparison.OrdinalIgnoreCase)
+                            && l.MinTrustToInject <= stage)
+                .ToList();
+            var gapLessons = lessons.Where(l => !dispatched.Contains(l.LessonId)).ToList();
+            gaps.Add(new CurriculumStageGap(
+                s, echelon, lessons.Count, lessons.Count - gapLessons.Count, gapLessons.Count));
+            missing.AddRange(gapLessons);
+        }
+
+        if (missing.Count == 0)
+            return new CurriculumBackfillResult(false, "nothing_missing", stage, 0, empty, gaps);
+
+        var created = new List<string>();
+        foreach (var lesson in missing.Take(BackfillMaxPerRun))
+        {
+            await CreateLessonHabitAsync(user, lesson, zh, dueDays: 21, ct);
+            if (!state.Injected.Contains(lesson.LessonId, StringComparer.OrdinalIgnoreCase))
+                state.Injected.Add(lesson.LessonId);
+            created.Add(lesson.LessonId);
+        }
+
         user.CurriculumStateJson = JsonSerializer.Serialize(state, JsonOpts);
         await RefreshEvaluationAsync(user, zh, ct);
         await _db.SaveChangesAsync(ct);
 
-        return new CurriculumInjectResult(true, "ok", habit, lesson.LessonId, title);
+        _logger.LogInformation(
+            "User {UserId} curriculum backfill at stage {Stage}: dispatched {Count} lesson(s) [{Lessons}]",
+            user.Id, stage, created.Count, string.Join(", ", created));
+
+        return new CurriculumBackfillResult(true, "backfilled", stage, created.Count, created, gaps);
     }
 
     /// <summary>Stage 0→1: first non-curriculum check-in enters observation.</summary>

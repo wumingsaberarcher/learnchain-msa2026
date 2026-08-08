@@ -143,6 +143,7 @@ public class AiAssistantService
             session.Id, CompanionMemoryService.ShortTermMessageLimit, ct);
 
         var affection = CompanionAffectionService.Snapshot(user);
+        await _trust.BackfillCurriculumAsync(user, zh, force: false, ct);
         var trust = _trust.SnapshotConfigured(user);
         var canalKbBlock = await _canalKnowledge.BuildPromptBlockAsync(trust.Level, zh, ct);
         var habitKnowledge = wantKnowledge

@@ -346,6 +346,26 @@
 
 .canal-admin-muted { opacity: 0.65; font-size: 0.85rem; }
 
+.canal-admin-backfill {
+	margin: 0.35rem 0 0.75rem;
+	padding: 0.55rem 0.7rem;
+	border-radius: 10px;
+	border: 1px solid rgba(120, 220, 160, 0.28);
+	background: rgba(30, 90, 70, 0.18);
+	font-size: 0.82rem;
+	line-height: 1.5;
+}
+
+.canal-admin-backfill ul {
+	list-style: none;
+	margin: 0.35rem 0 0;
+	padding: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.3rem 0.75rem;
+	opacity: 0.8;
+}
+
 .canal-admin-form {
 	margin: 0.75rem 0 1rem;
 	padding: 0.85rem;

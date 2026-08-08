@@ -158,6 +158,32 @@ export async function getCanalBondUser(id: number): Promise<CanalBondDetail> {
   return res.json()
 }
 
+export type CurriculumStageGap = {
+  stage: number
+  echelon: string
+  total: number
+  dispatched: number
+  missing: number
+}
+
+export type CurriculumBackfill = {
+  ran: boolean
+  reason: string
+  created: number
+  createdLessonIds: string[]
+  gaps: CurriculumStageGap[]
+}
+
+export type CanalBondSaveResult = {
+  message: string
+  trustLevel: number
+  trustStageKey: string
+  companionAffection: number
+  affectionTierKey: string
+  canalEvaluation?: string | null
+  backfill?: CurriculumBackfill
+}
+
 export async function setCanalBond(
   id: number,
   body: {
@@ -167,7 +193,7 @@ export async function setCanalBond(
     resetInjectToday?: boolean
     refreshEvaluation?: boolean
   },
-): Promise<unknown> {
+): Promise<CanalBondSaveResult> {
   const res = await apiFetch(`/admin/canal/users/${id}/bond`, {
     method: 'PUT',
     headers: authHeaders(true),

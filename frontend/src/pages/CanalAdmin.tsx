@@ -39,6 +39,7 @@ import {
   type CanalBondUser,
   type CanalDebugSnapshot,
   type CanalKnowledgeEntry,
+  type CurriculumBackfill,
 } from '../api/canalAdminApi'
 import '../styles/canal-admin.css'
 
@@ -116,6 +117,7 @@ export default function CanalAdmin() {
   const [editLevel, setEditLevel] = useState(0)
   const [editAff, setEditAff] = useState(0)
   const [editStateJson, setEditStateJson] = useState('')
+  const [backfill, setBackfill] = useState<CurriculumBackfill | null>(null)
 
   const [kb, setKb] = useState<CanalKnowledgeEntry[]>([])
   const [kbFilter, setKbFilter] = useState('')
@@ -193,12 +195,13 @@ export default function CanalAdmin() {
     setBusy(true)
     setError(null)
     try {
-      await setCanalBond(detail.id, {
+      const saved = await setCanalBond(detail.id, {
         trustLevel: editLevel,
         companionAffection: editAff,
         curriculumStateJson: editStateJson.trim() || undefined,
         refreshEvaluation: true,
       })
+      setBackfill(saved.backfill ?? null)
       await selectUser(detail.id)
       await loadUsers(q)
     } catch (e) {
@@ -530,7 +533,10 @@ export default function CanalAdmin() {
                     <button
                       type="button"
                       className={selectedId === u.id ? 'on' : ''}
-                      onClick={() => void selectUser(u.id)}
+                      onClick={() => {
+                        setBackfill(null)
+                        void selectUser(u.id)
+                      }}
                     >
                       <strong>{u.username}</strong>
                       <span>T{u.trustLevel} · {u.companionAffection}pt · {u.affectionTierKey}</span>
@@ -587,6 +593,23 @@ export default function CanalAdmin() {
                       {t('canalAdmin.resetInject')}
                     </button>
                   </div>
+                  {backfill && (
+                    <div className="canal-admin-backfill">
+                      <strong>
+                        {backfill.created > 0
+                          ? t('canalAdmin.backfillDone').replace('{n}', String(backfill.created))
+                          : t('canalAdmin.backfillNone')}
+                      </strong>
+                      <ul>
+                        {backfill.gaps.map((g) => (
+                          <li key={g.stage}>
+                            T{g.stage} · {g.echelon} — {g.dispatched}/{g.total}
+                            {g.missing > 0 ? ` (+${g.missing})` : ''}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   {!detail.canEdit && (
                     <p className="canal-admin-muted">{t('canalAdmin.cannotEditSuper')}</p>
                   )}
