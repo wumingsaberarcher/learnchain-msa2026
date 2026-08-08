@@ -23,6 +23,7 @@ import { useHabitStore } from './stores/habitStore'
 import { useAchievementStore } from './stores/achievementStore'
 import { useAiSettingsStore } from './stores/aiSettingsStore'
 import { useAffectionStore } from './stores/affectionStore'
+import { useTrustStore } from './stores/trustStore'
 import { useCompanionStore } from './stores/companionStore'
 import { useIdleRestStore } from './stores/idleRestStore'
 import { useFocusModeStore } from './stores/focusModeStore'
@@ -38,6 +39,8 @@ function App() {
     const hydrateCompanion = useCompanionStore(s => s.hydrateForUser)
     const hydrateAffection = useAffectionStore(s => s.hydrate)
     const clearAffection = useAffectionStore(s => s.clear)
+    const hydrateTrust = useTrustStore(s => s.hydrate)
+    const clearTrust = useTrustStore(s => s.clear)
     const { t, theme } = useTranslation()
     const isResting = useIdleRestStore(s => s.isResting)
     const isFocusing = useFocusModeStore(s => s.isActive)
@@ -47,9 +50,14 @@ function App() {
         const uid = isLoggedIn && currentUser ? currentUser.id : null
         hydrateAiSettings(uid)
         hydrateCompanion(uid)
-        if (uid) void hydrateAffection()
-        else clearAffection()
-    }, [isLoggedIn, currentUser?.id, hydrateAiSettings, hydrateCompanion, hydrateAffection, clearAffection])
+        if (uid) {
+            void hydrateAffection()
+            void hydrateTrust()
+        } else {
+            clearAffection()
+            clearTrust()
+        }
+    }, [isLoggedIn, currentUser?.id, hydrateAiSettings, hydrateCompanion, hydrateAffection, clearAffection, hydrateTrust, clearTrust])
 
     useEffect(() => {
         if (isLoggedIn) {

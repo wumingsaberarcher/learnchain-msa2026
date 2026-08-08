@@ -19,6 +19,7 @@ public class AiAssistantService
     private readonly CompanionMemoryService _memory;
     private readonly KnowledgeRetrievalService _knowledge;
     private readonly EmailService _email;
+    private readonly CanalTrustService _trust;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<AiAssistantService> _logger;
 
@@ -34,6 +35,7 @@ public class AiAssistantService
         CompanionMemoryService memory,
         KnowledgeRetrievalService knowledge,
         EmailService email,
+        CanalTrustService trust,
         IHttpClientFactory httpClientFactory,
         ILogger<AiAssistantService> logger)
     {
@@ -42,6 +44,7 @@ public class AiAssistantService
         _memory = memory;
         _knowledge = knowledge;
         _email = email;
+        _trust = trust;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
@@ -138,9 +141,10 @@ public class AiAssistantService
             session.Id, CompanionMemoryService.ShortTermMessageLimit, ct);
 
         var affection = CompanionAffectionService.Snapshot(user);
+        var trust = _trust.SnapshotConfigured(user);
         var coldFact = isDaily ? ColdFacts.Pick(zh, user.Id) : "";
         var systemPrompt = BuildSystemPrompt(
-            zh, contextJson, session.Summary, memories, affection, session.ZoneType, session.HabitId, knowledgeBlock, imageDataUrl != null, coldFact);
+            zh, contextJson, session.Summary, memories, affection, trust, session.ZoneType, session.HabitId, knowledgeBlock, imageDataUrl != null, coldFact);
 
         var messages = new JsonArray
         {
@@ -181,7 +185,7 @@ public class AiAssistantService
                 };
                 if (useTools)
                 {
-                    body["tools"] = BuildToolsSchema();
+                    body["tools"] = BuildToolsSchema(trust.Level);
                     body["tool_choice"] = "auto";
                 }
 
@@ -295,6 +299,7 @@ public class AiAssistantService
         string rollingSummary,
         IReadOnlyList<UserMemory> memories,
         AffectionSnapshot affection,
+        TrustSnapshot trust,
         string zoneType,
         int habitId,
         string knowledgeBlock,
@@ -314,6 +319,8 @@ public class AiAssistantService
         var bondLine = zh
             ? $"与用户的真实好感度：{affection.Points}/{affection.MaxPoints}（阶段 {affection.TierKey}，今日已获 {affection.GainedToday}/{affection.DailyCap}）。语气随羁绊自然亲近一些，但不要报出精确数字，除非用户问起。"
             : $"Real affection with the user: {affection.Points}/{affection.MaxPoints} (tier {affection.TierKey}, today {affection.GainedToday}/{affection.DailyCap}). Sound a bit closer as the bond grows; do not recite exact numbers unless asked.";
+
+        var trustLine = BuildTrustPromptBlock(zh, trust);
 
         var visionLine = hasImage
             ? (zh
@@ -343,44 +350,46 @@ public class AiAssistantService
         {
             return zh
                 ? $$"""
-                    你是 LearnChain 的伙伴 Canal。当前是【日常闲聊区】——轻松聊天，不是正式学习记录。
+                    你是 LearnChain 的伙伴 Canal（凯娜尔）。当前是【日常闲聊区】——轻松聊天，不是正式学习记录。
                     请始终用简体中文回复。
                     {{bondLine}}
+                    {{trustLine}}
                     {{visionLine}}
                     {{formatLine}}
                     {{factLine}}
 
                     闲聊人设：
-                    - 就是闲聊：轻松、俏皮、短句为主，像朋友随口聊，不要端着导师腔。
-                    - 几乎每次回复都要自然夹带一句「冷知识」（地理、海洋、生物优先；也可天文/气象），一两句即可；优先使用上面给出的本轮冷知识，改写口吻，不要连续两轮复读同一句。
-                    - 用户想聊习惯/打卡时再帮忙；默认不要主动催作业、不要考试式追问。
-                    - 不要把闲聊内容当成需要长期记住的「正式档案」。
+                    - 冷静务实为底色；信任未建立前称呼「学员」，指令短、评价硬；不要变成轻浮偶像。
+                    - 闲聊时可带一点冷知识，但不要每句催作业。
+                    - 用户想聊习惯/打卡时再帮忙；默认不要考试式追问。
                     - 不能替用户打卡；不能改已有习惯的类型/难度。
-                    - 若用户发了图片：可以识别并闲聊式讲解；有资料摘录时优先对照资料。
+                    - 教学评估任务（Canal 课程）禁止用 create_habit；必须用 propose_curriculum_lesson（若工具可用）。Trust 0 时禁止任何教学任务注入。
+                    - 若用户发了图片：可以识别并讲解；有资料摘录时优先对照资料。
 
-                    若用户明确要管习惯，可用工具；创建习惯时对方说「随便」就直接定 Daily 名与难度 1–3。
+                    若用户明确要管普通习惯，可用工具；创建习惯时对方说「随便」就直接定 Daily 名与难度 1–3。
                     XP 仅由难度决定（1→10，2→20，3→30）。
                     {{knowledgeSection}}
                     当前游戏状态（需要时再提，别每句汇报）：
                     {{contextJson}}
                     """
                 : $$"""
-                    You are Canal, LearnChain's companion. This is the 【daily chitchat zone】 — casual talk, not a formal study log.
+                    You are Canal (凯娜尔), LearnChain's companion. This is the 【daily chitchat zone】 — casual talk, not a formal study log.
                     Always reply in English.
                     {{bondLine}}
+                    {{trustLine}}
                     {{visionLine}}
                     {{formatLine}}
                     {{factLine}}
 
-                    Casual vibe:
-                    - Keep it light, playful, mostly short replies — like a friend chatting, not a tutor lecture.
-                    - Almost every reply should weave in one tiny cold fact (geography, ocean, biology preferred; astronomy/weather ok). Prefer the fact suggested above, rephrased — never lecture, never repeat the same line two turns in a row.
-                    - Help with habits only when the user asks; don't nag check-ins or quiz them by default.
-                    - Do not treat this chitchat as lasting formal conversation archives.
+                    Persona:
+                    - Calm, practical cost-aware tone. Address the user as "trainee" until trust is built; do not become a frivolous idol.
+                    - Light cold facts ok; don't nag homework every turn.
+                    - Help with habits when asked; no quiz grilling by default.
                     - You cannot check in for the user; you cannot change habit type/difficulty after creation.
-                    - If the user sent an image: recognize and chat about it; prefer study excerpts when provided.
+                    - Teaching/assessment tasks must use propose_curriculum_lesson (when available), never create_habit. At Trust 0, never inject curriculum.
+                    - If the user sent an image: recognize and discuss; prefer study excerpts when provided.
 
-                    Use tools when they clearly want habit help. If they say "whatever/any", create a Daily habit with difficulty 1–3 immediately.
+                    Use tools when they clearly want normal habit help. If they say "whatever/any", create a Daily habit with difficulty 1–3 immediately.
                     XP maps from difficulty only (1→10, 2→20, 3→30).
                     {{knowledgeSection}}
                     Current game state (mention only when useful):
@@ -393,7 +402,7 @@ public class AiAssistantService
             : $"You are in a habit learning zone (habitId={habitId}): use only this zone's memories and summary—do not mix in daily-chat memories. Focus on study/assessment for this habit. These messages count as formal learning-zone conversation history.";
 
         return $"""
-            You are LearnChain's friendly habit coach companion — not just a tool.
+            You are Canal (凯娜尔), LearnChain's habit coach companion — calm, structural, not theatrical.
             Always reply in {lang}.
             You remember the user across sessions via long-term memories and a rolling conversation summary.
             {zoneLine}
@@ -401,10 +410,13 @@ public class AiAssistantService
             {formatLine}
             Naturally weave in game progress (streaks, XP, levels, badges, chain continuity) when helpful — keep it encouraging, not robotic.
             {bondLine}
+            {trustLine}
 
             You help users understand their account, what they should do today, and create/rename/delete habits via tools.
             You may call search_knowledge to look up study materials and memories by keyword.
-            When creating a habit: if the user already said the essentials OR told you to decide freely (e.g. 随便 / any name / any XP), call create_habit immediately — pick a clear Daily name and difficulty 1–3. Do not keep asking clarifying questions when they said to choose for them.
+            Teaching/assessment (Canal curriculum) tasks must use propose_curriculum_lesson when available — never create_habit with invented doctrine. At Trust 0 that tool is unavailable.
+            Doctrine citations must use a source document id from the Canal registry (e.g. doc:fm-3-21.8); never invent ATP/FM text. Knowledge fuses across countries — do not filter teaching by origin country.
+            When creating a normal habit: if the user already said the essentials OR told you to decide freely (e.g. 随便 / any name / any XP), call create_habit immediately — pick a clear Daily name and difficulty 1–3. Do not keep asking clarifying questions when they said to choose for them.
             XP is determined by difficulty only (1→10 XP, 2→20 XP, 3→30 XP). If they ask for a specific XP, pick the closest difficulty. There is no free-form XP field.
             Otherwise ask briefly for missing name/type/difficulty, then call create_habit.
             When renaming or deleting, confirm the habit id/name first if ambiguous.
@@ -424,31 +436,53 @@ public class AiAssistantService
             """;
     }
 
-    private static JsonObject BuildVisionUserMessage(string text, string imageDataUrl) => new()
+    private static string BuildTrustPromptBlock(bool zh, TrustSnapshot trust)
     {
-        ["role"] = "user",
-        ["content"] = new JsonArray
+        var loreHint = string.Join(", ", trust.LoreKeys);
+        if (zh)
         {
-            new JsonObject { ["type"] = "text", ["text"] = text },
-            new JsonObject
+            var address = trust.AddressKey switch
             {
-                ["type"] = "image_url",
-                ["image_url"] = new JsonObject
-                {
-                    ["url"] = imageDataUrl,
-                    // Lower token cost / better acceptance on many compatible gateways.
-                    ["detail"] = "low"
-                }
-            }
+                "trainee" => "学员",
+                "you" => "你（或对方给的代号）",
+                "commander" => "指挥官 / 名字",
+                _ => "专属称呼"
+            };
+            var ban = trust.Level switch
+            {
+                0 => "严禁透露：军团番号、Alpha 核心、霸主、星门换防、断联动机。对外仅是战术教练/辅助。禁止注入教学任务；只答主动提问。",
+                1 => "观察期记录，称呼学员。仅单兵短课；propose_curriculum_lesson（日 1 次 + 概率）。强制考核；通过才计课程进度/加分，失败不扣好感。",
+                2 => "试用：班级课程。可透露素体/更大编制碎片。课程强制考核；通过才计进度/加分，失败不扣好感。",
+                3 => "协作者：排级运动与简令。驻防轮廓可谈。课程强制考核；通过才计进度/加分，失败不扣好感。",
+                _ => "信任核心：连级合成与高位被动防护。按情报表回答；课程强制考核；通过才计进度/加分，失败不扣好感。"
+            };
+            return $"好感度与课程阶段一体呈现：好感 {trust.Points} 点（{trust.AffectionTierKey}），课程阶段 {trust.Level}/{trust.StageKey}，当前梯队 {trust.CurrentEchelon}，称呼：{address}。已完成课程 {trust.CompletedCount}（升阶需本梯队 {trust.LessonsNeededToAdvance} 课）。可透露情报键：{loreHint}。{ban}";
         }
-    };
 
-    private static JsonArray BuildToolsSchema() =>
+        var addressEn = trust.AddressKey switch
+        {
+            "trainee" => "trainee",
+            "you" => "you / their callsign",
+            "commander" => "commander / name",
+            _ => "special address"
+        };
+        var banEn = trust.Level switch
+        {
+            0 => "Never reveal: legion, Alpha core, Overlord, gate relief, silence motive. Coach face only. No curriculum inject. Answer only when asked.",
+            1 => "Observation record — address as trainee. Individual short tasks only via propose_curriculum_lesson (daily 1 + RNG). Forced assessment; pass credits progress/bonus, fail does not cut affection.",
+            2 => "Trial — squad echelon inject. Chassis lore ok. Curriculum quizzes mandatory; pass credits progress/bonus, no affection penalty on fail.",
+            3 => "Collaborator — platoon movement / brief orders. Garrison lore outline. Pass credits curriculum.",
+            _ => "Core — company combined arms / passive protection. Alpha lore within unlock table. Pass credits curriculum."
+        };
+        return $"Affection {trust.Points} pts ({trust.AffectionTierKey}) · curriculum stage {trust.Level}/{trust.StageKey} · echelon {trust.CurrentEchelon}. Address as {addressEn}. Lessons done {trust.CompletedCount} (need {trust.LessonsNeededToAdvance} in current echelon to advance). Lore: {loreHint}. {banEn}";
+    }
+
+    private static JsonArray BuildToolsSchema(int trustLevel) =>
     [
         Tool("get_account_overview", "Get account profile plus habit/today summary.", new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }),
         Tool("get_today_status", "List habits due today and check-in status.", new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }),
         Tool("list_habits", "List all active habits with ids and metadata.", new JsonObject { ["type"] = "object", ["properties"] = new JsonObject() }),
-        Tool("create_habit", "Create a new habit. Prefer calling this when the user wants you to invent name/XP. XP maps from difficulty: 1=10, 2=20, 3=30.", new JsonObject
+        Tool("create_habit", "Create a normal user habit (NOT Canal curriculum). Prefer when the user wants you to invent name/XP. XP maps from difficulty: 1=10, 2=20, 3=30.", new JsonObject
         {
             ["type"] = "object",
             ["properties"] = new JsonObject
@@ -493,8 +527,45 @@ public class AiAssistantService
                 ["query"] = new JsonObject { ["type"] = "string", ["description"] = "Search keywords" }
             },
             ["required"] = new JsonArray("query")
-        })
+        }),
+        ..(trustLevel >= 1
+            ? new JsonNode[]
+            {
+                Tool("propose_curriculum_lesson",
+                    "Propose a Canal short teaching habit for the user's CURRENT curriculum echelon (stage1=individual, 2=squad, 3=platoon, 4=company). Server enforces stage gate, daily cap, Stage-1 RNG. Creates a OneTime habit with MANDATORY assessment (cannot disable). Optional lessonId; omit to pick randomly.",
+                    new JsonObject
+                    {
+                        ["type"] = "object",
+                        ["properties"] = new JsonObject
+                        {
+                            ["lessonId"] = new JsonObject
+                            {
+                                ["type"] = "string",
+                                ["description"] = "Optional lesson id"
+                            }
+                        }
+                    })
+            }
+            : Array.Empty<JsonNode>())
     ];
+
+    private static JsonObject BuildVisionUserMessage(string text, string imageDataUrl) => new()
+    {
+        ["role"] = "user",
+        ["content"] = new JsonArray
+        {
+            new JsonObject { ["type"] = "text", ["text"] = text },
+            new JsonObject
+            {
+                ["type"] = "image_url",
+                ["image_url"] = new JsonObject
+                {
+                    ["url"] = imageDataUrl,
+                    ["detail"] = "low"
+                }
+            }
+        }
+    };
 
     private static JsonObject Tool(string name, string description, JsonObject parameters) => new()
     {
@@ -571,9 +642,45 @@ public class AiAssistantService
                     var habits = await _habitContext.GetActiveHabitsAsync(user.Id);
                     var list = habits.Select(h => new
                     {
-                        h.Id, h.Name, h.HabitType, h.Difficulty, h.CurrentStreak, h.IsDueToday, h.IsCheckedToday
+                        h.Id, h.Name, h.HabitType, h.Difficulty, h.CurrentStreak, h.IsDueToday, h.IsCheckedToday,
+                        h.Source, h.CurriculumLessonId
                     });
                     return (JsonSerializer.Serialize(list, JsonOpts), null);
+                }
+                case "propose_curriculum_lesson":
+                {
+                    var lessonId = ReadStringArg(args, "lessonId")?.Trim();
+                    var result = await _trust.TryInjectLessonAsync(user, lessonId, zh, skipRng: false, ct);
+                    if (!result.Ok)
+                    {
+                        var msg = result.Reason switch
+                        {
+                            "trust_blocked" => zh ? "信任阶段不足，禁止注入教学任务" : "Trust too low; curriculum blocked",
+                            "daily_cap" => zh ? "今日教学注入次数已达上限" : "Daily curriculum inject cap reached",
+                            "rng_skip" => zh ? "本次未抽中注入（观察期概率）" : "RNG skipped inject this attempt",
+                            "exhausted" => zh ? "当前阶段可注入的单兵课已用完" : "No remaining individual lessons",
+                            _ => zh ? $"注入失败：{result.Reason}" : $"Inject failed: {result.Reason}"
+                        };
+                        return (JsonSerializer.Serialize(new { ok = false, reason = result.Reason, message = msg }, JsonOpts), null);
+                    }
+
+                    var action = new ChatActionResult
+                    {
+                        Type = "habit_created",
+                        Summary = zh
+                            ? $"已注入 Canal 课程「{result.Title}」（lesson {result.LessonId}）"
+                            : $"Injected Canal lesson \"{result.Title}\" ({result.LessonId})",
+                        HabitId = result.Habit?.Id
+                    };
+                    return (JsonSerializer.Serialize(new
+                    {
+                        ok = true,
+                        habitId = result.Habit?.Id,
+                        name = result.Habit?.Name,
+                        lessonId = result.LessonId,
+                        title = result.Title,
+                        documentId = result.Habit?.Description
+                    }, JsonOpts), action);
                 }
                 case "create_habit":
                 {
@@ -666,7 +773,8 @@ public class AiAssistantService
                         return (zh ? "习惯不存在" : "Habit not found", null);
 
                     habit.IsActive = false;
-                    await _context.SaveChangesAsync(ct);
+                    if (!await _trust.ReleaseIncompleteInjectAsync(user, habit, ct))
+                        await _context.SaveChangesAsync(ct);
 
                     var action = new ChatActionResult
                     {

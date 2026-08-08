@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAchievementStore } from '../stores/achievementStore'
 import { useAffectionStore } from '../stores/affectionStore'
+import { useTrustStore } from '../stores/trustStore'
 import { useAiSettingsStore } from '../stores/aiSettingsStore'
 import { useTranslation } from '../stores/settingsStore'
 import {
@@ -21,6 +22,7 @@ export default function ProfilePage() {
     const { t } = useTranslation()
     const aiSettings = useAiSettingsStore()
     const affection = useAffectionStore()
+    const trust = useTrustStore()
     const clearChatHistory = useChatStore(s => s.clearHistory)
     const [bio, setBio] = useState('')
     const [oldPwd, setOldPwd] = useState('')
@@ -42,6 +44,7 @@ export default function ProfilePage() {
     useEffect(() => { fetchProfile() }, [fetchProfile])
     useEffect(() => { if (profile) setBio(profile.bio) }, [profile])
     useEffect(() => { void affection.hydrate() }, [affection.hydrate])
+    useEffect(() => { void trust.hydrate() }, [trust.hydrate])
     useEffect(() => {
         setAiKey(aiSettings.apiKey)
         setAiBase(aiSettings.baseUrl)
@@ -178,6 +181,18 @@ export default function ProfilePage() {
                             cap: affection.dailyCap,
                             next: affection.toNextTier,
                         })}
+                    </p>
+                    <p className="profile-hint">
+                        {t('profile.affectionCurriculum', {
+                            done: trust.completedCount,
+                            stage: ['initial', 'observe', 'trial', 'collaborator', 'core'].includes(trust.stageKey)
+                                ? t(`profile.trustStage.${trust.stageKey}` as 'profile.trustStage.initial')
+                                : trust.stageKey,
+                        })}
+                        {' · '}
+                        {['trainee', 'you', 'commander', 'callsign'].includes(trust.addressKey)
+                            ? t(`profile.trustAddress.${trust.addressKey}` as 'profile.trustAddress.trainee')
+                            : trust.addressKey}
                     </p>
                 </div>
 

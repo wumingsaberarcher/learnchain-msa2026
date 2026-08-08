@@ -309,6 +309,16 @@ export default function AdminPage() {
                                 </strong>
                                 <span>{u.email}</span>
                                 <span>Lv.{u.level} · {u.totalXP} XP · {roleLabel(u.role, t)}</span>
+                                <span className="admin-canal-line">
+                                    {t('admin.canalBond')}: {u.companionAffection ?? 0}
+                                    {u.affectionTierKey ? ` · ${u.affectionTierKey}` : ''}
+                                    {u.curriculumCompleted != null
+                                        ? ` · ${t('admin.canalCurriculum', { n: u.curriculumCompleted })}`
+                                        : ''}
+                                </span>
+                                {u.canalEvaluation && (
+                                    <em className="admin-canal-eval">{u.canalEvaluation}</em>
+                                )}
                                 {u.isBanned && <em className="admin-banned-tag">{t('admin.bannedTag')}</em>}
                             </button>
                         ))}
@@ -333,6 +343,28 @@ export default function AdminPage() {
                                         {t('admin.bannedUntil')}: {new Date(detail.bannedUntil).toLocaleString()}
                                     </p>
                                 )}
+
+                                <section className="admin-section">
+                                    <h3><Sparkles className="w-4 h-4" /> {t('admin.canalBond')}</h3>
+                                    <p className="admin-meta">
+                                        {(detail.canal?.companionAffection ?? detail.companionAffection ?? 0)}
+                                        {' / '}
+                                        {detail.canal?.companionAffectionMax ?? 3000}
+                                        {' · '}
+                                        {detail.canal?.affectionTierKey ?? detail.affectionTierKey ?? 'stranger'}
+                                        {' · '}
+                                        {detail.canal?.trustStageKey ?? 'initial'}
+                                        {detail.canal != null && (
+                                            <> · {t('admin.canalCurriculum', { n: detail.canal.curriculumCompleted })}</>
+                                        )}
+                                    </p>
+                                    <p className="admin-canal-eval-block">
+                                        <strong>{t('admin.canalEval')}：</strong>
+                                        {detail.canal?.canalEvaluation
+                                            ?? detail.canalEvaluation
+                                            ?? '—'}
+                                    </p>
+                                </section>
 
                                 {isSuper && (
                                     <section className="admin-section">

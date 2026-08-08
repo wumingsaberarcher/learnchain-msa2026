@@ -24,6 +24,8 @@ interface AssessmentState {
   groupId: number | null
   habitName: string
   difficulty: AssessmentDifficulty
+  /** Canal curriculum: backend can quiz from lesson syllabus without uploads. */
+  curriculumSyllabus: boolean
   phase: AssessmentPhase
   materials: HabitMaterialDto[]
   questions: AssessmentQuestion[]
@@ -37,7 +39,7 @@ interface AssessmentState {
     habitId: number,
     habitName: string,
     difficulty?: AssessmentDifficulty,
-    opts?: { groupId?: number | null },
+    opts?: { groupId?: number | null; source?: string | null },
   ) => Promise<void>
   startPractice: (
     groupId: number,
@@ -63,6 +65,7 @@ const empty = {
   groupId: null as number | null,
   habitName: '',
   difficulty: 'easy' as AssessmentDifficulty,
+  curriculumSyllabus: false,
   phase: 'idle' as AssessmentPhase,
   materials: [] as HabitMaterialDto[],
   questions: [] as AssessmentQuestion[],
@@ -103,6 +106,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
 
   start: async (habitId, habitName, difficulty = 'easy', opts) => {
     const groupId = opts?.groupId ?? null
+    const curriculumSyllabus = opts?.source === 'canal_curriculum'
     set({
       ...empty,
       active: true,
@@ -110,6 +114,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
       habitId,
       groupId,
       habitName,
+      curriculumSyllabus,
       difficulty: difficulty === 'medium' || difficulty === 'hard' ? difficulty : 'easy',
       phase: 'ready',
     })
@@ -201,15 +206,19 @@ export async function triggerAssessmentAfterCheckIn(habit: {
   assessmentEnabled?: boolean
   assessmentDifficulty?: string
   groupId?: number | null
+  source?: string | null
 }) {
-  if (!habit.assessmentEnabled) return
+  if (!habit.assessmentEnabled && habit.source !== 'canal_curriculum') return
   const difficulty =
     habit.assessmentDifficulty === 'medium' || habit.assessmentDifficulty === 'hard'
       ? habit.assessmentDifficulty
-      : 'easy'
+      : habit.source === 'canal_curriculum'
+        ? 'medium'
+        : 'easy'
   const { useCompanionStore } = await import('./companionStore')
   await useAssessmentStore.getState().start(habit.id, habit.name, difficulty, {
     groupId: habit.groupId,
+    source: habit.source,
   })
   useCompanionStore.getState().enterGalMode({ zoneType: 'habit', habitId: habit.id })
 }

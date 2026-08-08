@@ -157,6 +157,27 @@
 	color: #f87171;
 }
 
+.admin-canal-line {
+	opacity: 0.85;
+	font-size: 0.78rem !important;
+}
+
+.admin-canal-eval {
+	display: block;
+	margin-top: 0.2rem;
+	font-size: 0.72rem;
+	font-style: italic;
+	opacity: 0.75;
+	line-height: 1.35;
+}
+
+.admin-canal-eval-block {
+	margin-top: 0.5rem;
+	font-size: 0.88rem;
+	line-height: 1.45;
+	opacity: 0.92;
+}
+
 .admin-hint,
 .admin-meta,
 .admin-sublabel {

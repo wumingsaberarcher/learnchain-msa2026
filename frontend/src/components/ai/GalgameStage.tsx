@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, History, ImagePlus, LogOut, MessageSquare, Mic,
 import { useChatStore, type UiChatMessage } from '../../stores/chatStore'
 import { useCompanionStore } from '../../stores/companionStore'
 import { useAssessmentStore } from '../../stores/assessmentStore'
+import { useTrustStore } from '../../stores/trustStore'
 import { useTranslation } from '../../stores/settingsStore'
 import { compressChatImage } from '../../utils/compressChatImage'
 import ChatMarkdown, { stripMarkdownLite } from './ChatMarkdown'
@@ -39,6 +40,7 @@ export default function GalgameStage() {
   const canalLine = useAssessmentStore((s) => s.canalLine)
   const clearCanalLine = useAssessmentStore((s) => s.setCanalLine)
   const closeAssessment = useAssessmentStore((s) => s.close)
+  const trust = useTrustStore()
 
   const [draft, setDraft] = useState('')
   const [pendingImage, setPendingImage] = useState<string | null>(null)
@@ -159,6 +161,10 @@ export default function GalgameStage() {
     playLine(canalLine)
     clearCanalLine(null)
   }, [canalLine, playLine, clearCanalLine])
+
+  useEffect(() => {
+    void trust.hydrate()
+  }, [trust.hydrate])
 
   /** Keep dialog/history stack below Canal's face; she "pushes" it down when it climbs too high. */
   useEffect(() => {
@@ -391,6 +397,20 @@ export default function GalgameStage() {
             <History className="w-4 h-4" />
             {t('chat.galModeHistory')}
           </button>
+        </div>
+        <div className="gal-trust-chip" title={t('profile.affectionHint')}>
+          {(() => {
+            const tier = trust.affectionTierKey || 'stranger'
+            return ['stranger', 'familiar', 'friend', 'trust', 'bond', 'heart'].includes(tier)
+              ? t(`profile.affectionTier.${tier}` as 'profile.affectionTier.stranger')
+              : tier
+          })()}
+          <span>
+            {trust.points} ·{' '}
+            {['trainee', 'you', 'commander', 'callsign'].includes(trust.addressKey)
+              ? t(`profile.trustAddress.${trust.addressKey}` as 'profile.trustAddress.trainee')
+              : trust.addressKey}
+          </span>
         </div>
         <button
           type="button"

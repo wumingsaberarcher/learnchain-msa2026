@@ -1,0 +1,112 @@
+[
+  {
+    "lessonId": "ind-observe-report-01",
+    "echelon": "individual",
+    "topic": "individual_skills",
+    "titleZh": "观察—判断—报告",
+    "titleEn": "Observe–Decide–Report",
+    "criteriaZh": [
+      "选定一个现实场景（通勤、走廊、自习室均可），用一分钟做静默观察。",
+      "写下：看到什么、可能意味着什么、若需上报会怎么说（三句以内）。",
+      "不编造戏剧冲突；强调清晰、可复核。"
+    ],
+    "criteriaEn": [
+      "Pick a real scene (commute, hallway, study room). Observe silently for one minute.",
+      "Write: what you saw, what it might mean, how you would report it (≤3 sentences).",
+      "No drama — clarity and verifiability only."
+    ],
+    "documentId": "doc:fm-3-21.8#observe-report",
+    "trustPointsOnPass": 10,
+    "minTrustToInject": 1
+  },
+  {
+    "lessonId": "ind-cover-terrain-01",
+    "echelon": "individual",
+    "topic": "individual_skills",
+    "titleZh": "个人利用地形与掩蔽",
+    "titleEn": "Personal cover and concealment",
+    "criteriaZh": [
+      "在日常环境里指出两处「掩蔽」（挡视线）与一处「掩护」（挡冲击/挡意外）的类比物。",
+      "各用一句话说明为什么，以及移动时如何利用。"
+    ],
+    "criteriaEn": [
+      "In a daily setting, name two concealment analogies and one cover analogy.",
+      "One sentence each on why, and how you would move using them."
+    ],
+    "documentId": "doc:fm-3-21.8#cover-concealment",
+    "trustPointsOnPass": 10,
+    "minTrustToInject": 1
+  },
+  {
+    "lessonId": "ind-comms-discipline-01",
+    "echelon": "individual",
+    "topic": "individual_skills",
+    "titleZh": "通信与口令纪律",
+    "titleEn": "Comms and challenge discipline",
+    "criteriaZh": [
+      "写一条你给小队用的简短口令格式（挑战—应答），不超过两行。",
+      "列出两条「禁止在公开频道说」的信息类型（位置细节、完整计划等）。"
+    ],
+    "criteriaEn": [
+      "Write a short challenge–reply passphrase format for a small team (≤2 lines).",
+      "List two info types forbidden on an open channel (exact location, full plan, etc.)."
+    ],
+    "documentId": "doc:atp-3-21.71-2024#comms",
+    "trustPointsOnPass": 10,
+    "minTrustToInject": 1
+  },
+  {
+    "lessonId": "ind-passive-protect-01",
+    "echelon": "individual",
+    "topic": "passive_protection",
+    "titleZh": "被动防护入门",
+    "titleEn": "Passive protection basics",
+    "criteriaZh": [
+      "针对「被突然点名/被盯上」的日常类比，写疏散或降低暴露的三步（短句）。",
+      "强调分散、降低可识别性，不要写攻击性对策。"
+    ],
+    "criteriaEn": [
+      "Using a daily analogy for sudden attention, write three short steps to disperse or reduce exposure.",
+      "Focus on dispersal and lower signature — no aggressive countermeasures."
+    ],
+    "documentId": "doc:jp-3-01#passive",
+    "trustPointsOnPass": 12,
+    "minTrustToInject": 1
+  },
+  {
+    "lessonId": "ind-report-brevity-01",
+    "echelon": "individual",
+    "topic": "individual_skills",
+    "titleZh": "短报结构练习",
+    "titleEn": "Brevity report drill",
+    "criteriaZh": [
+      "用「情况—位置（模糊）—行动/需求」格式写一条不超过 40 字的短报。",
+      "删掉一切形容词堆砌，只留可执行信息。"
+    ],
+    "criteriaEn": [
+      "Write a ≤40-word report: situation — rough location — action/need.",
+      "Strip adjectives; keep only actionable facts."
+    ],
+    "documentId": "doc:fm-3-21.8#brevity",
+    "trustPointsOnPass": 10,
+    "minTrustToInject": 1
+  },
+  {
+    "lessonId": "ind-field-discipline-01",
+    "echelon": "individual",
+    "topic": "individual_skills",
+    "titleZh": "个人纪律清单",
+    "titleEn": "Personal field discipline",
+    "criteriaZh": [
+      "列出四条你今日可执行的「冗余/检查」习惯（装备类比：钥匙、电源、资料备份等）。",
+      "每条一句话，说明失败代价。"
+    ],
+    "criteriaEn": [
+      "List four check/redundancy habits you can do today (keys, power, file backup analogies).",
+      "One sentence each on failure cost."
+    ],
+    "documentId": "doc:us-army-stp-individual#discipline",
+    "trustPointsOnPass": 10,
+    "minTrustToInject": 1
+  }
+]

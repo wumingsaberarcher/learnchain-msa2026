@@ -89,6 +89,26 @@ public class CompanionAffectionService
             _ => 5,
         };
 
+    /// <summary>
+    /// Curriculum / milestone bonus — counts toward MaxPoints but NOT the daily grind cap,
+    /// so teaching tasks remain meaningful when the daily affection cap is already full.
+    /// </summary>
+    public async Task<AffectionAwardResult> AwardBonusAsync(User user, int want, CancellationToken ct = default)
+    {
+        EnsureDay(user);
+        if (want <= 0 || user.CompanionAffection >= MaxPoints)
+            return Result(user, 0);
+
+        var roomMax = Math.Max(0, MaxPoints - user.CompanionAffection);
+        var award = Math.Min(want, roomMax);
+        if (award <= 0)
+            return Result(user, 0);
+
+        user.CompanionAffection += award;
+        await _db.SaveChangesAsync(ct);
+        return Result(user, award);
+    }
+
     private async Task<AffectionAwardResult> AwardAsync(User user, int want, CancellationToken ct)
     {
         EnsureDay(user);

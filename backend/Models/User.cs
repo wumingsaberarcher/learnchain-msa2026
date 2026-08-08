@@ -61,4 +61,25 @@ public class User
 
     /// <summary>Points already gained today toward the daily affection cap.</summary>
     public int CompanionAffectionGainedToday { get; set; }
+
+    /// <summary>
+    /// Cached curriculum stage 0–4 derived from CompanionAffection tier (kept for legacy/admin).
+    /// Source of truth for bond is CompanionAffection.
+    /// </summary>
+    public int TrustLevel { get; set; }
+
+    /// <summary>Deprecated mirror — prefer CompanionAffection. Kept for migration compatibility.</summary>
+    public int TrustPoints { get; set; }
+
+    /// <summary>UTC day for CurriculumInjectCountToday.</summary>
+    public DateTime? CurriculumInjectDayUtc { get; set; }
+
+    /// <summary>Successful/attempted curriculum injects today (Stage 1 cap = 1).</summary>
+    public int CurriculumInjectCountToday { get; set; }
+
+    /// <summary>JSON: { "injected": string[], "completed": string[] } lesson ids.</summary>
+    public string CurriculumStateJson { get; set; } = """{"injected":[],"completed":[]}""";
+
+    /// <summary>One-line Canal evaluation of this user (admin-visible; regenerated from usage data).</summary>
+    public string CanalEvaluation { get; set; } = string.Empty;
 }

@@ -28,6 +28,12 @@ public class Habit
     /// <summary>Optional habit group membership; null = ungrouped.</summary>
     public int? GroupId { get; set; }
 
+    /// <summary>Provenance: null = user/AI normal; "canal_curriculum" = Canal teaching task.</summary>
+    public string? Source { get; set; }
+
+    /// <summary>When Source is canal_curriculum, the lesson id from the curriculum catalog.</summary>
+    public string? CurriculumLessonId { get; set; }
+
     [NotMapped]
     public int CurrentStreak { get; set; }
 

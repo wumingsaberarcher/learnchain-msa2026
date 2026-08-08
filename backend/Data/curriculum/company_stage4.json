@@ -1,0 +1,74 @@
+[
+  {
+    "lessonId": "coy-offense-defense-01",
+    "echelon": "company",
+    "topic": "company_tactics",
+    "titleZh": "连级进攻与防御配置要点",
+    "titleEn": "Company offense & defense layout",
+    "criteriaZh": [
+      "各用两句写出进攻与防御时「主努力方向」如何定。",
+      "点出一处常见过度集中的错误。"
+    ],
+    "criteriaEn": [
+      "Two sentences each: how to set main effort in offense vs defense.",
+      "Name one over-concentration mistake."
+    ],
+    "documentId": "doc:fm-3-21.10#coy-layout",
+    "trustPointsOnPass": 16,
+    "minTrustToInject": 4
+  },
+  {
+    "lessonId": "coy-main-assist-reserve-01",
+    "echelon": "company",
+    "topic": "company_tactics",
+    "titleZh": "主攻 / 助攻 / 预备队思维",
+    "titleEn": "Main / supporting / reserve thinking",
+    "criteriaZh": [
+      "用一个日常项目类比：主攻、助攻、预备队各一句。",
+      "说明预备队过早用尽的代价一句。"
+    ],
+    "criteriaEn": [
+      "Project analogy: main, supporting, reserve (one sentence each).",
+      "One sentence on burning the reserve too early."
+    ],
+    "documentId": "doc:atp-3-90.1-2023#effort",
+    "trustPointsOnPass": 16,
+    "minTrustToInject": 4
+  },
+  {
+    "lessonId": "coy-combined-arms-01",
+    "echelon": "company",
+    "topic": "combined_arms",
+    "titleZh": "合成意识：步、装、火力、工兵补位",
+    "titleEn": "Combined arms: infantry, armor, fires, engineers",
+    "criteriaZh": [
+      "列出四类能力各一个「缺口时谁补」的例子（短句）。",
+      "强调补位是结构问题不是个人英雄。"
+    ],
+    "criteriaEn": [
+      "Four short examples: who fills gaps for infantry/armor/fires/engineers.",
+      "Structure over heroics."
+    ],
+    "documentId": "doc:abct-cab-open#combined",
+    "trustPointsOnPass": 16,
+    "minTrustToInject": 4
+  },
+  {
+    "lessonId": "coy-passive-high-threat-01",
+    "echelon": "company",
+    "topic": "passive_protection",
+    "titleZh": "高位威胁下的被动防护",
+    "titleEn": "Passive protection under high-tier threat",
+    "criteriaZh": [
+      "用科幻包装写四招：分散、伪装、预警、假目标（各一句）。",
+      "禁止写成主动反击表演；强调降低被侦测与损耗。"
+    ],
+    "criteriaEn": [
+      "Sci-fi wrap of four measures: dispersal, camouflage, warning, decoys (one each).",
+      "No offensive theatrics — reduce signature and loss."
+    ],
+    "documentId": "doc:jp-3-01#passive-high",
+    "trustPointsOnPass": 16,
+    "minTrustToInject": 4
+  }
+]

@@ -242,6 +242,9 @@ export const useHabitStore = create<HabitState>((set, get) => {
                 const { useAiSettingsStore } = await import('./aiSettingsStore')
                 useAiSettingsStore.getState().hydrateForUser(userInfo.id)
 
+                const { useTrustStore } = await import('./trustStore')
+                void useTrustStore.getState().hydrate()
+
                 const { useAchievementStore } = await import('./achievementStore')
                 const achStore = useAchievementStore.getState()
                 await achStore.fetchProfile()
@@ -277,6 +280,9 @@ export const useHabitStore = create<HabitState>((set, get) => {
             })
             import('./affectionStore').then(({ useAffectionStore }) => {
                 useAffectionStore.getState().clear()
+            })
+            import('./trustStore').then(({ useTrustStore }) => {
+                useTrustStore.getState().clear()
             })
             set({
                 isLoggedIn: false,

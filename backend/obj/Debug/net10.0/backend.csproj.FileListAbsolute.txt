@@ -90,3 +90,8 @@ D:\learnchain-msa2026\backend\bin\Debug\net10.0\UglyToad.PdfPig.Core.dll
 D:\learnchain-msa2026\backend\bin\Debug\net10.0\UglyToad.PdfPig.Fonts.dll
 D:\learnchain-msa2026\backend\bin\Debug\net10.0\UglyToad.PdfPig.Tokenization.dll
 D:\learnchain-msa2026\backend\bin\Debug\net10.0\UglyToad.PdfPig.Tokens.dll
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\Data\curriculum\individual_stage1.json
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\Data\curriculum\source_catalog.json
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\Data\curriculum\company_stage4.json
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\Data\curriculum\platoon_stage3.json
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\Data\curriculum\squad_stage2.json

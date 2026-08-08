@@ -325,12 +325,19 @@ export default function Habits() {
                                                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem' }}>
                                                     <input
                                                         type="checkbox"
-                                                        checked={!!editingHabit.assessmentEnabled}
-                                                        onChange={e => setEditingHabit({ ...editingHabit, assessmentEnabled: e.target.checked })}
+                                                        checked={habit.source === 'canal_curriculum' ? true : !!editingHabit.assessmentEnabled}
+                                                        disabled={habit.source === 'canal_curriculum'}
+                                                        onChange={e => {
+                                                            if (habit.source === 'canal_curriculum') return
+                                                            setEditingHabit({ ...editingHabit, assessmentEnabled: e.target.checked })
+                                                        }}
                                                     />
                                                     {t('habits.assessment')}
+                                                    {habit.source === 'canal_curriculum' && (
+                                                        <span className="habit-badge habit-badge-canal">{t('habits.canalAssessLocked')}</span>
+                                                    )}
                                                 </label>
-                                                {editingHabit.assessmentEnabled && (
+                                                {(habit.source === 'canal_curriculum' || editingHabit.assessmentEnabled) && (
                                                     <div className="habits-difficulty-grid habit-edit-assess-diff">
                                                         {(['easy', 'medium', 'hard'] as const).map((d) => (
                                                             <button
@@ -355,6 +362,9 @@ export default function Habits() {
                                                     <span className="habit-badge habit-badge-xp">+{habit.baseXP} XP</span>
                                                     {habit.assessmentEnabled && (
                                                         <span className="habit-badge habit-badge-streak">{t('habits.assessmentOn')}</span>
+                                                    )}
+                                                    {habit.source === 'canal_curriculum' && (
+                                                        <span className="habit-badge habit-badge-canal">{t('habits.canalCurriculum')}</span>
                                                     )}
                                                     {habit.habitType === 'OneTime' && (
                                                         <span className="habit-badge habit-badge-onetime">{t('habits.oneTime')}</span>
@@ -459,6 +469,22 @@ export default function Habits() {
                                         {habit.isCompleted && (
                                             <button type="button" disabled className="btn-habit btn-habit-checkin done">
                                                 <Check className="w-3.5 h-3.5 inline mr-1" />{t('habits.completed')}
+                                            </button>
+                                        )}
+                                        {habit.source === 'canal_curriculum' && habit.isCompleted && (
+                                            <button
+                                                type="button"
+                                                className="btn-habit btn-habit-focus"
+                                                onClick={() => void triggerAssessmentAfterCheckIn({
+                                                    id: habit.id,
+                                                    name: habit.name,
+                                                    assessmentEnabled: true,
+                                                    assessmentDifficulty: habit.assessmentDifficulty || 'medium',
+                                                    groupId: habit.groupId,
+                                                    source: habit.source,
+                                                })}
+                                            >
+                                                {t('habits.retakeCurriculumQuiz')}
                                             </button>
                                         )}
                                         <button type="button" className="btn-habit btn-habit-ghost" onClick={() => setEditingHabit(habit)}>

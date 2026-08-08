@@ -18,6 +18,7 @@ public class UserController : ControllerBase
     private readonly IConfiguration _configuration;
     private readonly AchievementService _achievements;
     private readonly EmailService _email;
+    private readonly CanalTrustService _trust;
     private readonly IHostEnvironment _env;
     private readonly ILogger<UserController> _logger;
 
@@ -26,6 +27,7 @@ public class UserController : ControllerBase
         IConfiguration configuration,
         AchievementService achievements,
         EmailService email,
+        CanalTrustService trust,
         IHostEnvironment env,
         ILogger<UserController> logger)
     {
@@ -33,6 +35,7 @@ public class UserController : ControllerBase
         _configuration = configuration;
         _achievements = achievements;
         _email = email;
+        _trust = trust;
         _env = env;
         _logger = logger;
     }
@@ -253,6 +256,7 @@ public class UserController : ControllerBase
             return NotFound("用户不存在");
 
         var affection = CompanionAffectionService.Snapshot(user);
+        var trust = _trust.SnapshotConfigured(user);
         await _context.SaveChangesAsync();
         return Ok(new
         {
@@ -272,6 +276,15 @@ public class UserController : ControllerBase
             companionAffectionGainedToday = affection.GainedToday,
             companionAffectionDailyCap = affection.DailyCap,
             companionAffectionToNext = affection.ToNextTier,
+            trustLevel = trust.Level,
+            trustPoints = trust.Points,
+            trustStageKey = trust.StageKey,
+            trustAddressKey = trust.AddressKey,
+            trustInjectedCount = trust.InjectedCount,
+            trustCompletedCount = trust.CompletedCount,
+            trustLessonsToStage2 = trust.LessonsToStage2,
+            trustLoreKeys = trust.LoreKeys,
+            canalEvaluation = user.CanalEvaluation,
             achievements = await _achievements.GetAchievementStatusAsync(userId)
         });
     }

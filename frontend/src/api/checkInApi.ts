@@ -25,6 +25,15 @@ export interface CheckInResult {
     affectionTierKey?: string
     affectionGainedToday?: number
     affectionDailyCap?: number
+    trustLevel?: number
+    trustPoints?: number
+    trustStageKey?: string
+    trustAddressKey?: string
+    trustPromotedToObserve?: boolean
+    trustCurriculumAwarded?: number
+    trustLeveledUp?: boolean
+    trustCompletedCount?: number
+    trustLessonsToStage2?: number
 }
 
 export async function createCheckIn(payload: CheckInPayload): Promise<CheckInResult> {
@@ -54,6 +63,15 @@ export async function createCheckIn(payload: CheckInPayload): Promise<CheckInRes
         affectionTierKey: data.affectionTierKey ?? data.AffectionTierKey,
         affectionGainedToday: data.affectionGainedToday ?? data.AffectionGainedToday,
         affectionDailyCap: data.affectionDailyCap ?? data.AffectionDailyCap,
+        trustLevel: data.trustLevel ?? data.TrustLevel,
+        trustPoints: data.trustPoints ?? data.TrustPoints,
+        trustStageKey: data.trustStageKey ?? data.TrustStageKey,
+        trustAddressKey: data.trustAddressKey ?? data.TrustAddressKey,
+        trustPromotedToObserve: data.trustPromotedToObserve ?? data.TrustPromotedToObserve,
+        trustCurriculumAwarded: data.trustCurriculumAwarded ?? data.TrustCurriculumAwarded,
+        trustLeveledUp: data.trustLeveledUp ?? data.TrustLeveledUp,
+        trustCompletedCount: data.trustCompletedCount ?? data.TrustCompletedCount,
+        trustLessonsToStage2: data.trustLessonsToStage2 ?? data.TrustLessonsToStage2,
     }
     if (result.affectionPoints != null) {
         const { useAffectionStore } = await import('../stores/affectionStore')
@@ -63,6 +81,17 @@ export async function createCheckIn(payload: CheckInPayload): Promise<CheckInRes
             tierKey: result.affectionTierKey,
             gainedToday: result.affectionGainedToday,
             dailyCap: result.affectionDailyCap,
+        })
+    }
+    if (result.trustLevel != null || result.trustPoints != null) {
+        const { useTrustStore } = await import('../stores/trustStore')
+        useTrustStore.getState().applySnapshot({
+            level: result.trustLevel,
+            points: result.trustPoints,
+            stageKey: result.trustStageKey,
+            addressKey: result.trustAddressKey,
+            completedCount: result.trustCompletedCount,
+            lessonsToStage2: result.trustLessonsToStage2,
         })
     }
     return result

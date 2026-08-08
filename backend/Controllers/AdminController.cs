@@ -62,19 +62,38 @@ public class AdminController : ControllerBase
             .Select(g => new { UserId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.UserId, x => x.Count);
 
-        var result = users.Select(u => new
+        var result = users.Select(u =>
         {
-            u.Id,
-            u.Username,
-            u.Email,
-            u.TotalXP,
-            u.Level,
-            u.Role,
-            u.CreatedAt,
-            u.BannedUntil,
-            isBanned = u.IsBanned,
-            habitCount = habitCounts.GetValueOrDefault(u.Id),
-            badgeCount = badgeCounts.GetValueOrDefault(u.Id)
+            var aff = CompanionAffectionService.Snapshot(u);
+            var state = CanalTrustService.ParseState(u.CurriculumStateJson);
+            var level = CanalTrustService.CurriculumStage(u);
+            return new
+            {
+                u.Id,
+                u.Username,
+                u.Email,
+                u.TotalXP,
+                u.Level,
+                u.Role,
+                u.CreatedAt,
+                u.BannedUntil,
+                isBanned = u.IsBanned,
+                habitCount = habitCounts.GetValueOrDefault(u.Id),
+                badgeCount = badgeCounts.GetValueOrDefault(u.Id),
+                companionAffection = aff.Points,
+                companionAffectionMax = aff.MaxPoints,
+                affectionTierKey = aff.TierKey,
+                affectionTier = aff.Tier,
+                trustStageKey = CanalTrustService.StageKey(level),
+                trustLevel = level,
+                curriculumCompleted = state.Completed.Count,
+                canalEvaluation = string.IsNullOrWhiteSpace(u.CanalEvaluation)
+                    ? CanalTrustService.BuildEvaluation(
+                        true, u.Username, aff.Points, aff.TierKey, level,
+                        state.Completed.Count, habitCounts.GetValueOrDefault(u.Id),
+                        0, u.Level, u.TotalXP, u.IsBanned)
+                    : u.CanalEvaluation
+            };
         });
 
         return Ok(result);
@@ -87,6 +106,33 @@ public class AdminController : ControllerBase
         if (user == null) return NotFound("用户不存在");
 
         var achievements = await _achievements.GetAchievementStatusAsync(id);
+        var aff = CompanionAffectionService.Snapshot(user);
+        var state = CanalTrustService.ParseState(user.CurriculumStateJson);
+        var level = CanalTrustService.CurriculumStage(user);
+        var checkIns = await _context.CheckIns.CountAsync(c => c.UserId == id);
+        var habits = await _context.Habits.CountAsync(h => h.UserId == id && h.IsActive);
+        var evaluation = string.IsNullOrWhiteSpace(user.CanalEvaluation)
+            ? CanalTrustService.BuildEvaluation(
+                true, user.Username, aff.Points, aff.TierKey, level,
+                state.Completed.Count, habits, checkIns, user.Level, user.TotalXP, user.IsBanned)
+            : user.CanalEvaluation;
+
+        var canalBlock = new
+        {
+            companionAffection = aff.Points,
+            companionAffectionMax = aff.MaxPoints,
+            affectionTierKey = aff.TierKey,
+            affectionTier = aff.Tier,
+            trustLevel = level,
+            trustStageKey = CanalTrustService.StageKey(level),
+            trustAddressKey = CanalTrustService.AddressKey(level),
+            currentEchelon = level >= 1 ? CanalTrustService.EchelonForStage(level) : "none",
+            curriculumCompleted = state.Completed.Count,
+            curriculumInjected = state.Injected.Count,
+            canalEvaluation = evaluation,
+            checkInCount = checkIns,
+            activeHabitCount = habits
+        };
 
         if (CallerIsSuperAdmin)
         {
@@ -108,7 +154,11 @@ public class AdminController : ControllerBase
                 hasPendingReset = !string.IsNullOrEmpty(user.PasswordResetTokenHash)
                     && user.PasswordResetExpiresAt > DateTime.UtcNow,
                 achievements,
-                viewerIsSuperAdmin = true
+                viewerIsSuperAdmin = true,
+                canal = canalBlock,
+                companionAffection = canalBlock.companionAffection,
+                affectionTierKey = canalBlock.affectionTierKey,
+                canalEvaluation = canalBlock.canalEvaluation
             });
         }
 
@@ -125,7 +175,11 @@ public class AdminController : ControllerBase
             user.BannedUntil,
             isBanned = user.IsBanned,
             achievements,
-            viewerIsSuperAdmin = false
+            viewerIsSuperAdmin = false,
+            canal = canalBlock,
+            companionAffection = canalBlock.companionAffection,
+            affectionTierKey = canalBlock.affectionTierKey,
+            canalEvaluation = canalBlock.canalEvaluation
         });
     }
 

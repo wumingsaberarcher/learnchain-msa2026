@@ -14,11 +14,13 @@ public class HabitController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly AchievementService _achievements;
+    private readonly CanalTrustService _trust;
 
-    public HabitController(AppDbContext context, AchievementService achievements)
+    public HabitController(AppDbContext context, AchievementService achievements, CanalTrustService trust)
     {
         _context = context;
         _achievements = achievements;
+        _trust = trust;
     }
 
     private int GetCurrentUserId()
@@ -223,10 +225,26 @@ public class HabitController : ControllerBase
         }
 
         if (request.AssessmentEnabled.HasValue)
-            existingHabit.AssessmentEnabled = request.AssessmentEnabled.Value;
+        {
+            if (string.Equals(existingHabit.Source, CanalTrustService.CurriculumSource, StringComparison.OrdinalIgnoreCase))
+            {
+                // Canal curriculum: assessment is mandatory and cannot be turned off.
+                existingHabit.AssessmentEnabled = true;
+                if (request.AssessmentEnabled == false)
+                    return BadRequest("Canal 课程习惯强制考核，无法关闭");
+            }
+            else
+            {
+                existingHabit.AssessmentEnabled = request.AssessmentEnabled.Value;
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(request.AssessmentDifficulty))
             existingHabit.AssessmentDifficulty = NormalizeAssessmentDifficulty(request.AssessmentDifficulty);
+
+        // Keep curriculum assessment always on even if client omitted the flag.
+        if (string.Equals(existingHabit.Source, CanalTrustService.CurriculumSource, StringComparison.OrdinalIgnoreCase))
+            existingHabit.AssessmentEnabled = true;
 
         if (request.SetGroupId == true)
         {
@@ -267,6 +285,10 @@ public class HabitController : ControllerBase
             return NotFound("习惯不存在或无权限");
 
         habit.IsActive = false;
+        var user = await _context.Users.FindAsync(currentUserId);
+        if (user != null && await _trust.ReleaseIncompleteInjectAsync(user, habit))
+            return NoContent();
+
         await _context.SaveChangesAsync();
         return NoContent();
     }

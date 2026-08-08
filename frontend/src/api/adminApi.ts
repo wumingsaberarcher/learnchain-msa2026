@@ -24,6 +24,13 @@ export interface AdminUserSummary {
     isBanned: boolean
     habitCount: number
     badgeCount: number
+    companionAffection?: number
+    companionAffectionMax?: number
+    affectionTierKey?: string
+    affectionTier?: number
+    trustStageKey?: string
+    curriculumCompleted?: number
+    canalEvaluation?: string
 }
 
 export interface AdminUserDetail extends Omit<AdminUserSummary, 'habitCount' | 'badgeCount'> {
@@ -35,6 +42,19 @@ export interface AdminUserDetail extends Omit<AdminUserSummary, 'habitCount' | '
     passwordAvailable?: boolean
     hasPendingReset?: boolean
     viewerIsSuperAdmin?: boolean
+    canal?: {
+        companionAffection: number
+        companionAffectionMax: number
+        affectionTierKey: string
+        affectionTier: number
+        trustStageKey: string
+        trustAddressKey: string
+        curriculumCompleted: number
+        curriculumInjected: number
+        canalEvaluation: string
+        checkInCount: number
+        activeHabitCount: number
+    }
 }
 
 async function readError(res: Response) {

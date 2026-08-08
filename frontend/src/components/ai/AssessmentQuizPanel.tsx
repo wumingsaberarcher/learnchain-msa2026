@@ -108,6 +108,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
     difficulty,
     phase,
     materials,
+    curriculumSyllabus,
     questions,
     currentIndex,
     answers,
@@ -299,7 +300,7 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
       setError(t('chat.missingApiKey'))
       return
     }
-    if (selectedUsable.length === 0) {
+    if (selectedUsable.length === 0 && !curriculumSyllabus) {
       setError(t('assess.needSelectMaterial'))
       return
     }
@@ -309,6 +310,8 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
     try {
       const materialIds = selectedUsable.filter((m) => m.source !== 'group').map((m) => m.id)
       const groupMaterialIds = selectedUsable.filter((m) => m.source === 'group').map((m) => m.id)
+      // Curriculum + no selection → syllabus only (do not auto-include every uploaded file).
+      const syllabusOnly = curriculumSyllabus && selectedUsable.length === 0
       const data = await generateAssessment({
         habitId: habitId ?? 0,
         groupId: groupId ?? undefined,
@@ -318,8 +321,8 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
         baseUrl,
         model,
         language,
-        materialIds: materialIds.length ? materialIds : undefined,
-        groupMaterialIds: groupMaterialIds.length ? groupMaterialIds : undefined,
+        materialIds: syllabusOnly ? [] : materialIds.length ? materialIds : undefined,
+        groupMaterialIds: syllabusOnly ? [] : groupMaterialIds.length ? groupMaterialIds : undefined,
       })
       const normalized = data.questions.map((q) =>
         isShortQuestion(q) ? { ...q, type: 'short' } : { ...q, type: 'mcq' },
@@ -395,6 +398,19 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
           dailyCap: result.affection.dailyCap,
         })
       }
+      if (!practice && (result.trustLevel != null || result.trustPoints != null || result.curriculum)) {
+        void import('../../stores/trustStore').then(({ useTrustStore }) => {
+          useTrustStore.getState().applySnapshot({
+            level: result.trustLevel,
+            points: result.trustPoints,
+            stageKey: result.trustStageKey,
+            addressKey: result.trustAddressKey,
+            completedCount: result.trustCompletedCount,
+            lessonsToStage2: result.trustLessonsToStage2,
+            evaluation: result.canalEvaluation,
+          })
+        })
+      }
       useChatStore.getState().appendLocalExchange(
         t('assess.historyUser', { name: habitName }),
         `${result.critique}\n${result.summary}`,
@@ -461,7 +477,15 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
       <div className="assess-body">
         <aside className="assess-sidebar">
           <div className="assess-sidebar-title">{t('assess.materials')}</div>
-          <p className="assess-select-hint">{t('assess.selectHint')}</p>
+          <p className="assess-select-hint">
+            {curriculumSyllabus ? t('assess.selectHintCurriculum') : t('assess.selectHint')}
+          </p>
+          {curriculumSyllabus && (
+            <div className="assess-syllabus-chip" role="status">
+              <Sparkles className="w-3.5 h-3.5" />
+              {t('assess.curriculumSyllabusOn')}
+            </div>
+          )}
           <input
             ref={fileRef}
             type="file"
@@ -497,7 +521,11 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
             </div>
           )}
           <ul className="assess-file-list">
-            {materials.length === 0 && <li className="assess-empty">{t('assess.noMaterials')}</li>}
+            {materials.length === 0 && (
+              <li className="assess-empty">
+                {curriculumSyllabus ? t('assess.noMaterialsCurriculum') : t('assess.noMaterials')}
+              </li>
+            )}
             {materials.map((m) => {
               const kind = fileKind(m.fileName)
               const selected = selectedKeys.includes(materialKey(m))
@@ -553,15 +581,19 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
             <div className="assess-ready">
               <p>
                 {usableMaterials.length === 0
-                  ? t('assess.needMaterial')
+                  ? (curriculumSyllabus ? t('assess.needMaterialCurriculum') : t('assess.needMaterial'))
                   : selectedUsable.length === 0
-                    ? t('assess.needSelectMaterial')
-                    : t('assess.readyHintSelected', { n: selectedUsable.length })}
+                    ? (curriculumSyllabus
+                      ? t('assess.readyHintCurriculumOnly')
+                      : t('assess.needSelectMaterial'))
+                    : curriculumSyllabus
+                      ? t('assess.readyHintCurriculumPlus', { n: selectedUsable.length })
+                      : t('assess.readyHintSelected', { n: selectedUsable.length })}
               </p>
               <button
                 type="button"
                 className="assess-primary"
-                disabled={busy || selectedUsable.length === 0}
+                disabled={busy || (selectedUsable.length === 0 && !curriculumSyllabus)}
                 onClick={() => void startGenerate()}
               >
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null}

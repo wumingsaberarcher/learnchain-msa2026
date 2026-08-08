@@ -13,6 +13,7 @@ public class AssessmentService
     private readonly AppDbContext _db;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly CompanionAffectionService _affection;
+    private readonly CanalTrustService _trust;
     private readonly ILogger<AssessmentService> _logger;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -24,11 +25,13 @@ public class AssessmentService
         AppDbContext db,
         IHttpClientFactory httpClientFactory,
         CompanionAffectionService affection,
+        CanalTrustService trust,
         ILogger<AssessmentService> logger)
     {
         _db = db;
         _httpClientFactory = httpClientFactory;
         _affection = affection;
+        _trust = trust;
         _logger = logger;
     }
 
@@ -74,14 +77,17 @@ public class AssessmentService
             ?? throw new InvalidOperationException("Habit not found.");
 
         var chunks = new List<string>();
+        var zh = (request.Language ?? "zh").StartsWith("zh", StringComparison.OrdinalIgnoreCase);
+        var isCanalCurriculum = string.Equals(
+            habit.Source, CanalTrustService.CurriculumSource, StringComparison.OrdinalIgnoreCase);
 
         var habitQuery = _db.HabitMaterials
             .Where(m => m.HabitId == request.HabitId && m.UserId == userId && m.ExtractedText != "");
-        if (request.MaterialIds is { Count: > 0 })
+        if (request.MaterialIds != null)
         {
+            // Explicit list (possibly empty) = only those ids; null = all habit materials.
             var idSet = request.MaterialIds.Where(id => id > 0).Distinct().ToList();
-            if (idSet.Count > 0)
-                habitQuery = habitQuery.Where(m => idSet.Contains(m.Id));
+            habitQuery = habitQuery.Where(m => idSet.Contains(m.Id));
         }
         var habitMats = await habitQuery.OrderByDescending(m => m.CreatedAt).ToListAsync(ct);
         chunks.AddRange(habitMats.Select(m => $"[{m.FileName}]\n{m.ExtractedText}"));
@@ -92,27 +98,38 @@ public class AssessmentService
             var groupQuery = _db.HabitGroupMaterials
                 .Where(m => m.GroupId == gid && m.UserId == userId && m.ExtractedText != "");
 
-            if (request.GroupMaterialIds is { Count: > 0 })
+            if (request.GroupMaterialIds != null)
             {
                 var ids = request.GroupMaterialIds.Where(id => id > 0).Distinct().ToList();
                 groupQuery = groupQuery.Where(m => ids.Contains(m.Id));
                 var groupMats = await groupQuery.OrderByDescending(m => m.CreatedAt).ToListAsync(ct);
                 chunks.AddRange(groupMats.Select(m => $"[group:{m.FileName}]\n{m.ExtractedText}"));
             }
-            else if (request.MaterialIds == null || request.MaterialIds.Count == 0)
+            else if (request.MaterialIds == null)
             {
-                // No selection → include all group materials with habit materials
+                // No habit/group selection → include all group materials with habit materials
                 var groupMats = await groupQuery.OrderByDescending(m => m.CreatedAt).ToListAsync(ct);
                 chunks.AddRange(groupMats.Select(m => $"[group:{m.FileName}]\n{m.ExtractedText}"));
             }
-            // else: only habit MaterialIds selected → do not auto-add group mats
+            // else: MaterialIds explicitly set (incl. empty) without GroupMaterialIds → no auto group mats
+        }
+
+        // Canal curriculum: always include syllabus so quizzes work without uploads;
+        // uploaded files enrich rather than replace the lesson criteria.
+        if (isCanalCurriculum)
+        {
+            var syllabus = _trust.BuildLessonStudyText(habit.CurriculumLessonId, zh, habit);
+            if (!string.IsNullOrWhiteSpace(syllabus))
+                chunks.Insert(0, syllabus);
         }
 
         if (chunks.Count == 0)
             throw new InvalidOperationException(
                 request.MaterialIds is { Count: > 0 } || request.GroupMaterialIds is { Count: > 0 }
                     ? "No usable text in the selected materials. Select files with extractable text."
-                    : "No usable study materials. Upload at least one file with extractable text.");
+                    : isCanalCurriculum
+                        ? "Canal lesson syllabus unavailable for this habit."
+                        : "No usable study materials. Upload at least one file with extractable text.");
 
         var combined = string.Join("\n\n---\n\n", chunks);
         if (combined.Length > 28_000)
@@ -267,19 +284,44 @@ public class AssessmentService
         string? affectionTierKey = null;
         var points = user.CompanionAffection;
         var gainedToday = user.CompanionAffectionGainedToday;
+        CurriculumCompleteResult? curriculum = null;
+        var isCanalCurriculum = string.Equals(
+            habit?.Source, CanalTrustService.CurriculumSource, StringComparison.OrdinalIgnoreCase);
 
         if (!request.Practice && !passed)
         {
-            var penalty = CompanionAffectionService.AssessmentFailPenalty(difficulty);
-            var award = await _affection.PenaltyAsync(user, penalty, ct);
-            affectionDelta = award.Awarded;
-            points = award.Points;
-            gainedToday = award.GainedToday;
-            affectionTierKey = award.TierKey;
+            if (isCanalCurriculum)
+            {
+                // Canal curriculum: forced assessment, but failure never reduces affection.
+                // Lesson credit / stage-up wait for a later pass.
+                points = user.CompanionAffection;
+                gainedToday = user.CompanionAffectionGainedToday;
+                var (_, tierKey, _) = CompanionAffectionService.ResolveTier(points);
+                affectionTierKey = tierKey;
+                affectionDelta = 0;
+            }
+            else
+            {
+                var penalty = CompanionAffectionService.AssessmentFailPenalty(difficulty);
+                var award = await _affection.PenaltyAsync(user, penalty, ct);
+                affectionDelta = award.Awarded;
+                points = award.Points;
+                gainedToday = award.GainedToday;
+                affectionTierKey = award.TierKey;
+            }
+        }
+        else if (!request.Practice && passed && isCanalCurriculum && habit != null)
+        {
+            curriculum = await _trust.OnCurriculumHabitCompletedAsync(user, habit, ct);
+            affectionDelta = curriculum.AwardedPoints;
+            points = user.CompanionAffection;
+            gainedToday = user.CompanionAffectionGainedToday;
+            var (_, tierKey, _) = CompanionAffectionService.ResolveTier(points);
+            affectionTierKey = tierKey;
         }
         else
         {
-            // Practice mode or pass: refresh snapshot without changing affection.
+            // Practice mode or non-curriculum pass: refresh snapshot without changing affection.
             points = user.CompanionAffection;
             gainedToday = user.CompanionAffectionGainedToday;
             var (_, tierKey, _) = CompanionAffectionService.ResolveTier(points);
@@ -290,25 +332,49 @@ public class AssessmentService
             ? (request.Practice
                 ? (passed ? $"练习完成！正确 {correctCount}/{total}。" : $"练习结束（{correctCount}/{total}）。不影响好感度。")
                 : (passed
-                    ? $"考核通过！正确 {correctCount}/{total}。"
-                    : $"考核未达标（{correctCount}/{total}）。好感度 {affectionDelta}。"))
+                    ? (isCanalCurriculum
+                        ? $"考核通过！正确 {correctCount}/{total}。课程进度已计入" +
+                          (curriculum is { AwardedPoints: > 0 } ? $"，好感 +{curriculum.AwardedPoints}" : "") + "。"
+                        : $"考核通过！正确 {correctCount}/{total}。")
+                    : (isCanalCurriculum
+                        ? $"Canal 课程考核未达标（{correctCount}/{total}）。打卡 XP 仍有效；课程进度需通过后才计入，好感不扣。"
+                        : $"考核未达标（{correctCount}/{total}）。好感度 {affectionDelta}。")))
             : (request.Practice
                 ? (passed ? $"Practice done! {correctCount}/{total} correct." : $"Practice finished ({correctCount}/{total}). No affection change.")
                 : (passed
-                    ? $"Passed! {correctCount}/{total} correct."
-                    : $"Did not pass ({correctCount}/{total}). Affection {affectionDelta}."));
+                    ? (isCanalCurriculum
+                        ? $"Passed! {correctCount}/{total} correct. Curriculum progress credited" +
+                          (curriculum is { AwardedPoints: > 0 } ? $", affection +{curriculum.AwardedPoints}" : "") + "."
+                        : $"Passed! {correctCount}/{total} correct.")
+                    : (isCanalCurriculum
+                        ? $"Canal lesson quiz missed ({correctCount}/{total}). Check-in XP kept; curriculum credit needs a pass; no affection loss."
+                        : $"Did not pass ({correctCount}/{total}). Affection {affectionDelta}.")));
 
         var critique = zh
             ? (request.Practice
                 ? (passed ? "练习得不错，继续保持。" : "练习就是为了找漏洞——我们再对着资料过一遍。")
                 : (passed
-                    ? "不错嘛，看来资料你有认真看过。继续保持。"
-                    : "嗯……这次不太行。打卡已经记下了，但好感度扣了。来，我把错的地方讲一遍。"))
+                    ? (isCanalCurriculum
+                        ? (curriculum is { LeveledUp: true }
+                            ? "考核过了。这批课够了——阶段推进。继续保持。"
+                            : "考核过了。课程进度已记，继续保持。")
+                        : "不错嘛，看来资料你有认真看过。继续保持。")
+                    : (isCanalCurriculum
+                        ? "观察期记录已记下。考核没过不扣好感，也不计课程完成——把错的地方过一遍再考。"
+                        : "嗯……这次不太行。打卡已经记下了，但好感度扣了。来，我把错的地方讲一遍。")))
             : (request.Practice
                 ? (passed ? "Solid practice—keep going." : "Practice is for finding gaps. Let’s review the materials.")
                 : (passed
-                    ? "Not bad—you actually read the materials. Keep it up."
-                    : "Hmm… that wasn’t great. Check-in still counts, but affection dropped. Let’s review the misses."));
+                    ? (isCanalCurriculum
+                        ? (curriculum is { LeveledUp: true }
+                            ? "Passed. Enough lessons in this echelon—stage advanced. Keep it up."
+                            : "Passed. Curriculum progress logged. Keep it up.")
+                        : "Not bad—you actually read the materials. Keep it up.")
+                    : (isCanalCurriculum
+                        ? "Observation logged. Missed quiz doesn’t cost affection or curriculum credit—review and try again."
+                        : "Hmm… that wasn’t great. Check-in still counts, but affection dropped. Let’s review the misses.")));
+
+        var trustSnap = _trust.SnapshotConfigured(user);
 
         return new
         {
@@ -328,7 +394,23 @@ public class AssessmentService
                 tierKey = affectionTierKey,
                 gainedToday,
                 dailyCap = CompanionAffectionService.DailyCap
-            }
+            },
+            curriculum = curriculum == null ? null : new
+            {
+                ok = curriculum.Ok,
+                awardedPoints = curriculum.AwardedPoints,
+                leveledUp = curriculum.LeveledUp,
+                lessonId = curriculum.LessonId,
+            },
+            trustLevel = trustSnap.Level,
+            trustPoints = trustSnap.Points,
+            trustStageKey = trustSnap.StageKey,
+            trustAddressKey = trustSnap.AddressKey,
+            trustCurriculumAwarded = curriculum?.AwardedPoints ?? 0,
+            trustLeveledUp = curriculum?.LeveledUp ?? false,
+            trustCompletedCount = trustSnap.CompletedCount,
+            trustLessonsToStage2 = trustSnap.LessonsNeededToAdvance,
+            canalEvaluation = user.CanalEvaluation,
         };
     }
 

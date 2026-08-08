@@ -1,0 +1,74 @@
+[
+  {
+    "lessonId": "plt-movement-01",
+    "echelon": "platoon",
+    "topic": "platoon_tactics",
+    "titleZh": "排级运动：行进 / 监视行进 / 交替跃进",
+    "titleEn": "Platoon movement: travel / traveling overwatch / bounding",
+    "criteriaZh": [
+      "用三句分别说明三种运动技术的适用条件。",
+      "指出「威胁升高」时应从哪一种切到哪一种。"
+    ],
+    "criteriaEn": [
+      "Three sentences: when to use travel, traveling overwatch, bounding overwatch.",
+      "Name the switch when threat rises."
+    ],
+    "documentId": "doc:atp-3-21.71-2024#plt-movement",
+    "trustPointsOnPass": 14,
+    "minTrustToInject": 3
+  },
+  {
+    "lessonId": "plt-mech-march-01",
+    "echelon": "platoon",
+    "topic": "march_movement",
+    "titleZh": "机械化行军：车际距离、警戒、隘路",
+    "titleEn": "Mechanized march: spacing, security, defiles",
+    "criteriaZh": [
+      "写车际距离的目的一句 + 隘路通过时的警戒要点两句。",
+      "禁止写成表演性冲锋描述。"
+    ],
+    "criteriaEn": [
+      "One sentence on vehicle spacing purpose; two on security through a defile.",
+      "No cinematic charge language."
+    ],
+    "documentId": "doc:attp-3-21.71-bradley#march",
+    "trustPointsOnPass": 14,
+    "minTrustToInject": 3
+  },
+  {
+    "lessonId": "plt-strongpoint-01",
+    "echelon": "platoon",
+    "topic": "defense_positions",
+    "titleZh": "排支撑点：正面、纵深、交叉火力",
+    "titleEn": "Platoon strongpoint: frontage, depth, interlocking fires",
+    "criteriaZh": [
+      "用三句对应正面宽度、纵深配置、交叉火力意图。",
+      "说明预备班放在哪一类位置更合理（一句）。"
+    ],
+    "criteriaEn": [
+      "Three sentences: frontage, depth, interlocking fires.",
+      "One sentence where a reserve squad sits."
+    ],
+    "documentId": "doc:fm-3-21.8#plt-defense",
+    "trustPointsOnPass": 14,
+    "minTrustToInject": 3
+  },
+  {
+    "lessonId": "plt-opord-brief-01",
+    "echelon": "platoon",
+    "topic": "platoon_tactics",
+    "titleZh": "简令：任务—意图—重点—时间",
+    "titleEn": "Brief order: mission–intent–key tasks–time",
+    "criteriaZh": [
+      "按「任务 / 意图 / 重点 / 时间」四格各写一句（总计≤80 字）。",
+      "不得省略时间约束。"
+    ],
+    "criteriaEn": [
+      "Four lines: mission / intent / key tasks / time (≤80 words total).",
+      "Time constraint required."
+    ],
+    "documentId": "doc:atp-3-21.71-2024#opord",
+    "trustPointsOnPass": 14,
+    "minTrustToInject": 3
+  }
+]

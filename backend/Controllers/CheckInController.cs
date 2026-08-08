@@ -28,12 +28,18 @@ public class CheckInController : ControllerBase
     private readonly AppDbContext _context;
     private readonly AchievementService _achievements;
     private readonly CompanionAffectionService _affection;
+    private readonly CanalTrustService _trust;
 
-    public CheckInController(AppDbContext context, AchievementService achievements, CompanionAffectionService affection)
+    public CheckInController(
+        AppDbContext context,
+        AchievementService achievements,
+        CompanionAffectionService affection,
+        CanalTrustService trust)
     {
         _context = context;
         _achievements = achievements;
         _affection = affection;
+        _trust = trust;
     }
 
     private int GetCurrentUserId()
@@ -213,10 +219,21 @@ public class CheckInController : ControllerBase
         await _context.SaveChangesAsync();
 
         AffectionAwardResult? affection = null;
+        bool trustPromoted = false;
         if (user != null)
+        {
             affection = await _affection.AwardCheckInAsync(user, request.FromFocusMode);
+            trustPromoted = await _trust.TryPromoteToObserveAsync(user, habit);
+            // Canal curriculum progress / bonus / stage-up only after a passed non-practice assessment.
+            if (!trustPromoted)
+                await _trust.RefreshEvaluationAsync(user);
+        }
 
         var newlyUnlocked = await _achievements.EvaluateAndUnlockAsync(currentUserId);
+        var trustSnap = user != null ? _trust.SnapshotConfigured(user) : null;
+        var affFinal = user != null ? CompanionAffectionService.Snapshot(user) : null;
+        if (user != null)
+            await _context.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetCheckIns), new { habitId = checkIn.HabitId }, new
         {
@@ -231,10 +248,20 @@ public class CheckInController : ControllerBase
             checkIn.MilestoneId,
             newlyUnlocked,
             affectionAwarded = affection?.Awarded ?? 0,
-            affectionPoints = affection?.Points ?? user?.CompanionAffection ?? 0,
-            affectionTierKey = affection?.TierKey,
-            affectionGainedToday = affection?.GainedToday,
-            affectionDailyCap = affection?.DailyCap,
+            affectionPoints = affFinal?.Points ?? user?.CompanionAffection ?? 0,
+            affectionTierKey = affFinal?.TierKey ?? affection?.TierKey,
+            affectionGainedToday = affFinal?.GainedToday ?? affection?.GainedToday,
+            affectionDailyCap = affFinal?.DailyCap ?? affection?.DailyCap,
+            trustLevel = trustSnap?.Level ?? 0,
+            trustPoints = trustSnap?.Points ?? user?.CompanionAffection ?? 0,
+            trustStageKey = trustSnap?.StageKey,
+            trustAddressKey = trustSnap?.AddressKey,
+            trustPromotedToObserve = trustPromoted,
+            trustCurriculumAwarded = 0,
+            trustLeveledUp = false,
+            trustCompletedCount = trustSnap?.CompletedCount,
+            trustLessonsToStage2 = trustSnap?.LessonsNeededToAdvance ?? trustSnap?.LessonsToStage2,
+            canalEvaluation = user?.CanalEvaluation,
         });
     }
 }

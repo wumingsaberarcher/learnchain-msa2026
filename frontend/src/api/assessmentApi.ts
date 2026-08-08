@@ -70,6 +70,21 @@ export interface AssessmentGradeResult {
     gainedToday?: number
     dailyCap?: number
   }
+  curriculum?: {
+    ok?: boolean
+    awardedPoints?: number
+    leveledUp?: boolean
+    lessonId?: string
+  } | null
+  trustLevel?: number
+  trustPoints?: number
+  trustStageKey?: string
+  trustAddressKey?: string
+  trustCurriculumAwarded?: number
+  trustLeveledUp?: boolean
+  trustCompletedCount?: number
+  trustLessonsToStage2?: number
+  canalEvaluation?: string
 }
 
 function parseErrorBody(text: string): string {

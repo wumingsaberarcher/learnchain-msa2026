@@ -34,6 +34,9 @@ export interface Habit {
     assessmentEnabled?: boolean
     assessmentDifficulty?: AssessmentDifficulty
     groupId?: number | null
+    /** null = normal; canal_curriculum = Canal teaching task */
+    source?: string | null
+    curriculumLessonId?: string | null
 }
 
 export interface HabitGroup {

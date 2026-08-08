@@ -1,0 +1,74 @@
+[
+  {
+    "lessonId": "sqd-roles-01",
+    "echelon": "squad",
+    "topic": "squad_tactics",
+    "titleZh": "班内机动 / 火力 / 警戒分工",
+    "titleEn": "Squad: maneuver / fire / security roles",
+    "criteriaZh": [
+      "用三个人名或角色，分别标出机动、火力、警戒职责（各一句）。",
+      "写清谁在移动时谁负责掩护观察。"
+    ],
+    "criteriaEn": [
+      "Assign three roles: maneuver, fire, security (one sentence each).",
+      "State who covers/observes while who moves."
+    ],
+    "documentId": "doc:fm-3-21.8#squad-roles",
+    "trustPointsOnPass": 12,
+    "minTrustToInject": 2
+  },
+  {
+    "lessonId": "sqd-bound-cover-01",
+    "echelon": "squad",
+    "topic": "squad_tactics",
+    "titleZh": "跃进与相互掩护",
+    "titleEn": "Bounding and mutual support",
+    "criteriaZh": [
+      "写一组「谁先跃进、谁掩护、跃进终点信号」的短流程（≤4 句）。",
+      "强调未收到掩护确认前不盲目跃进。"
+    ],
+    "criteriaEn": [
+      "Write a short bound: who moves, who covers, end-signal (≤4 sentences).",
+      "No blind bound without cover acknowledgment."
+    ],
+    "documentId": "doc:atp-3-21.71-2024#bounding",
+    "trustPointsOnPass": 12,
+    "minTrustToInject": 2
+  },
+  {
+    "lessonId": "sqd-formation-contact-01",
+    "echelon": "squad",
+    "topic": "squad_tactics",
+    "titleZh": "短距离队形与接触反应",
+    "titleEn": "Close formation and contact drill",
+    "criteriaZh": [
+      "选一种短距离队形（纵队/横队/楔形之一），写适用场景一句。",
+      "写接触后的第一反应两步（找掩护、报告）。"
+    ],
+    "criteriaEn": [
+      "Pick one close formation (file/line/wedge) and one sentence when it fits.",
+      "Two first reactions on contact: cover, then report."
+    ],
+    "documentId": "doc:fm-3-21.8#contact",
+    "trustPointsOnPass": 12,
+    "minTrustToInject": 2
+  },
+  {
+    "lessonId": "sqd-strongpoint-01",
+    "echelon": "squad",
+    "topic": "defense_positions",
+    "titleZh": "班级支撑点基本选择",
+    "titleEn": "Squad strongpoint basics",
+    "criteriaZh": [
+      "列出选支撑点的三个条件（视野、掩蔽、撤退线类比）。",
+      "用一句话说明为何「好看但无退路」不可取。"
+    ],
+    "criteriaEn": [
+      "Three criteria for a strongpoint (view, cover, withdrawal analogy).",
+      "One sentence why ‘pretty but no exit’ fails."
+    ],
+    "documentId": "doc:fm-3-21.8#strongpoint",
+    "trustPointsOnPass": 12,
+    "minTrustToInject": 2
+  }
+]

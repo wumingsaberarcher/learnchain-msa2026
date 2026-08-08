@@ -18,6 +18,7 @@ public class ChatController : ControllerBase
     private readonly HabitContextBuilder _habitContext;
     private readonly CompanionMemoryService _memory;
     private readonly CompanionAffectionService _affection;
+    private readonly CanalTrustService _trust;
     private readonly EmailService _email;
 
     public ChatController(
@@ -26,6 +27,7 @@ public class ChatController : ControllerBase
         HabitContextBuilder habitContext,
         CompanionMemoryService memory,
         CompanionAffectionService affection,
+        CanalTrustService trust,
         EmailService email)
     {
         _context = context;
@@ -33,6 +35,7 @@ public class ChatController : ControllerBase
         _habitContext = habitContext;
         _memory = memory;
         _affection = affection;
+        _trust = trust;
         _email = email;
     }
 
@@ -57,6 +60,8 @@ public class ChatController : ControllerBase
         {
             var result = await _assistant.ChatAsync(user, request, ct);
             var affection = await _affection.AwardChatAsync(user, ct);
+            await _trust.RefreshEvaluationAsync(user, request.Language?.StartsWith("zh", StringComparison.OrdinalIgnoreCase) ?? true, ct);
+            await _context.SaveChangesAsync(ct);
             result.AffectionAwarded = affection.Awarded;
             result.AffectionPoints = affection.Points;
             result.AffectionTierKey = affection.TierKey;
