@@ -99,6 +99,13 @@ try
     builder.Services.AddScoped<HabitGroupDescriptionService>();
     builder.Services.AddScoped<KnowledgeRetrievalService>();
     builder.Services.AddSingleton<EmailService>();
+    builder.Services.AddHttpClient("CanalFetch", client =>
+    {
+        client.Timeout = TimeSpan.FromSeconds(180);
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(
+            "Mozilla/5.0 (compatible; LearnChainCanalBot/1.0; +https://localhost; educational)");
+        client.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml,application/pdf,*/*");
+    });
     builder.Services.AddHttpClient("OpenAiCompatible", client =>
     {
         client.Timeout = TimeSpan.FromSeconds(120);
@@ -136,7 +143,22 @@ try
     {
         var kb = scope.ServiceProvider.GetRequiredService<CanalKnowledgeService>();
         await kb.EnsureSeededAsync();
-        Console.WriteLine("[LearnChain] Canal knowledge base seeded.");
+        var imported = await kb.ImportLocalDocsFolderAsync();
+        var fresh = imported.Count(r => r.Ok && r.Reason == "imported");
+        Console.WriteLine($"[LearnChain] Canal knowledge base seeded. Local doctrine imports: {fresh} new / {imported.Count} checked.");
+        try
+        {
+            var fetched = await kb.FetchRemoteCatalogPagesAsync();
+            var ok = fetched.Count(r => r.Ok && r.Reason is "fetched" or "already_imported");
+            var fail = fetched.Count(r => !r.Ok);
+            Console.WriteLine($"[LearnChain] CN remote fetch: {ok} ok / {fail} failed / {fetched.Count} attempted.");
+            foreach (var r in fetched.Where(x => !x.Ok))
+                Console.WriteLine($"  FAIL {r.DocId} {r.Reason} {r.Url}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[LearnChain] CN remote fetch skipped: {ex.Message}");
+        }
     }
 
     if (app.Environment.IsDevelopment())

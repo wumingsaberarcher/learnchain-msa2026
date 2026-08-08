@@ -8,7 +8,9 @@ namespace backend.Services;
 public class HabitMaterialTextExtractor
 {
     public const long MaxUploadBytes = 8 * 1024 * 1024;
-    public const int MaxExtractedChars = 40_000;
+    /// <summary>Canal doctrine imports may keep a longer excerpt for prompt/RAG recall.</summary>
+    public const int MaxExtractedChars = 80_000;
+    public const long MaxCanalImportBytes = 40 * 1024 * 1024;
 
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {

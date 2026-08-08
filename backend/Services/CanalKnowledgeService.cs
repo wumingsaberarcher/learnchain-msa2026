@@ -17,15 +17,18 @@ public class CanalKnowledgeService
 
     private readonly AppDbContext _db;
     private readonly CurriculumSourceCatalog _sources;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<CanalKnowledgeService> _logger;
 
     public CanalKnowledgeService(
         AppDbContext db,
         CurriculumSourceCatalog sources,
+        IHttpClientFactory httpClientFactory,
         ILogger<CanalKnowledgeService> logger)
     {
         _db = db;
         _sources = sources;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
 
@@ -34,7 +37,415 @@ public class CanalKnowledgeService
         await MigrateLegacyCategoriesAsync(ct);
         await SeedIdentityFromJsonAsync(ct);
         await SyncMilitaryCoreCatalogAsync(ct);
+        await SyncCnSourcesCatalogAsync(ct);
         await SyncSourceCatalogEntriesAsync(ct);
+    }
+
+    public sealed record RemoteFetchResult(
+        string DocId,
+        bool Ok,
+        string Reason,
+        string? Url = null,
+        int? Chars = null);
+
+    public sealed record LocalImportResult(string DocId, bool Ok, string Reason, string? Key = null, int? Chars = null, string? FileName = null, long? Size = null);
+
+    /// <summary>
+    /// Import files from App_Data/canal-pdfs named {DOC_ID}.pdf|.txt into military.core.{DOC_ID}.
+    /// Prefers .txt (OCR) when both exist.
+    /// </summary>
+    public async Task<IReadOnlyList<LocalImportResult>> ImportLocalDocsFolderAsync(CancellationToken ct = default)
+    {
+        var dirs = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "App_Data", "canal-pdfs"),
+            Path.Combine(Directory.GetCurrentDirectory(), "App_Data", "canal-pdfs"),
+            Path.Combine(Directory.GetCurrentDirectory(), "..", "App_Data", "canal-pdfs"),
+        };
+
+        string? dir = dirs.FirstOrDefault(Directory.Exists);
+        if (dir == null)
+        {
+            _logger.LogInformation("No App_Data/canal-pdfs folder — skip local doctrine import");
+            return Array.Empty<LocalImportResult>();
+        }
+
+        var results = new List<LocalImportResult>();
+        var files = Directory.GetFiles(dir)
+            .Where(f =>
+            {
+                var ext = Path.GetExtension(f).ToLowerInvariant();
+                return ext is ".txt" or ".pdf" or ".md";
+            })
+            .GroupBy(f => Path.GetFileNameWithoutExtension(f), StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+                g.OrderBy(f => Path.GetExtension(f).Equals(".txt", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                    .First())
+            .ToList();
+
+        var extractor = new HabitMaterialTextExtractor();
+        foreach (var path in files)
+        {
+            ct.ThrowIfCancellationRequested();
+            var docId = Path.GetFileNameWithoutExtension(path);
+            if (docId.EndsWith("b", StringComparison.OrdinalIgnoreCase) && docId.Contains("JP-301", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var key = $"military.core.{docId}";
+            var entry = await _db.CanalKnowledgeEntries.FirstOrDefaultAsync(e => e.EntryKey == key, ct);
+            if (entry == null)
+            {
+                results.Add(new LocalImportResult(docId, false, "entry_missing", Key: key));
+                continue;
+            }
+
+            // Skip if already has substantial extracted text
+            if (!string.IsNullOrWhiteSpace(entry.ExtractedText) && entry.ExtractedText.Length > 2000)
+            {
+                results.Add(new LocalImportResult(docId, true, "already_imported", Chars: entry.ExtractedText.Length));
+                continue;
+            }
+
+            var fi = new FileInfo(path);
+            if (fi.Length < 64)
+            {
+                results.Add(new LocalImportResult(docId, false, "file_too_small"));
+                continue;
+            }
+            if (fi.Length > HabitMaterialTextExtractor.MaxCanalImportBytes)
+            {
+                results.Add(new LocalImportResult(docId, false, "file_too_large", Size: fi.Length));
+                continue;
+            }
+
+            // Reject HTML masquerading as PDF (armypubs stubs)
+            if (Path.GetExtension(path).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                await using var probe = File.OpenRead(path);
+                var buf = new byte[5];
+                _ = await probe.ReadAsync(buf.AsMemory(0, 5), ct);
+                var head = System.Text.Encoding.ASCII.GetString(buf);
+                if (!head.StartsWith("%PDF", StringComparison.Ordinal))
+                {
+                    results.Add(new LocalImportResult(docId, false, "not_binary_pdf_html"));
+                    continue;
+                }
+            }
+
+            string extracted;
+            var fileName = Path.GetFileName(path);
+            await using (var stream = File.OpenRead(path))
+            {
+                extracted = await extractor.ExtractAsync(fileName, stream, ct);
+            }
+
+            if (string.IsNullOrWhiteSpace(extracted) || extracted.Length < 80)
+            {
+                results.Add(new LocalImportResult(docId, false, "extract_empty", FileName: fileName));
+                continue;
+            }
+
+            var destDir = Path.Combine(
+                Path.GetDirectoryName(dir) ?? dir,
+                "canal-knowledge",
+                entry.Id.ToString());
+            Directory.CreateDirectory(destDir);
+            var destPath = Path.Combine(destDir, fileName);
+            File.Copy(path, destPath, overwrite: true);
+
+            await AttachDocumentAsync(
+                entry.Id,
+                fileName,
+                extractor.DetectContentType(fileName),
+                fi.Length,
+                destPath,
+                extracted,
+                ct);
+
+            results.Add(new LocalImportResult(docId, true, "imported", Chars: extracted.Length, FileName: fileName));
+            _logger.LogInformation("Imported local doctrine {DocId} ({Chars} chars) into {Key}", docId, extracted.Length, key);
+        }
+
+        return results;
+    }
+
+    private async Task SyncCnSourcesCatalogAsync(CancellationToken ct)
+    {
+        var paths = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "Data", "curriculum", "cn_sources_catalog.json"),
+            Path.Combine(Directory.GetCurrentDirectory(), "Data", "curriculum", "cn_sources_catalog.json"),
+        };
+
+        MilitaryCoreFile? file = null;
+        foreach (var path in paths)
+        {
+            if (!File.Exists(path)) continue;
+            try
+            {
+                file = JsonSerializer.Deserialize<MilitaryCoreFile>(await File.ReadAllTextAsync(path, ct), JsonOpts);
+                if (file?.Documents is { Count: > 0 })
+                {
+                    _logger.LogInformation("Loaded CN sources catalog ({Count}) from {Path}", file.Documents.Count, path);
+                    break;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load cn_sources_catalog from {Path}", path);
+            }
+        }
+
+        if (file?.Documents is not { Count: > 0 }) return;
+
+        var sort = 500;
+        foreach (var portal in file.Portals ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(portal.Id)) continue;
+            await UpsertSourceRowAsync(
+                $"portal.core.{portal.Id}",
+                "military",
+                portal.Name ?? portal.Id,
+                portal.Name ?? portal.Id,
+                zhBody: $"【CN 检索入口】{portal.Name}\nURL：{portal.Url}\n访问：{portal.AccessNote}",
+                enBody: $"[CN portal] {portal.Name}\nURL: {portal.Url}\nAccess: {portal.AccessNote}",
+                minTrust: 1,
+                section: "CN-B",
+                sortOrder: sort++,
+                ct);
+        }
+
+        sort = 600;
+        foreach (var doc in file.Documents)
+        {
+            if (string.IsNullOrWhiteSpace(doc.Id)) continue;
+            var topics = string.Join(", ", doc.Topics ?? []);
+            var echelons = string.Join(", ", doc.Echelons ?? []);
+            var year = doc.Year?.ToString() ?? "n/a";
+            var origin = string.IsNullOrWhiteSpace(doc.OriginCountry) ? "CN" : doc.OriginCountry!;
+            var access = doc.AccessNote ?? "";
+            var disclaimer = access is "academic_secondary" or "historical" or "limited"
+                ? "引用时注明非大陆内部战斗条令原文；本条为公开/历史/外部研究材料。\n"
+                : "公开媒体或白皮书表述，禁止当作内部《战斗条令/教范》原文引用。\n";
+
+            var zhBody =
+                $"【中国文献增补 · {doc.Group}】来源向登记。\n" +
+                $"编号：{doc.Id} · origin={origin}\n年份：{year}\n链接：{doc.Url}\n" +
+                $"摘要：{doc.SummaryZh}\n" +
+                $"主题 topic：{topics}\n梯队 echelon：{echelons}\n访问 access：{access}\n" +
+                disclaimer +
+                "正文：优先抓取 official_media / white_paper 页面；学术/历史有全文则挂载，否则仅题录。";
+            var enBody =
+                $"[CN supplement · {doc.Group}] provenance registry.\n" +
+                $"Id: {doc.Id} · origin={origin}\nYear: {year}\nURL: {doc.Url}\n" +
+                $"Summary: {doc.SummaryEn}\n" +
+                $"Topics: {topics}\nEchelons: {echelons}\nAccess: {access}\n" +
+                "Open media / white paper / secondary / historical only — not internal PLA combat manuals.";
+
+            await UpsertSourceRowAsync(
+                $"military.core.{doc.Id}",
+                "military",
+                doc.Title ?? doc.Id,
+                doc.Title ?? doc.Id,
+                zhBody,
+                enBody,
+                minTrust: 1,
+                section: doc.Group ?? "CN",
+                sortOrder: sort + (doc.Priority ?? 1) * 10,
+                ct);
+            sort++;
+        }
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Fetch fetch=true CN catalog URLs (official_media / white_paper / open historical) into ExtractedText.
+    /// </summary>
+    public async Task<IReadOnlyList<RemoteFetchResult>> FetchRemoteCatalogPagesAsync(CancellationToken ct = default)
+    {
+        var paths = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "Data", "curriculum", "cn_sources_catalog.json"),
+            Path.Combine(Directory.GetCurrentDirectory(), "Data", "curriculum", "cn_sources_catalog.json"),
+        };
+
+        MilitaryCoreFile? file = null;
+        foreach (var path in paths)
+        {
+            if (!File.Exists(path)) continue;
+            try
+            {
+                file = JsonSerializer.Deserialize<MilitaryCoreFile>(await File.ReadAllTextAsync(path, ct), JsonOpts);
+                if (file?.Documents is { Count: > 0 }) break;
+            }
+            catch { /* try next */ }
+        }
+
+        if (file?.Documents is not { Count: > 0 })
+            return Array.Empty<RemoteFetchResult>();
+
+        string[] priority =
+        [
+            "CN-JFJB-2020-合成营",
+            "CN-JFJB-2021-作战运用",
+            "CN-81-什么是合成营",
+            "CN-WP-2015-战略",
+            "CN-JFJB-2020-主动融",
+            "CN-81-2016-独立作战型",
+        ];
+
+        var fetchable = file.Documents
+            .Where(d => d.Fetch == true && !string.IsNullOrWhiteSpace(d.Id) && !string.IsNullOrWhiteSpace(d.Url))
+            .OrderBy(d =>
+            {
+                var i = Array.IndexOf(priority, d.Id);
+                return i < 0 ? 1000 + (d.Priority ?? 9) : i;
+            })
+            .ToList();
+
+        var dumpDir = Path.Combine(Directory.GetCurrentDirectory(), "App_Data", "canal-pdfs");
+        Directory.CreateDirectory(dumpDir);
+
+        var client = _httpClientFactory.CreateClient("CanalFetch");
+        var extractor = new HabitMaterialTextExtractor();
+        var results = new List<RemoteFetchResult>();
+
+        foreach (var doc in fetchable)
+        {
+            ct.ThrowIfCancellationRequested();
+            var docId = doc.Id!;
+            var key = $"military.core.{docId}";
+            var entry = await _db.CanalKnowledgeEntries.FirstOrDefaultAsync(e => e.EntryKey == key, ct);
+            if (entry == null)
+            {
+                results.Add(new RemoteFetchResult(docId, false, "entry_missing"));
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(entry.ExtractedText) && entry.ExtractedText.Length > 800)
+            {
+                results.Add(new RemoteFetchResult(docId, true, "already_imported", Chars: entry.ExtractedText.Length));
+                continue;
+            }
+
+            var urls = new List<string> { doc.Url! };
+            if (doc.AltUrls is { Count: > 0 })
+                urls.AddRange(doc.AltUrls.Where(u => !string.IsNullOrWhiteSpace(u))!);
+
+            string? plain = null;
+            string? usedUrl = null;
+            string? failReason = null;
+
+            foreach (var url in urls)
+            {
+                try
+                {
+                    using var resp = await client.GetAsync(url, ct);
+                    if (!resp.IsSuccessStatusCode)
+                    {
+                        failReason = $"http_{(int)resp.StatusCode}";
+                        continue;
+                    }
+
+                    var media = resp.Content.Headers.ContentType?.MediaType ?? "";
+                    var bytes = await resp.Content.ReadAsByteArrayAsync(ct);
+                    if (bytes.Length < 64)
+                    {
+                        failReason = "too_small";
+                        continue;
+                    }
+
+                    if (media.Contains("pdf", StringComparison.OrdinalIgnoreCase)
+                        || (bytes.Length >= 4 && bytes[0] == 0x25 && bytes[1] == 0x50 && bytes[2] == 0x44 && bytes[3] == 0x46))
+                    {
+                        await using var ms = new MemoryStream(bytes);
+                        plain = await extractor.ExtractAsync($"{docId}.pdf", ms, ct);
+                        usedUrl = url;
+                        break;
+                    }
+
+                    var html = Encoding.UTF8.GetString(bytes);
+                    if (html.Contains("charset=gb", StringComparison.OrdinalIgnoreCase)
+                        || html.Contains("gb2312", StringComparison.OrdinalIgnoreCase)
+                        || html.Contains("gbk", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+                        html = Encoding.GetEncoding("GB18030").GetString(bytes);
+                    }
+
+                    if (url.Contains("wikimedia.org/wiki/File:", StringComparison.OrdinalIgnoreCase)
+                        || url.Contains("commons.wikimedia.org", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var pdfUrl = HtmlPageTextExtractor.FindFirstPdfUrl(html, new Uri(url));
+                        if (pdfUrl != null)
+                        {
+                            using var pdfResp = await client.GetAsync(pdfUrl, ct);
+                            if (pdfResp.IsSuccessStatusCode)
+                            {
+                                var pdfBytes = await pdfResp.Content.ReadAsByteArrayAsync(ct);
+                                await using var ms = new MemoryStream(pdfBytes);
+                                plain = await extractor.ExtractAsync($"{docId}.pdf", ms, ct);
+                                usedUrl = pdfUrl;
+                                break;
+                            }
+                        }
+                    }
+
+                    plain = HtmlPageTextExtractor.ExtractArticleish(html);
+                    if (string.IsNullOrWhiteSpace(plain) || plain.Length < 120)
+                    {
+                        failReason = "extract_thin";
+                        plain = null;
+                        continue;
+                    }
+
+                    usedUrl = url;
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    failReason = "exception";
+                    _logger.LogWarning(ex, "Fetch failed for {DocId} url {Url}", docId, url);
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(plain) || plain.Length < 120)
+            {
+                results.Add(new RemoteFetchResult(docId, false, failReason ?? "fetch_failed", Url: doc.Url));
+                continue;
+            }
+
+            var header =
+                $"【来源说明】公开页面抓取（access={doc.AccessNote}），非内部战斗条令/教范原文。\n" +
+                $"source_id={docId} · origin={doc.OriginCountry ?? "CN"} · url={usedUrl}\n\n";
+            var body = header + plain;
+            if (body.Length > HabitMaterialTextExtractor.MaxExtractedChars)
+                body = body[..HabitMaterialTextExtractor.MaxExtractedChars];
+
+            var fileName = $"{docId}.txt";
+            var dumpPath = Path.Combine(dumpDir, fileName);
+            await File.WriteAllTextAsync(dumpPath, body, Encoding.UTF8, ct);
+
+            var destDir = Path.Combine(Directory.GetCurrentDirectory(), "App_Data", "canal-knowledge", entry.Id.ToString());
+            Directory.CreateDirectory(destDir);
+            var destPath = Path.Combine(destDir, fileName);
+            File.Copy(dumpPath, destPath, overwrite: true);
+
+            await AttachDocumentAsync(
+                entry.Id,
+                fileName,
+                "text/plain",
+                new FileInfo(dumpPath).Length,
+                destPath,
+                body,
+                ct);
+
+            results.Add(new RemoteFetchResult(docId, true, "fetched", Url: usedUrl, Chars: body.Length));
+            _logger.LogInformation("Fetched CN source {DocId} ({Chars} chars) from {Url}", docId, body.Length, usedUrl);
+        }
+
+        return results;
     }
 
     public async Task<List<CanalKnowledgeEntry>> ListAsync(
@@ -611,12 +1022,15 @@ public class CanalKnowledgeService
         public string? Group { get; set; }
         public string? Title { get; set; }
         public int? Year { get; set; }
+        public string? OriginCountry { get; set; }
         public string? Url { get; set; }
+        public List<string>? AltUrls { get; set; }
         public string? SummaryZh { get; set; }
         public string? SummaryEn { get; set; }
         public List<string>? Topics { get; set; }
         public List<string>? Echelons { get; set; }
         public string? AccessNote { get; set; }
         public int? Priority { get; set; }
+        public bool? Fetch { get; set; }
     }
 }

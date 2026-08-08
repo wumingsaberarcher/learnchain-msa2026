@@ -46,6 +46,37 @@ public static class DatabaseMigrator
             EnsureSqliteColumn(connection, "Users", "CurriculumInjectCountToday", "INTEGER NOT NULL DEFAULT 0");
             EnsureSqliteColumn(connection, "Users", "CurriculumStateJson", "TEXT NOT NULL DEFAULT '{\"injected\":[],\"completed\":[]}'");
             EnsureSqliteColumn(connection, "Users", "CanalEvaluation", "TEXT NOT NULL DEFAULT ''");
+
+            // New tables must exist before additive column patches (EnsureCreated won't add tables to old DBs).
+            using (var canalKbBootstrap = connection.CreateCommand())
+            {
+                canalKbBootstrap.CommandText = """
+                    CREATE TABLE IF NOT EXISTS CanalKnowledgeEntries (
+                        Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        EntryKey TEXT NOT NULL,
+                        Category TEXT NOT NULL DEFAULT 'other',
+                        TitleZh TEXT NOT NULL DEFAULT '',
+                        TitleEn TEXT NOT NULL DEFAULT '',
+                        BodyZh TEXT NOT NULL DEFAULT '',
+                        BodyEn TEXT NOT NULL DEFAULT '',
+                        ExtractedText TEXT NOT NULL DEFAULT '',
+                        FileName TEXT NOT NULL DEFAULT '',
+                        ContentType TEXT NOT NULL DEFAULT '',
+                        FileSize INTEGER NOT NULL DEFAULT 0,
+                        StoredPath TEXT NOT NULL DEFAULT '',
+                        MinTrustLevel INTEGER NOT NULL DEFAULT 0,
+                        Section TEXT NOT NULL DEFAULT '',
+                        IsBuiltin INTEGER NOT NULL DEFAULT 0,
+                        IsActive INTEGER NOT NULL DEFAULT 1,
+                        SortOrder INTEGER NOT NULL DEFAULT 0,
+                        CreatedAt TEXT NOT NULL,
+                        UpdatedAt TEXT NOT NULL
+                    );
+                    CREATE UNIQUE INDEX IF NOT EXISTS IX_CanalKnowledgeEntries_EntryKey ON CanalKnowledgeEntries(EntryKey);
+                    """;
+                canalKbBootstrap.ExecuteNonQuery();
+            }
+
             EnsureSqliteColumn(connection, "CanalKnowledgeEntries", "ExtractedText", "TEXT NOT NULL DEFAULT ''");
             EnsureSqliteColumn(connection, "CanalKnowledgeEntries", "FileName", "TEXT NOT NULL DEFAULT ''");
             EnsureSqliteColumn(connection, "CanalKnowledgeEntries", "ContentType", "TEXT NOT NULL DEFAULT ''");
@@ -392,6 +423,17 @@ public static class DatabaseMigrator
 
     private static void EnsureSqliteColumn(System.Data.Common.DbConnection connection, string table, string column, string definition)
     {
+        using (var tableCheck = connection.CreateCommand())
+        {
+            tableCheck.CommandText = "SELECT 1 FROM sqlite_master WHERE type='table' AND name=$table LIMIT 1;";
+            var p = tableCheck.CreateParameter();
+            p.ParameterName = "$table";
+            p.Value = table;
+            tableCheck.Parameters.Add(p);
+            if (tableCheck.ExecuteScalar() == null)
+                return;
+        }
+
         using var check = connection.CreateCommand();
         check.CommandText = $"PRAGMA table_info({table});";
 

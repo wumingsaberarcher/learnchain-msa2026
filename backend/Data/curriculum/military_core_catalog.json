@@ -197,54 +197,54 @@
     {
       "id": "CN-PLA-DAILY-合成营",
       "group": "A6",
-      "title": "《解放军报》合成营相关公开报道",
-      "year": null,
+      "title": "（已拆分）见 cn_sources_catalog · CN-JFJB / CN-MOD 合成营条目",
+      "year": 2020,
       "url": "http://www.81.cn",
-      "summaryZh": "合成营作为机动作战基本单元；模块化、多兵种嵌入等公开表述（非内部教范全文）。",
-      "summaryEn": "Open PLA Daily framing of combined-arms battalion as basic maneuver unit; modular multi-arm embedding (not internal manuals).",
-      "topics": ["company_tactics", "combined_arms"],
+      "summaryZh": "占位：具体军报/国防部文章已迁入 Data/curriculum/cn_sources_catalog.json（CN-JFJB-* / CN-MOD-*）。",
+      "summaryEn": "Superseded by cn_sources_catalog.json granular CN entries.",
+      "topics": ["combined_arms", "company_tactics"],
       "echelons": ["battalion", "company"],
       "accessNote": "limited",
-      "priority": 2
+      "priority": 9
     },
     {
       "id": "CN-81-合成营",
       "group": "A6",
-      "title": "中国军网 合成营介绍类文章",
-      "year": null,
+      "title": "（已拆分）见 CN-81-什么是合成营 等",
+      "year": 2020,
       "url": "https://photo.81.cn/",
-      "summaryZh": "营级编制概念、合成化沿革的公开科普级叙述。",
-      "summaryEn": "Open popular explanations of battalion organization and combined-arms evolution.",
+      "summaryZh": "占位：详见 cn_sources_catalog.json。",
+      "summaryEn": "See cn_sources_catalog.json.",
       "topics": ["combined_arms", "company_tactics"],
       "echelons": ["battalion"],
       "accessNote": "limited",
-      "priority": 2
+      "priority": 9
     },
     {
       "id": "CN-SU-BARR-1942",
       "group": "A6",
-      "title": "《苏联红军步兵战斗条令》第一部（班排连）中译翻印",
-      "year": 1942,
+      "title": "（已拆分）见 CN-HIST-苏步兵条令-1949",
+      "year": 1949,
       "url": "https://www.blackwater.tw",
-      "summaryZh": "班、排、连进攻/防御/警戒/侦察等基层规范（1942 苏军条令中译传统）。",
-      "summaryEn": "Squad/platoon/company offense/defense/security/recon norms (1942 RKKA infantry manual Chinese reprint tradition).",
-      "topics": ["squad_tactics", "platoon_tactics", "company_tactics", "defense_positions"],
+      "summaryZh": "占位：详见 cn_sources_catalog.json 历史条令条目。",
+      "summaryEn": "See CN-HIST-* in cn_sources_catalog.json.",
+      "topics": ["squad_tactics", "platoon_tactics", "company_tactics"],
       "echelons": ["squad", "platoon", "company"],
       "accessNote": "secondary",
-      "priority": 2
+      "priority": 9
     },
     {
       "id": "CN-THESIS",
       "group": "A6",
-      "title": "国防大学等学位论文题录（机步/合成/装甲）",
+      "title": "（已拆分）见 CN-TW-NDU-* / CN-WF-* 等学术题录",
       "year": null,
       "url": "https://ndltd.ncl.edu.tw/",
-      "summaryZh": "外部研究对共军机械化与合成营的引述与分析（secondary）；入库以题录 + 可公开段落为准。",
-      "summaryEn": "External theses citing PLA mechanization/combined-arms battalions (secondary); index + open excerpts only.",
+      "summaryZh": "占位：详见 cn_sources_catalog.json。",
+      "summaryEn": "See cn_sources_catalog.json academic_secondary rows.",
       "topics": ["combined_arms", "company_tactics"],
       "echelons": ["battalion", "company"],
       "accessNote": "secondary",
-      "priority": 2
+      "priority": 9
     }
   ]
 }

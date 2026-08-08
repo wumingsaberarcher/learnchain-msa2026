@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "/TBgnoGnso0=",
+  "dgSpecHash": "92FU6IKNh3g=",
   "success": true,
   "projectFilePath": "D:\\learnchain-msa2026\\backend\\backend.csproj",
   "expectedPackageFiles": [
@@ -37,6 +37,7 @@
     "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\a0254d70124cf5236d0b0770f4d3be49\\nuget\\system.identitymodel.tokens.jwt\\8.0.1\\system.identitymodel.tokens.jwt.8.0.1.nupkg.sha512",
     "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\a0254d70124cf5236d0b0770f4d3be49\\nuget\\system.io.packaging\\8.0.1\\system.io.packaging.8.0.1.nupkg.sha512",
     "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\a0254d70124cf5236d0b0770f4d3be49\\nuget\\system.security.cryptography.pkcs\\8.0.1\\system.security.cryptography.pkcs.8.0.1.nupkg.sha512",
+    "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\a0254d70124cf5236d0b0770f4d3be49\\nuget\\system.text.encoding.codepages\\9.0.0\\system.text.encoding.codepages.9.0.0.nupkg.sha512",
     "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\a0254d70124cf5236d0b0770f4d3be49\\nuget\\uglytoad.pdfpig\\1.7.0-custom-5\\uglytoad.pdfpig.1.7.0-custom-5.nupkg.sha512",
     "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\a0254d70124cf5236d0b0770f4d3be49\\nuget\\uglytoad.pdfpig.core\\1.7.0-custom-5\\uglytoad.pdfpig.core.1.7.0-custom-5.nupkg.sha512",
     "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\a0254d70124cf5236d0b0770f4d3be49\\nuget\\uglytoad.pdfpig.fonts\\1.7.0-custom-5\\uglytoad.pdfpig.fonts.1.7.0-custom-5.nupkg.sha512",
@@ -44,6 +45,18 @@
     "C:\\Users\\wumin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\a0254d70124cf5236d0b0770f4d3be49\\nuget\\uglytoad.pdfpig.tokens\\1.7.0-custom-5\\uglytoad.pdfpig.tokens.1.7.0-custom-5.nupkg.sha512"
   ],
   "logs": [
+    {
+      "code": "NU1510",
+      "level": "Warning",
+      "message": "PackageReference System.Text.Encoding.CodePages 将不会删除。请考虑从依赖项中移除此包，因为可能不需要它。",
+      "projectPath": "D:\\learnchain-msa2026\\backend\\backend.csproj",
+      "warningLevel": 1,
+      "filePath": "D:\\learnchain-msa2026\\backend\\backend.csproj",
+      "libraryId": "System.Text.Encoding.CodePages",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    },
     {
       "code": "NU1902",
       "level": "Warning",

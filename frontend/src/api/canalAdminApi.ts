@@ -185,6 +185,36 @@ export async function reseedCanalKnowledge(): Promise<{ count: number }> {
   return res.json()
 }
 
+export async function importLocalCanalKnowledge(): Promise<{
+  message: string
+  imported: number
+  results: Array<{ docId: string; ok: boolean; reason: string; chars?: number; fileName?: string }>
+}> {
+  const res = await apiFetch('/admin/canal/knowledge/import-local', {
+    method: 'POST',
+    headers: authHeaders(true),
+  })
+  if (!res.ok) throw new Error(await readError(res))
+  return res.json()
+}
+
+export async function fetchCnCanalKnowledge(): Promise<{
+  message: string
+  cnSourcesAttempted: number
+  successCount: number
+  newlyFetched: number
+  failedCount: number
+  failedUrls: Array<{ docId: string; reason: string; url?: string }>
+  results: Array<{ docId: string; ok: boolean; reason: string; url?: string; chars?: number }>
+}> {
+  const res = await apiFetch('/admin/canal/knowledge/fetch-cn', {
+    method: 'POST',
+    headers: authHeaders(true),
+  })
+  if (!res.ok) throw new Error(await readError(res))
+  return res.json()
+}
+
 export async function uploadCanalKnowledgeFile(
   file: File,
   opts?: { category?: string; titleZh?: string; titleEn?: string; minTrustLevel?: number },

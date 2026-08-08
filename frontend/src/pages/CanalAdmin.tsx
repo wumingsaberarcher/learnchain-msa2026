@@ -26,6 +26,8 @@ import {
   getCanalBondUser,
   listCanalBondUsers,
   listCanalKnowledge,
+  importLocalCanalKnowledge,
+  fetchCnCanalKnowledge,
   reseedCanalKnowledge,
   setCanalBond,
   updateCanalKnowledge,
@@ -262,6 +264,44 @@ export default function CanalAdmin() {
     }
   }
 
+  const importLocal = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const report = await importLocalCanalKnowledge()
+      const failed = report.results.filter((r) => !r.ok)
+      if (failed.length) {
+        setError(
+          `本地导入：成功 ${report.imported}；未成功 ${failed.map((f) => `${f.docId}(${f.reason})`).join(', ')}`,
+        )
+      }
+      await loadKb()
+      await loadDebug()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'import_local_failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const fetchCn = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      const report = await fetchCnCanalKnowledge()
+      const failNote = report.failedCount
+        ? `；失败 ${report.failedUrls.map((f) => `${f.docId}(${f.reason})`).join(', ')}`
+        : ''
+      setError(`中国文献：新增抓取 ${report.newlyFetched} / 成功 ${report.successCount} / 尝试 ${report.cnSourcesAttempted}${failNote}`)
+      await loadKb()
+      await loadDebug()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'fetch_cn_failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const onUploadLit = async (files: FileList | null) => {
     if (!files?.length) return
     setBusy(true)
@@ -481,6 +521,12 @@ export default function CanalAdmin() {
               <button type="button" onClick={openCreate}><Plus className="w-4 h-4" /> {t('canalAdmin.addEntry')}</button>
               <button type="button" onClick={() => uploadRef.current?.click()}><Upload className="w-4 h-4" /> {t('canalAdmin.uploadLit')}</button>
               <button type="button" onClick={() => void reseed()}><RefreshCw className="w-4 h-4" /> {t('canalAdmin.reseed')}</button>
+              <button type="button" onClick={() => void importLocal()} title={t('canalAdmin.importLocalHint')}>
+                <Upload className="w-4 h-4" /> {t('canalAdmin.importLocal')}
+              </button>
+              <button type="button" onClick={() => void fetchCn()} title={t('canalAdmin.fetchCnHint')}>
+                <BookOpen className="w-4 h-4" /> {t('canalAdmin.fetchCn')}
+              </button>
               <input
                 value={kbFilter}
                 onChange={(e) => setKbFilter(e.target.value)}

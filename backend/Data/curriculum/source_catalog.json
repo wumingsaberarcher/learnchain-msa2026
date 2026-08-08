@@ -500,6 +500,66 @@
       "urlOrLocator": "open Chinese military journals",
       "accessNote": "limited",
       "section": "7.4"
+    },
+    {
+      "id": "CN-JFJB-2020-合成营",
+      "title": "《合成营成为陆军机动作战基本单元》解放军报 2020-03-20",
+      "year": 2020,
+      "originCountry": "CN",
+      "docType": "official_media",
+      "echelons": ["company", "battalion"],
+      "topics": ["combined_arms", "company_tactics", "battalion"],
+      "urlOrLocator": "http://www.81.cn/jfjbmap/content/2020-03/20/content_256956.htm",
+      "accessNote": "official_media",
+      "section": "7.2"
+    },
+    {
+      "id": "CN-JFJB-2021-作战运用",
+      "title": "《浅谈合成营作战运用》解放军报 2021-10-28",
+      "year": 2021,
+      "originCountry": "CN",
+      "docType": "official_media",
+      "echelons": ["company", "battalion"],
+      "topics": ["combined_arms", "company_tactics", "battalion"],
+      "urlOrLocator": "http://www.81.cn/jfjbmap/content/2021-10/28/content_301827.htm",
+      "accessNote": "official_media",
+      "section": "7.2"
+    },
+    {
+      "id": "CN-81-什么是合成营",
+      "title": "中国军网《什么是合成营？》",
+      "year": 2020,
+      "originCountry": "CN",
+      "docType": "official_media",
+      "echelons": ["company", "battalion"],
+      "topics": ["combined_arms", "company_tactics"],
+      "urlOrLocator": "https://photo.81.cn/tsjs/2020-03/23/content_9776002.htm",
+      "accessNote": "official_media",
+      "section": "7.2"
+    },
+    {
+      "id": "CN-WP-2015-战略",
+      "title": "《中国的军事战略》白皮书（2015）",
+      "year": 2015,
+      "originCountry": "CN",
+      "docType": "white_paper",
+      "echelons": ["operational"],
+      "topics": ["operational"],
+      "urlOrLocator": "https://english.gov.cn/archive/white_paper/2015/05/27/content_281475115610833.htm",
+      "accessNote": "white_paper",
+      "section": "7.3"
+    },
+    {
+      "id": "CN-HIST-操典-1947",
+      "title": "《步兵操典草案第一部各个班排连战斗教练教案》",
+      "year": 1947,
+      "originCountry": "CN",
+      "docType": "historical",
+      "echelons": ["individual", "squad", "platoon", "company"],
+      "topics": ["individual_skills", "squad_tactics", "platoon_tactics"],
+      "urlOrLocator": "commons.wikimedia.org (NLC 步兵操典草案)",
+      "accessNote": "historical",
+      "section": "7.1"
     }
   ]
 }

@@ -97,3 +97,4 @@ D:\learnchain-msa2026\backend\bin\Debug\net10.0\Data\curriculum\platoon_stage3.j
 D:\learnchain-msa2026\backend\bin\Debug\net10.0\Data\curriculum\squad_stage2.json
 D:\learnchain-msa2026\backend\bin\Debug\net10.0\Data\curriculum\canal_knowledge_seed.json
 D:\learnchain-msa2026\backend\bin\Debug\net10.0\Data\curriculum\military_core_catalog.json
+D:\learnchain-msa2026\backend\bin\Debug\net10.0\Data\curriculum\cn_sources_catalog.json

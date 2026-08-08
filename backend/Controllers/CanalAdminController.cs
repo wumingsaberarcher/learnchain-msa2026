@@ -404,6 +404,44 @@ public class CanalAdminController : ControllerBase
         return Ok(new { message = "已同步内置身份与 §7–8 文献登记", count });
     }
 
+    /// <summary>
+    /// Import App_Data/canal-pdfs/{DOC_ID}.txt|.pdf into military.core.{DOC_ID} (OCR/txt preferred).
+    /// </summary>
+    [HttpPost("knowledge/import-local")]
+    public async Task<IActionResult> ImportLocalKnowledge(CancellationToken ct)
+    {
+        await _knowledge.EnsureSeededAsync(ct);
+        var results = await _knowledge.ImportLocalDocsFolderAsync(ct);
+        return Ok(new
+        {
+            message = "已尝试从 App_Data/canal-pdfs 导入文献正文",
+            imported = results.Count(r => r.Ok && (r.Reason is "imported" or "already_imported")),
+            newlyImported = results.Count(r => r.Ok && r.Reason == "imported"),
+            results,
+        });
+    }
+
+    /// <summary>Fetch CN official_media / white_paper / open historical pages into knowledge ExtractedText.</summary>
+    [HttpPost("knowledge/fetch-cn")]
+    public async Task<IActionResult> FetchCnKnowledge(CancellationToken ct)
+    {
+        await _knowledge.EnsureSeededAsync(ct);
+        var results = await _knowledge.FetchRemoteCatalogPagesAsync(ct);
+        var added = results.Count(r => r.Ok && r.Reason == "fetched");
+        var ok = results.Count(r => r.Ok);
+        var failed = results.Where(r => !r.Ok).ToList();
+        return Ok(new
+        {
+            message = "中国文献增补：远程抓取完成",
+            cnSourcesAttempted = results.Count,
+            successCount = ok,
+            newlyFetched = added,
+            failedCount = failed.Count,
+            failedUrls = failed.Select(f => new { f.DocId, f.Reason, f.Url }),
+            results,
+        });
+    }
+
     private static object MapKnowledge(CanalKnowledgeEntry e) => new
     {
         e.Id,
