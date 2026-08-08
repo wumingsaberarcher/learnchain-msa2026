@@ -57,14 +57,15 @@ export interface CanalBondUser {
   canEdit: boolean
 }
 
-export interface CanalBondDetail extends CanalBondUser {
+export interface CanalBondDetail extends Omit<CanalBondUser, 'curriculumCompleted' | 'curriculumInjected'> {
   trustAddressKey: string
   currentEchelon: string
   companionAffectionMax: number
   affectionGainedToday: number
   curriculumStateJson: string
-  curriculumCompleted: string[] | number
-  curriculumInjected: string[] | number
+  /** Lesson id lists (detail endpoint), not counts. */
+  curriculumCompleted: string[]
+  curriculumInjected: string[]
   injectDayUtc?: string | null
   loreKeys: string[]
 }
