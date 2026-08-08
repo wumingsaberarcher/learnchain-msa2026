@@ -1,8 +1,8 @@
 namespace backend.Models;
 
 /// <summary>
-/// Canal companion knowledge base entry (identity / lore / doctrine sources / custom).
-/// SuperAdmin CRUD; builtin seeds are re-activated on migrate but body can be edited.
+/// Canal (凯娜尔) knowledge base entry.
+/// Categories: identity | military | other
 /// </summary>
 public class CanalKnowledgeEntry
 {
@@ -11,18 +11,26 @@ public class CanalKnowledgeEntry
     /// <summary>Stable key for seed upsert, e.g. identity.alpha-core or source.atp-3-21.71-2024</summary>
     public string EntryKey { get; set; } = "";
 
-    /// <summary>identity | lore | source | portal | custom</summary>
-    public string Category { get; set; } = "custom";
+    /// <summary>identity = 角色身份; military = 军事知识贮备; other = 其他</summary>
+    public string Category { get; set; } = "other";
 
     public string TitleZh { get; set; } = "";
     public string TitleEn { get; set; } = "";
     public string BodyZh { get; set; } = "";
     public string BodyEn { get; set; } = "";
 
+    /// <summary>Full text extracted from uploaded PDF/docx/md/txt (Canal may recall via prompt + search).</summary>
+    public string ExtractedText { get; set; } = "";
+
+    public string FileName { get; set; } = "";
+    public string ContentType { get; set; } = "";
+    public long FileSize { get; set; }
+    public string StoredPath { get; set; } = "";
+
     /// <summary>Minimum curriculum TrustLevel (0–4) before Canal may use this in prompts.</summary>
     public int MinTrustLevel { get; set; }
 
-    /// <summary>Literature section tag, e.g. 7.1 / 8</summary>
+    /// <summary>Literature section tag, e.g. 7.1 / 8 / lore</summary>
     public string Section { get; set; } = "";
 
     public bool IsBuiltin { get; set; }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -10,6 +10,7 @@ import {
   Shield,
   Sparkles,
   Trash2,
+  Upload,
   Zap,
 } from 'lucide-react'
 import { useHabitStore } from '../stores/habitStore'
@@ -28,6 +29,8 @@ import {
   reseedCanalKnowledge,
   setCanalBond,
   updateCanalKnowledge,
+  uploadCanalKnowledgeFile,
+  uploadCanalKnowledgeToEntry,
   type CanalBondDetail,
   type CanalBondUser,
   type CanalDebugSnapshot,
@@ -36,10 +39,11 @@ import {
 import '../styles/canal-admin.css'
 
 type Tab = 'bond' | 'knowledge' | 'live2d' | 'runtime'
+type KbGroup = 'all' | 'identity' | 'military' | 'other'
 
 const emptyForm = (): Partial<CanalKnowledgeEntry> => ({
   entryKey: '',
-  category: 'custom',
+  category: 'military',
   titleZh: '',
   titleEn: '',
   bodyZh: '',
@@ -49,6 +53,12 @@ const emptyForm = (): Partial<CanalKnowledgeEntry> => ({
   isActive: true,
   sortOrder: 0,
 })
+
+function categoryLabel(cat: string, zh: boolean) {
+  if (cat === 'identity') return zh ? '角色身份' : 'Identity'
+  if (cat === 'military') return zh ? '军事知识贮备' : 'Military'
+  return zh ? '其他类型' : 'Other'
+}
 
 export default function CanalAdmin() {
   const { t, language } = useTranslation()
@@ -71,9 +81,13 @@ export default function CanalAdmin() {
 
   const [kb, setKb] = useState<CanalKnowledgeEntry[]>([])
   const [kbFilter, setKbFilter] = useState('')
+  const [kbGroup, setKbGroup] = useState<KbGroup>('all')
   const [editing, setEditing] = useState<CanalKnowledgeEntry | null>(null)
   const [form, setForm] = useState(emptyForm())
   const [formOpen, setFormOpen] = useState(false)
+  const uploadRef = useRef<HTMLInputElement>(null)
+  const attachRef = useRef<HTMLInputElement>(null)
+  const [attachId, setAttachId] = useState<number | null>(null)
 
   const zh = language.startsWith('zh')
 
@@ -226,6 +240,42 @@ export default function CanalAdmin() {
     }
   }
 
+  const onUploadLit = async (files: FileList | null) => {
+    if (!files?.length) return
+    setBusy(true)
+    setError(null)
+    try {
+      for (const file of Array.from(files)) {
+        await uploadCanalKnowledgeFile(file, {
+          category: kbGroup === 'all' ? 'military' : kbGroup,
+          titleZh: file.name.replace(/\.[^.]+$/, ''),
+          minTrustLevel: 1,
+        })
+      }
+      await loadKb()
+      await loadDebug()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'upload_failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onAttach = async (files: FileList | null) => {
+    if (!files?.length || attachId == null) return
+    setBusy(true)
+    setError(null)
+    try {
+      await uploadCanalKnowledgeToEntry(attachId, files[0])
+      setAttachId(null)
+      await loadKb()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'attach_failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (!currentUser) return <Navigate to="/" replace />
   if (!isSuper) {
     return (
@@ -240,6 +290,7 @@ export default function CanalAdmin() {
   }
 
   const filteredKb = kb.filter((row) => {
+    if (kbGroup !== 'all' && row.category !== kbGroup) return false
     if (!kbFilter.trim()) return true
     const f = kbFilter.toLowerCase()
     return (
@@ -248,8 +299,15 @@ export default function CanalAdmin() {
       || row.titleZh.toLowerCase().includes(f)
       || row.titleEn.toLowerCase().includes(f)
       || row.section.toLowerCase().includes(f)
+      || (row.fileName || '').toLowerCase().includes(f)
     )
   })
+
+  const grouped = {
+    identity: filteredKb.filter((r) => r.category === 'identity'),
+    military: filteredKb.filter((r) => r.category === 'military'),
+    other: filteredKb.filter((r) => r.category === 'other'),
+  }
 
   return (
     <div className="canal-admin-page">
@@ -346,7 +404,7 @@ export default function CanalAdmin() {
                     />
                   </label>
                   <label>
-                    CurriculumStateJson
+                    {t('canalAdmin.curriculumState')}
                     <textarea
                       rows={5}
                       value={editStateJson}
@@ -354,6 +412,7 @@ export default function CanalAdmin() {
                       onChange={(e) => setEditStateJson(e.target.value)}
                     />
                   </label>
+                  <p className="canal-admin-muted">{t('canalAdmin.curriculumStateHint')}</p>
                   <div className="canal-admin-actions">
                     <button type="button" disabled={!detail.canEdit || busy} onClick={() => void saveBond()}>
                       {t('canalAdmin.saveBond')}
@@ -373,14 +432,50 @@ export default function CanalAdmin() {
 
         {tab === 'knowledge' && (
           <section>
+            <input
+              ref={uploadRef}
+              type="file"
+              accept=".pdf,.docx,.doc,.md,.txt,application/pdf,text/plain"
+              multiple
+              hidden
+              onChange={(e) => {
+                const files = e.target.files
+                e.target.value = ''
+                void onUploadLit(files)
+              }}
+            />
+            <input
+              ref={attachRef}
+              type="file"
+              accept=".pdf,.docx,.doc,.md,.txt,application/pdf,text/plain"
+              hidden
+              onChange={(e) => {
+                const files = e.target.files
+                e.target.value = ''
+                void onAttach(files)
+              }}
+            />
             <div className="canal-admin-actions">
               <button type="button" onClick={openCreate}><Plus className="w-4 h-4" /> {t('canalAdmin.addEntry')}</button>
+              <button type="button" onClick={() => uploadRef.current?.click()}><Upload className="w-4 h-4" /> {t('canalAdmin.uploadLit')}</button>
               <button type="button" onClick={() => void reseed()}><RefreshCw className="w-4 h-4" /> {t('canalAdmin.reseed')}</button>
               <input
                 value={kbFilter}
                 onChange={(e) => setKbFilter(e.target.value)}
                 placeholder={t('canalAdmin.filterKb')}
               />
+            </div>
+            <div className="canal-admin-tabs canal-admin-subtabs">
+              {([
+                ['all', t('canalAdmin.groupAll')],
+                ['identity', t('canalAdmin.groupIdentity')],
+                ['military', t('canalAdmin.groupMilitary')],
+                ['other', t('canalAdmin.groupOther')],
+              ] as const).map(([id, label]) => (
+                <button key={id} type="button" className={kbGroup === id ? 'on' : ''} onClick={() => setKbGroup(id)}>
+                  {label}
+                </button>
+              ))}
             </div>
             <p className="canal-admin-muted">
               {t('canalAdmin.kbHint', { n: debug?.curriculum.knowledgeActive ?? kb.filter((x) => x.isActive).length })}
@@ -392,8 +487,10 @@ export default function CanalAdmin() {
                 <div className="canal-admin-form-grid">
                   <label>entryKey<input value={form.entryKey || ''} disabled={!!editing?.isBuiltin} onChange={(e) => setForm({ ...form, entryKey: e.target.value })} /></label>
                   <label>category
-                    <select value={form.category || 'custom'} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                      {['identity', 'lore', 'source', 'portal', 'custom'].map((c) => <option key={c} value={c}>{c}</option>)}
+                    <select value={form.category || 'military'} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                      <option value="identity">{t('canalAdmin.groupIdentity')}</option>
+                      <option value="military">{t('canalAdmin.groupMilitary')}</option>
+                      <option value="other">{t('canalAdmin.groupOther')}</option>
                     </select>
                   </label>
                   <label>minTrust<input type="number" min={0} max={4} value={form.minTrustLevel ?? 0} onChange={(e) => setForm({ ...form, minTrustLevel: Number(e.target.value) })} /></label>
@@ -412,21 +509,44 @@ export default function CanalAdmin() {
               </div>
             )}
 
-            <ul className="canal-admin-kb-list">
-              {filteredKb.map((row) => (
-                <li key={row.id} className={!row.isActive ? 'off' : ''}>
-                  <div>
-                    <strong>{zh ? (row.titleZh || row.titleEn) : (row.titleEn || row.titleZh)}</strong>
-                    <span>{row.category} · T≥{row.minTrustLevel} · {row.section || '—'} {row.isBuiltin ? '· builtin' : ''}</span>
-                    <small>{row.entryKey}</small>
-                  </div>
-                  <div className="canal-admin-actions">
-                    <button type="button" onClick={() => openEdit(row)}>{t('canalAdmin.edit')}</button>
-                    <button type="button" className="danger" onClick={() => void removeKb(row)}><Trash2 className="w-3.5 h-3.5" /></button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            {(['identity', 'military', 'other'] as const).map((cat) => {
+              const rows = grouped[cat]
+              if (kbGroup !== 'all' && kbGroup !== cat) return null
+              if (rows.length === 0) return null
+              return (
+                <div key={cat} className="canal-admin-kb-group">
+                  <h3>{categoryLabel(cat, zh)} <span>({rows.length})</span></h3>
+                  <ul className="canal-admin-kb-list">
+                    {rows.map((row) => (
+                      <li key={row.id} className={!row.isActive ? 'off' : ''}>
+                        <div>
+                          <strong>{zh ? (row.titleZh || row.titleEn) : (row.titleEn || row.titleZh)}</strong>
+                          <span>
+                            T≥{row.minTrustLevel} · {row.section || '—'}
+                            {row.isBuiltin ? ' · builtin' : ''}
+                            {row.hasDocument ? ` · ${t('canalAdmin.hasDoc', { n: row.textLength ?? 0 })}` : ''}
+                          </span>
+                          <small>{row.entryKey}{row.fileName ? ` · ${row.fileName}` : ''}</small>
+                        </div>
+                        <div className="canal-admin-actions">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAttachId(row.id)
+                              attachRef.current?.click()
+                            }}
+                          >
+                            <Upload className="w-3.5 h-3.5" /> {t('canalAdmin.attachFile')}
+                          </button>
+                          <button type="button" onClick={() => openEdit(row)}>{t('canalAdmin.edit')}</button>
+                          <button type="button" className="danger" onClick={() => void removeKb(row)}><Trash2 className="w-3.5 h-3.5" /></button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            })}
           </section>
         )}
 

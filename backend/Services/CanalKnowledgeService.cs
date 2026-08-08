@@ -31,6 +31,7 @@ public class CanalKnowledgeService
 
     public async Task EnsureSeededAsync(CancellationToken ct = default)
     {
+        await MigrateLegacyCategoriesAsync(ct);
         await SeedIdentityFromJsonAsync(ct);
         await SyncSourceCatalogEntriesAsync(ct);
     }
@@ -133,37 +134,188 @@ public class CanalKnowledgeService
         return true;
     }
 
-    /// <summary>Prompt block for Canal AI, filtered by curriculum trust stage.</summary>
+    /// <summary>Prompt block for Canal AI, filtered by curriculum trust stage.
+    /// Identity entries are included in full; military/other include note + document excerpts.</summary>
     public async Task<string> BuildPromptBlockAsync(int trustLevel, bool zh, CancellationToken ct = default)
     {
         var level = Math.Clamp(trustLevel, 0, CanalTrustService.MaxTrustLevel);
         var rows = await _db.CanalKnowledgeEntries
             .AsNoTracking()
             .Where(e => e.IsActive && e.MinTrustLevel <= level)
-            .OrderBy(e => e.SortOrder)
+            .OrderBy(e => e.Category == "identity" ? 0 : e.Category == "military" ? 1 : 2)
+            .ThenBy(e => e.SortOrder)
             .ThenBy(e => e.Id)
             .ToListAsync(ct);
 
         if (rows.Count == 0) return "";
 
+        const int maxTotal = 28_000;
+        const int maxDocPerEntry = 6_000;
+        var used = 0;
+
         var sb = new StringBuilder();
-        sb.AppendLine(zh ? "【Canal 内置知识库（按信任阶段开放）】" : "[Canal built-in knowledge (trust-gated)]");
-        foreach (var e in rows)
+        sb.AppendLine(zh
+            ? "【凯娜尔（Canal）知识库 — 按信任阶段开放；上传文献的正文已存档，可用 search_knowledge 检索】"
+            : "[Canal (凯娜尔) knowledge — trust-gated; uploaded literature text is stored; use search_knowledge to retrieve]");
+
+        void AppendGroup(string cat, string titleZh, string titleEn)
         {
+            var group = rows.Where(e => e.Category == cat).ToList();
+            if (group.Count == 0) return;
+            sb.AppendLine();
+            sb.AppendLine(zh ? $"## {titleZh}" : $"## {titleEn}");
+            foreach (var e in group)
+            {
+                if (used >= maxTotal) break;
+                var title = zh
+                    ? (string.IsNullOrWhiteSpace(e.TitleZh) ? e.TitleEn : e.TitleZh)
+                    : (string.IsNullOrWhiteSpace(e.TitleEn) ? e.TitleZh : e.TitleEn);
+                var body = zh
+                    ? (string.IsNullOrWhiteSpace(e.BodyZh) ? e.BodyEn : e.BodyZh)
+                    : (string.IsNullOrWhiteSpace(e.BodyEn) ? e.BodyZh : e.BodyEn);
+
+                sb.AppendLine($"- [{cat}|T≥{e.MinTrustLevel}] {title}");
+                used += title.Length + 20;
+
+                if (!string.IsNullOrWhiteSpace(body))
+                {
+                    var b = body.Length > 2500 ? body[..2500] + "…" : body;
+                    sb.AppendLine($"  {b.Replace("\r\n", "\n").Replace("\n", "\n  ")}");
+                    used += b.Length;
+                }
+
+                if (!string.IsNullOrWhiteSpace(e.ExtractedText))
+                {
+                    var room = Math.Min(maxDocPerEntry, maxTotal - used);
+                    if (room < 200) continue;
+                    var doc = e.ExtractedText.Length > room
+                        ? e.ExtractedText[..room] + "…"
+                        : e.ExtractedText;
+                    var label = string.IsNullOrWhiteSpace(e.FileName) ? "document" : e.FileName;
+                    sb.AppendLine(zh
+                        ? $"  【文献正文摘录 · {label} · 共 {e.ExtractedText.Length} 字】"
+                        : $"  [Literature excerpt · {label} · {e.ExtractedText.Length} chars]");
+                    sb.AppendLine($"  {doc.Replace("\r\n", "\n").Replace("\n", "\n  ")}");
+                    used += doc.Length + 40;
+                }
+            }
+        }
+
+        AppendGroup("identity", "角色身份", "Character identity");
+        AppendGroup("military", "军事知识贮备", "Military knowledge");
+        AppendGroup("other", "其他类型知识贮备", "Other knowledge");
+
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>Keyword search over uploaded / stored Canal literature for tool use.</summary>
+    public async Task<string> SearchDocumentsAsync(
+        int trustLevel,
+        string? query,
+        bool zh,
+        int maxChars = 12_000,
+        CancellationToken ct = default)
+    {
+        var level = Math.Clamp(trustLevel, 0, CanalTrustService.MaxTrustLevel);
+        var terms = ExtractTerms(query);
+        var rows = await _db.CanalKnowledgeEntries
+            .AsNoTracking()
+            .Where(e => e.IsActive && e.MinTrustLevel <= level
+                        && (e.ExtractedText != "" || e.BodyZh != "" || e.BodyEn != ""))
+            .OrderBy(e => e.SortOrder)
+            .ToListAsync(ct);
+
+        var scored = rows.Select(e =>
+            {
+                var blob = $"{e.TitleZh} {e.TitleEn} {e.FileName} {e.BodyZh} {e.BodyEn} {e.ExtractedText}";
+                var score = terms.Count == 0
+                    ? (string.IsNullOrWhiteSpace(e.ExtractedText) ? 1 : 2)
+                    : terms.Count(t => blob.Contains(t, StringComparison.OrdinalIgnoreCase));
+                return (e, score);
+            })
+            .Where(x => terms.Count == 0 || x.score > 0)
+            .OrderByDescending(x => x.score)
+            .ThenByDescending(x => x.e.ExtractedText.Length)
+            .Take(8)
+            .ToList();
+
+        if (scored.Count == 0)
+            return zh ? "（凯娜尔知识库无匹配文献）" : "(No matching Canal knowledge documents.)";
+
+        var sb = new StringBuilder();
+        sb.AppendLine(zh ? "凯娜尔知识库检索结果：" : "Canal knowledge search hits:");
+        var used = 0;
+        foreach (var (e, score) in scored)
+        {
+            if (used >= maxChars) break;
             var title = zh
                 ? (string.IsNullOrWhiteSpace(e.TitleZh) ? e.TitleEn : e.TitleZh)
                 : (string.IsNullOrWhiteSpace(e.TitleEn) ? e.TitleZh : e.TitleEn);
-            var body = zh
-                ? (string.IsNullOrWhiteSpace(e.BodyZh) ? e.BodyEn : e.BodyZh)
-                : (string.IsNullOrWhiteSpace(e.BodyEn) ? e.BodyZh : e.BodyEn);
-            if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(body))
-                continue;
-            sb.AppendLine($"- [{e.Category}|T≥{e.MinTrustLevel}] {title}");
-            if (!string.IsNullOrWhiteSpace(body))
-                sb.AppendLine($"  {body.Replace("\r\n", "\n").Replace("\n", "\n  ")}");
+            var text = !string.IsNullOrWhiteSpace(e.ExtractedText)
+                ? e.ExtractedText
+                : (zh ? e.BodyZh : e.BodyEn);
+            var room = Math.Min(3500, maxChars - used);
+            var chunk = text.Length > room ? text[..room] + "…" : text;
+            sb.AppendLine($"[{e.Category}|score={score}] {title}" +
+                          (string.IsNullOrWhiteSpace(e.FileName) ? "" : $" ({e.FileName})"));
+            sb.AppendLine(chunk);
+            sb.AppendLine("---");
+            used += chunk.Length + 40;
         }
 
         return sb.ToString().TrimEnd();
+    }
+
+    public async Task<CanalKnowledgeEntry?> AttachDocumentAsync(
+        int id,
+        string fileName,
+        string contentType,
+        long size,
+        string storedPath,
+        string extractedText,
+        CancellationToken ct = default)
+    {
+        var entry = await _db.CanalKnowledgeEntries.FirstOrDefaultAsync(e => e.Id == id, ct);
+        if (entry == null) return null;
+
+        entry.FileName = fileName;
+        entry.ContentType = contentType;
+        entry.FileSize = size;
+        entry.StoredPath = storedPath;
+        entry.ExtractedText = extractedText ?? "";
+        if (string.IsNullOrWhiteSpace(entry.BodyZh) && !string.IsNullOrWhiteSpace(extractedText))
+            entry.BodyZh = $"已上传文献《{fileName}》，正文已抽取 {extractedText.Length} 字供凯娜尔引用。";
+        if (string.IsNullOrWhiteSpace(entry.BodyEn) && !string.IsNullOrWhiteSpace(extractedText))
+            entry.BodyEn = $"Uploaded literature \"{fileName}\"; {extractedText.Length} chars extracted for Canal recall.";
+        entry.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return entry;
+    }
+
+    private async Task MigrateLegacyCategoriesAsync(CancellationToken ct)
+    {
+        var rows = await _db.CanalKnowledgeEntries
+            .Where(e => e.Category != "identity" && e.Category != "military" && e.Category != "other")
+            .ToListAsync(ct);
+        if (rows.Count == 0) return;
+
+        foreach (var e in rows)
+            e.Category = NormalizeCategory(e.Category);
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Migrated {Count} Canal knowledge categories to identity/military/other", rows.Count);
+    }
+
+    private static HashSet<string> ExtractTerms(string? text)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrWhiteSpace(text)) return set;
+        foreach (System.Text.RegularExpressions.Match m in
+                 System.Text.RegularExpressions.Regex.Matches(text.ToLowerInvariant(), @"[\p{L}\p{N}]{2,}"))
+        {
+            if (m.Value.Length >= 2) set.Add(m.Value);
+            if (set.Count >= 24) break;
+        }
+        return set;
     }
 
     private async Task SeedIdentityFromJsonAsync(CancellationToken ct)
@@ -236,7 +388,7 @@ public class CanalKnowledgeService
             var key = $"portal.{portal.Id}";
             await UpsertSourceRowAsync(
                 key,
-                "portal",
+                "military",
                 portal.Name,
                 portal.Name,
                 zhBody: $"检索入口：{portal.Name}\nURL：{portal.Url}\n访问：{portal.AccessNote}",
@@ -255,7 +407,7 @@ public class CanalKnowledgeService
             var topics = string.Join(", ", doc.Topics);
             await UpsertSourceRowAsync(
                 key,
-                "source",
+                "military",
                 doc.Title,
                 doc.Title,
                 zhBody:
@@ -287,9 +439,13 @@ public class CanalKnowledgeService
         if (existing != null)
         {
             existing.IsBuiltin = true;
-            // Refresh catalog text only if admin never customized (same titles as catalog)
-            if (existing.Category is "source" or "portal")
+            // Refresh catalog text for military registry rows (do not wipe uploaded ExtractedText).
+            if (existing.IsBuiltin && string.IsNullOrWhiteSpace(existing.ExtractedText)
+                && (existing.Category is "military" or "source" or "portal"
+                    || existing.EntryKey.StartsWith("source.", StringComparison.OrdinalIgnoreCase)
+                    || existing.EntryKey.StartsWith("portal.", StringComparison.OrdinalIgnoreCase)))
             {
+                existing.Category = "military";
                 existing.TitleZh = titleZh;
                 existing.TitleEn = titleEn;
                 existing.BodyZh = zhBody;
@@ -305,7 +461,7 @@ public class CanalKnowledgeService
         _db.CanalKnowledgeEntries.Add(new CanalKnowledgeEntry
         {
             EntryKey = key,
-            Category = category,
+            Category = NormalizeCategory(category),
             TitleZh = titleZh,
             TitleEn = titleEn,
             BodyZh = zhBody,
@@ -320,10 +476,16 @@ public class CanalKnowledgeService
         });
     }
 
-    private static string NormalizeCategory(string? raw)
+    /// <summary>Maps legacy + new labels onto identity | military | other.</summary>
+    public static string NormalizeCategory(string? raw)
     {
-        var v = (raw ?? "custom").Trim().ToLowerInvariant();
-        return v is "identity" or "lore" or "source" or "portal" or "custom" ? v : "custom";
+        var v = (raw ?? "other").Trim().ToLowerInvariant();
+        return v switch
+        {
+            "identity" or "lore" or "character" or "角色" or "角色身份" => "identity",
+            "military" or "source" or "portal" or "doctrine" or "军事" or "军事知识" or "军事知识贮备" => "military",
+            _ => "other",
+        };
     }
 
     private sealed class SeedRow

@@ -56,22 +56,22 @@
   },
   {
     "entryKey": "doctrine.citation-rule",
-    "category": "lore",
+    "category": "military",
     "titleZh": "条令引用规则",
     "titleEn": "Doctrine citation rule",
-    "bodyZh": "学说引用必须使用知识库 / 文献登记中的 document id（如 doc:fm-3-21.8）。禁止编造 ATP/FM 正文。知识可跨国家融合，不以来源国过滤教学。",
-    "bodyEn": "Doctrine citations must use a document id from the knowledge / source registry (e.g. doc:fm-3-21.8). Never invent ATP/FM body text. Knowledge may fuse across countries — do not filter teaching by origin country.",
+    "bodyZh": "学说引用必须使用知识库 / 文献登记中的 document id（如 doc:fm-3-21.8）。禁止编造 ATP/FM 正文。知识可跨国家融合，不以来源国过滤教学。上传的 PDF 正文优先于登记摘要。",
+    "bodyEn": "Doctrine citations must use a document id from the knowledge / source registry (e.g. doc:fm-3-21.8). Never invent ATP/FM body text. Knowledge may fuse across countries. Prefer uploaded PDF body text over registry blurbs.",
     "minTrustLevel": 1,
     "section": "doctrine",
     "sortOrder": 60
   },
   {
     "entryKey": "doctrine.assessment-bond",
-    "category": "lore",
+    "category": "identity",
     "titleZh": "课程考核与好感",
     "titleEn": "Curriculum quiz and affection",
-    "bodyZh": "Canal 课程强制考核；通过才计课程进度与课程加分。失败不扣好感。打卡 XP 与普通好感仍可生效。",
-    "bodyEn": "Canal lessons force assessment; pass credits progress and lesson bonus. Fail never cuts affection. Check-in XP and normal affection grind still apply.",
+    "bodyZh": "Canal（凯娜尔）课程强制考核；通过才计课程进度与课程加分。失败不扣好感。打卡 XP 与普通好感仍可生效。",
+    "bodyEn": "Canal (凯娜尔) lessons force assessment; pass credits progress and lesson bonus. Fail never cuts affection. Check-in XP and normal affection grind still apply.",
     "minTrustLevel": 0,
     "section": "system",
     "sortOrder": 70

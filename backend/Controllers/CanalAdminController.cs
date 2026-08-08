@@ -20,19 +20,25 @@ public class CanalAdminController : ControllerBase
     private readonly CanalKnowledgeService _knowledge;
     private readonly CurriculumSourceCatalog _sources;
     private readonly IConfiguration _config;
+    private readonly HabitMaterialTextExtractor _extractor;
+    private readonly IWebHostEnvironment _env;
 
     public CanalAdminController(
         AppDbContext db,
         CanalTrustService trust,
         CanalKnowledgeService knowledge,
         CurriculumSourceCatalog sources,
-        IConfiguration config)
+        IConfiguration config,
+        HabitMaterialTextExtractor extractor,
+        IWebHostEnvironment env)
     {
         _db = db;
         _trust = trust;
         _knowledge = knowledge;
         _sources = sources;
         _config = config;
+        _extractor = extractor;
+        _env = env;
     }
 
     private int? CallerId
@@ -297,6 +303,99 @@ public class CanalAdminController : ControllerBase
         return Ok(new { message = "已删除或停用", id });
     }
 
+    /// <summary>Upload PDF/docx/md/txt; extract text into the entry so Canal can recall it.</summary>
+    [HttpPost("knowledge/{id:int}/upload")]
+    [RequestSizeLimit(HabitMaterialTextExtractor.MaxUploadBytes)]
+    public async Task<IActionResult> UploadKnowledgeDocument(int id, IFormFile file, CancellationToken ct)
+    {
+        var entry = await _knowledge.GetAsync(id, ct);
+        if (entry == null) return NotFound("知识条目不存在");
+
+        if (file == null || file.Length == 0)
+            return BadRequest("请选择文件");
+        if (file.Length > HabitMaterialTextExtractor.MaxUploadBytes)
+            return BadRequest("文件过大（上限 8MB）");
+        if (!_extractor.IsAllowed(file.FileName))
+            return BadRequest("仅支持 pdf / docx / md / txt");
+
+        var safeName = Path.GetFileName(file.FileName);
+        var dir = Path.Combine(_env.ContentRootPath, "App_Data", "canal-knowledge", id.ToString());
+        Directory.CreateDirectory(dir);
+        var storedName = $"{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}{Path.GetExtension(safeName)}";
+        var fullPath = Path.Combine(dir, storedName);
+
+        await using (var fs = System.IO.File.Create(fullPath))
+            await file.CopyToAsync(fs, ct);
+
+        string extracted;
+        await using (var read = System.IO.File.OpenRead(fullPath))
+            extracted = await _extractor.ExtractAsync(safeName, read, ct);
+
+        if (string.IsNullOrWhiteSpace(extracted))
+            return BadRequest("未能抽取到可用文本（扫描版 PDF 可能需要 OCR）");
+
+        var updated = await _knowledge.AttachDocumentAsync(
+            id, safeName, _extractor.DetectContentType(safeName), file.Length, fullPath, extracted, ct);
+        return Ok(MapKnowledge(updated!));
+    }
+
+    [HttpPost("knowledge/upload")]
+    [RequestSizeLimit(HabitMaterialTextExtractor.MaxUploadBytes)]
+    public async Task<IActionResult> UploadNewKnowledgeDocument(
+        IFormFile file,
+        [FromForm] string? category,
+        [FromForm] string? titleZh,
+        [FromForm] string? titleEn,
+        [FromForm] int minTrustLevel = 1,
+        CancellationToken ct = default)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("请选择文件");
+        if (file.Length > HabitMaterialTextExtractor.MaxUploadBytes)
+            return BadRequest("文件过大（上限 8MB）");
+        if (!_extractor.IsAllowed(file.FileName))
+            return BadRequest("仅支持 pdf / docx / md / txt");
+
+        var safeName = Path.GetFileName(file.FileName);
+        var cat = CanalKnowledgeService.NormalizeCategory(category ?? "military");
+        var title = string.IsNullOrWhiteSpace(titleZh) ? Path.GetFileNameWithoutExtension(safeName) : titleZh.Trim();
+
+        var entry = await _knowledge.CreateAsync(new AdminCanalKnowledgeDto
+        {
+            EntryKey = $"upload.{Guid.NewGuid():N}",
+            Category = cat,
+            TitleZh = title,
+            TitleEn = string.IsNullOrWhiteSpace(titleEn) ? title : titleEn.Trim(),
+            BodyZh = "",
+            BodyEn = "",
+            MinTrustLevel = Math.Clamp(minTrustLevel, 0, CanalTrustService.MaxTrustLevel),
+            Section = "upload",
+            IsActive = true,
+            SortOrder = 5000,
+        }, ct);
+
+        var dir = Path.Combine(_env.ContentRootPath, "App_Data", "canal-knowledge", entry.Id.ToString());
+        Directory.CreateDirectory(dir);
+        var storedName = $"{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}{Path.GetExtension(safeName)}";
+        var fullPath = Path.Combine(dir, storedName);
+        await using (var fs = System.IO.File.Create(fullPath))
+            await file.CopyToAsync(fs, ct);
+
+        string extracted;
+        await using (var read = System.IO.File.OpenRead(fullPath))
+            extracted = await _extractor.ExtractAsync(safeName, read, ct);
+
+        if (string.IsNullOrWhiteSpace(extracted))
+        {
+            await _knowledge.DeleteAsync(entry.Id, ct);
+            return BadRequest("未能抽取到可用文本（扫描版 PDF 可能需要 OCR）");
+        }
+
+        var updated = await _knowledge.AttachDocumentAsync(
+            entry.Id, safeName, _extractor.DetectContentType(safeName), file.Length, fullPath, extracted, ct);
+        return Ok(MapKnowledge(updated!));
+    }
+
     [HttpPost("knowledge/reseed")]
     public async Task<IActionResult> ReseedKnowledge(CancellationToken ct)
     {
@@ -321,5 +420,10 @@ public class CanalAdminController : ControllerBase
         e.SortOrder,
         e.CreatedAt,
         e.UpdatedAt,
+        e.FileName,
+        e.ContentType,
+        e.FileSize,
+        hasDocument = !string.IsNullOrWhiteSpace(e.ExtractedText),
+        textLength = e.ExtractedText?.Length ?? 0,
     };
 }

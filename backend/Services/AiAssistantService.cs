@@ -129,16 +129,15 @@ public class AiAssistantService
             : await _memory.GetRelevantMemoriesAsync(
                 user.Id, userText, request.ZoneType, request.HabitId, ct: ct);
 
-        // Prefetch knowledge for habit zone, or when user sent an image / asked about materials.
+        // Prefetch habit materials when relevant; Canal (凯娜尔) literature is always searched.
         var wantKnowledge = !isDaily || imageDataUrl != null
             || userText.Contains("资料", StringComparison.Ordinal)
             || userText.Contains("知识", StringComparison.Ordinal)
+            || userText.Contains("文献", StringComparison.Ordinal)
+            || userText.Contains("条令", StringComparison.Ordinal)
             || userText.Contains("material", StringComparison.OrdinalIgnoreCase)
-            || userText.Contains("knowledge", StringComparison.OrdinalIgnoreCase);
-        var knowledgeBlock = wantKnowledge
-            ? await _knowledge.BuildContextBlockAsync(
-                user.Id, session.ZoneType, session.HabitId, userText, zh, ct)
-            : "";
+            || userText.Contains("knowledge", StringComparison.OrdinalIgnoreCase)
+            || userText.Contains("doctrine", StringComparison.OrdinalIgnoreCase);
 
         var recent = await _memory.GetRecentActiveMessagesAsync(
             session.Id, CompanionMemoryService.ShortTermMessageLimit, ct);
@@ -146,7 +145,11 @@ public class AiAssistantService
         var affection = CompanionAffectionService.Snapshot(user);
         var trust = _trust.SnapshotConfigured(user);
         var canalKbBlock = await _canalKnowledge.BuildPromptBlockAsync(trust.Level, zh, ct);
-        var mergedKnowledge = string.Join("\n\n", new[] { canalKbBlock, knowledgeBlock }
+        var habitKnowledge = wantKnowledge
+            ? await _knowledge.BuildContextBlockAsync(
+                user.Id, session.ZoneType, session.HabitId, userText, zh, trust.Level, ct)
+            : await _canalKnowledge.SearchDocumentsAsync(trust.Level, userText, zh, 8_000, ct);
+        var mergedKnowledge = string.Join("\n\n", new[] { canalKbBlock, habitKnowledge }
             .Where(s => !string.IsNullOrWhiteSpace(s)));
         var coldFact = isDaily ? ColdFacts.Pick(zh, user.Id) : "";
         var systemPrompt = BuildSystemPrompt(
@@ -525,7 +528,7 @@ public class AiAssistantService
             ["type"] = "object",
             ["properties"] = new JsonObject()
         }),
-        Tool("search_knowledge", "Search the user's study materials (habit uploads) and long-term memories by keyword. Use when answering questions about study content.", new JsonObject
+        Tool("search_knowledge", "Search Canal (凯娜尔) knowledge base (including uploaded PDF/docx literature text), the user's study materials, and long-term memories by keyword. Use for doctrine / literature questions.", new JsonObject
         {
             ["type"] = "object",
             ["properties"] = new JsonObject
@@ -625,11 +628,13 @@ public class AiAssistantService
                 case "search_knowledge":
                 {
                     var query = ReadStringArg(args, "query")?.Trim() ?? "";
-                    var block = await _knowledge.SearchAsync(user.Id, zoneType, habitId, query, zh, ct);
+                    var trustSnap = _trust.SnapshotConfigured(user);
+                    var block = await _knowledge.SearchAsync(
+                        user.Id, zoneType, habitId, query, zh, trustSnap.Level, ct);
                     return (block, new ChatActionResult
                     {
                         Type = "search_knowledge",
-                        Summary = zh ? $"已检索知识库：{query}" : $"Searched knowledge: {query}",
+                        Summary = zh ? $"已检索凯娜尔知识库：{query}" : $"Searched Canal knowledge: {query}",
                         HabitId = habitId > 0 ? habitId : null
                     });
                 }

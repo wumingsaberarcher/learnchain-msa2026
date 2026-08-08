@@ -318,3 +318,25 @@
 	padding: 0.4rem 0.5rem;
 	text-align: left;
 }
+
+.canal-admin-subtabs {
+	margin: 0.35rem 0 0.75rem;
+}
+
+.canal-admin-kb-group {
+	margin-top: 1rem;
+}
+
+.canal-admin-kb-group h3 {
+	margin: 0 0 0.5rem;
+	font-size: 1rem;
+	display: flex;
+	align-items: baseline;
+	gap: 0.4rem;
+}
+
+.canal-admin-kb-group h3 span {
+	font-size: 0.8rem;
+	opacity: 0.65;
+	font-weight: 500;
+}

@@ -8,13 +8,15 @@ namespace backend.Services;
 /// <summary>Retrieve study materials + memories for Canal (text or vision grounding).</summary>
 public class KnowledgeRetrievalService
 {
-    public const int MaxSnippetChars = 10_000;
+    public const int MaxSnippetChars = 14_000;
 
     private readonly AppDbContext _db;
+    private readonly CanalKnowledgeService _canalKnowledge;
 
-    public KnowledgeRetrievalService(AppDbContext db)
+    public KnowledgeRetrievalService(AppDbContext db, CanalKnowledgeService canalKnowledge)
     {
         _db = db;
+        _canalKnowledge = canalKnowledge;
     }
 
     public async Task<string> BuildContextBlockAsync(
@@ -23,6 +25,7 @@ public class KnowledgeRetrievalService
         int habitId,
         string? query,
         bool zh,
+        int trustLevel = 4,
         CancellationToken ct = default)
     {
         var (zone, hid) = ChatZones.Normalize(zoneType, habitId);
@@ -111,10 +114,20 @@ public class KnowledgeRetrievalService
             .Select(x => $"- [{x.Type}/{x.Key}] {x.Content}")
             .ToList();
 
-        if (materialLines.Count == 0 && memoryLines.Count == 0)
+        var canalBlock = await _canalKnowledge.SearchDocumentsAsync(trustLevel, query, zh, 10_000, ct);
+        var hasCanal = !string.IsNullOrWhiteSpace(canalBlock)
+                       && !canalBlock.Contains("无匹配", StringComparison.Ordinal)
+                       && !canalBlock.Contains("No matching", StringComparison.OrdinalIgnoreCase);
+
+        if (materialLines.Count == 0 && memoryLines.Count == 0 && !hasCanal)
             return zh ? "（当前知识库与记忆暂无匹配内容）" : "(No matching knowledge or memories.)";
 
         var sb = new System.Text.StringBuilder();
+        if (hasCanal)
+        {
+            sb.AppendLine(canalBlock);
+            sb.AppendLine();
+        }
         if (memoryLines.Count > 0)
         {
             sb.AppendLine(zh ? "相关记忆：" : "Related memories:");
@@ -134,11 +147,12 @@ public class KnowledgeRetrievalService
         int habitId,
         string query,
         bool zh,
+        int trustLevel = 4,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query))
             return zh ? "请提供检索关键词。" : "Provide a search query.";
-        return await BuildContextBlockAsync(userId, zoneType, habitId, query, zh, ct);
+        return await BuildContextBlockAsync(userId, zoneType, habitId, query, zh, trustLevel, ct);
     }
 
     private static HashSet<string> ExtractTerms(string? text)

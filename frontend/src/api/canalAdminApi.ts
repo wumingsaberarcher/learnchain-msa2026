@@ -85,6 +85,11 @@ export interface CanalKnowledgeEntry {
   sortOrder: number
   createdAt: string
   updatedAt: string
+  fileName?: string
+  contentType?: string
+  fileSize?: number
+  hasDocument?: boolean
+  textLength?: number
 }
 
 export async function fetchCanalDebug(): Promise<CanalDebugSnapshot> {
@@ -175,6 +180,38 @@ export async function reseedCanalKnowledge(): Promise<{ count: number }> {
   const res = await apiFetch('/admin/canal/knowledge/reseed', {
     method: 'POST',
     headers: authHeaders(true),
+  })
+  if (!res.ok) throw new Error(await readError(res))
+  return res.json()
+}
+
+export async function uploadCanalKnowledgeFile(
+  file: File,
+  opts?: { category?: string; titleZh?: string; titleEn?: string; minTrustLevel?: number },
+): Promise<CanalKnowledgeEntry> {
+  const form = new FormData()
+  form.append('file', file)
+  if (opts?.category) form.append('category', opts.category)
+  if (opts?.titleZh) form.append('titleZh', opts.titleZh)
+  if (opts?.titleEn) form.append('titleEn', opts.titleEn)
+  if (opts?.minTrustLevel != null) form.append('minTrustLevel', String(opts.minTrustLevel))
+  const res = await apiFetch('/admin/canal/knowledge/upload', {
+    method: 'POST',
+    body: form,
+  })
+  if (!res.ok) throw new Error(await readError(res))
+  return res.json()
+}
+
+export async function uploadCanalKnowledgeToEntry(
+  id: number,
+  file: File,
+): Promise<CanalKnowledgeEntry> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await apiFetch(`/admin/canal/knowledge/${id}/upload`, {
+    method: 'POST',
+    body: form,
   })
   if (!res.ok) throw new Error(await readError(res))
   return res.json()

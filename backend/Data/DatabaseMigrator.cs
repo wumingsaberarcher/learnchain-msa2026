@@ -46,6 +46,11 @@ public static class DatabaseMigrator
             EnsureSqliteColumn(connection, "Users", "CurriculumInjectCountToday", "INTEGER NOT NULL DEFAULT 0");
             EnsureSqliteColumn(connection, "Users", "CurriculumStateJson", "TEXT NOT NULL DEFAULT '{\"injected\":[],\"completed\":[]}'");
             EnsureSqliteColumn(connection, "Users", "CanalEvaluation", "TEXT NOT NULL DEFAULT ''");
+            EnsureSqliteColumn(connection, "CanalKnowledgeEntries", "ExtractedText", "TEXT NOT NULL DEFAULT ''");
+            EnsureSqliteColumn(connection, "CanalKnowledgeEntries", "FileName", "TEXT NOT NULL DEFAULT ''");
+            EnsureSqliteColumn(connection, "CanalKnowledgeEntries", "ContentType", "TEXT NOT NULL DEFAULT ''");
+            EnsureSqliteColumn(connection, "CanalKnowledgeEntries", "FileSize", "INTEGER NOT NULL DEFAULT 0");
+            EnsureSqliteColumn(connection, "CanalKnowledgeEntries", "StoredPath", "TEXT NOT NULL DEFAULT ''");
             EnsureSqliteColumn(connection, "Habits", "AssessmentEnabled", "INTEGER NOT NULL DEFAULT 0");
             EnsureSqliteColumn(connection, "Habits", "AssessmentDifficulty", "TEXT NOT NULL DEFAULT 'easy'");
             EnsureSqliteColumn(connection, "Habits", "GroupId", "INTEGER NULL");
@@ -132,11 +137,16 @@ public static class DatabaseMigrator
                 CREATE TABLE IF NOT EXISTS CanalKnowledgeEntries (
                     Id INTEGER PRIMARY KEY AUTOINCREMENT,
                     EntryKey TEXT NOT NULL,
-                    Category TEXT NOT NULL DEFAULT 'custom',
+                    Category TEXT NOT NULL DEFAULT 'other',
                     TitleZh TEXT NOT NULL DEFAULT '',
                     TitleEn TEXT NOT NULL DEFAULT '',
                     BodyZh TEXT NOT NULL DEFAULT '',
                     BodyEn TEXT NOT NULL DEFAULT '',
+                    ExtractedText TEXT NOT NULL DEFAULT '',
+                    FileName TEXT NOT NULL DEFAULT '',
+                    ContentType TEXT NOT NULL DEFAULT '',
+                    FileSize INTEGER NOT NULL DEFAULT 0,
+                    StoredPath TEXT NOT NULL DEFAULT '',
                     MinTrustLevel INTEGER NOT NULL DEFAULT 0,
                     Section TEXT NOT NULL DEFAULT '',
                     IsBuiltin INTEGER NOT NULL DEFAULT 0,
@@ -225,6 +235,11 @@ public static class DatabaseMigrator
             EnsurePostgresColumn(connection, "Users", "CurriculumInjectCountToday", "integer NOT NULL DEFAULT 0");
             EnsurePostgresColumn(connection, "Users", "CurriculumStateJson", "text NOT NULL DEFAULT '{\"injected\":[],\"completed\":[]}'");
             EnsurePostgresColumn(connection, "Users", "CanalEvaluation", "text NOT NULL DEFAULT ''");
+            EnsurePostgresColumn(connection, "CanalKnowledgeEntries", "ExtractedText", "text NOT NULL DEFAULT ''");
+            EnsurePostgresColumn(connection, "CanalKnowledgeEntries", "FileName", "text NOT NULL DEFAULT ''");
+            EnsurePostgresColumn(connection, "CanalKnowledgeEntries", "ContentType", "text NOT NULL DEFAULT ''");
+            EnsurePostgresColumn(connection, "CanalKnowledgeEntries", "FileSize", "bigint NOT NULL DEFAULT 0");
+            EnsurePostgresColumn(connection, "CanalKnowledgeEntries", "StoredPath", "text NOT NULL DEFAULT ''");
             EnsurePostgresColumn(connection, "Habits", "HabitType", "text NOT NULL DEFAULT 'Daily'");
             EnsurePostgresColumn(connection, "Habits", "Difficulty", "integer NOT NULL DEFAULT 1");
             EnsurePostgresColumn(connection, "Habits", "DueDate", "timestamp with time zone NULL");
@@ -297,11 +312,16 @@ public static class DatabaseMigrator
                     CREATE TABLE IF NOT EXISTS "CanalKnowledgeEntries" (
                         "Id" serial PRIMARY KEY,
                         "EntryKey" text NOT NULL,
-                        "Category" text NOT NULL DEFAULT 'custom',
+                        "Category" text NOT NULL DEFAULT 'other',
                         "TitleZh" text NOT NULL DEFAULT '',
                         "TitleEn" text NOT NULL DEFAULT '',
                         "BodyZh" text NOT NULL DEFAULT '',
                         "BodyEn" text NOT NULL DEFAULT '',
+                        "ExtractedText" text NOT NULL DEFAULT '',
+                        "FileName" text NOT NULL DEFAULT '',
+                        "ContentType" text NOT NULL DEFAULT '',
+                        "FileSize" bigint NOT NULL DEFAULT 0,
+                        "StoredPath" text NOT NULL DEFAULT '',
                         "MinTrustLevel" integer NOT NULL DEFAULT 0,
                         "Section" text NOT NULL DEFAULT '',
                         "IsBuiltin" boolean NOT NULL DEFAULT false,
