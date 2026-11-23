@@ -4,6 +4,19 @@ Gamified personal habit tracker — React + .NET 10 (MSA 2026 Phase 2).
 
 Build lasting habits through check-ins, streaks, XP, levels, achievements, and a visual habit calendar.
 
+## For recruiters (30 seconds)
+
+**Live app:** https://learnchain-msa2026.vercel.app  
+**Source:** this repo · **API health:** https://learnchain-msa2026.onrender.com/health  
+
+What it is: a public full-stack habit tracker with JWT auth, server-enforced check-ins / streaks / XP / badges, bilingual UI, and an AI companion that only mutates habits after a server check.
+
+Stack: **React** (Vercel) · **ASP.NET Core** + **PostgreSQL** + **Docker** (Render) · **xUnit**.
+
+Not a coursework-only demo — shipped and reachable on the public web.
+
+---
+
 ## Live Deployment
 
 | Service | URL | Notes |
