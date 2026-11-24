@@ -16,28 +16,33 @@ export default function BootIntro({ onFinished }: BootIntroProps) {
     const finish = () => {
         if (doneRef.current) return
         doneRef.current = true
+        setPhase('exit')
         try {
             sessionStorage.setItem(SESSION_KEY, '1')
+            // Cover mode is one-shot for the current URL load
+            const url = new URL(window.location.href)
+            if (url.searchParams.has('cover')) {
+                url.searchParams.delete('cover')
+                window.history.replaceState({}, '', url.pathname + url.search + url.hash)
+            }
         } catch { /* ignore */ }
-        onFinished()
+        window.setTimeout(() => onFinished(), 720)
     }
 
     useEffect(() => {
         const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
         if (reduce) {
-            const t0 = window.setTimeout(() => finish(), 200)
-            return () => clearTimeout(t0)
+            setPhase('hold')
+            return
         }
 
-        const toHold = window.setTimeout(() => setPhase('hold'), 700)
-        const toExit = window.setTimeout(() => setPhase('exit'), 2400)
-        const toDone = window.setTimeout(() => finish(), 3200)
+        const toHold = window.setTimeout(() => setPhase('hold'), 900)
+        // Stay on the cover until the user enters — soft fallback for kiosks only
+        const softEnter = window.setTimeout(() => finish(), 22000)
         return () => {
             clearTimeout(toHold)
-            clearTimeout(toExit)
-            clearTimeout(toDone)
+            clearTimeout(softEnter)
         }
-        // finish is stable for this mount; avoid re-arming timers
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -45,30 +50,50 @@ export default function BootIntro({ onFinished }: BootIntroProps) {
         <div
             className={`boot-intro theme-${theme} phase-${phase}`}
             role="dialog"
+            aria-modal="true"
             aria-label={t('intro.aria')}
-            onClick={finish}
         >
+            <div className="boot-intro-sky" aria-hidden="true" />
+            <div className="boot-intro-grid" aria-hidden="true" />
             <div className="boot-intro-glow" aria-hidden="true" />
-            <div className="boot-intro-ring" aria-hidden="true" />
+            <div className="boot-intro-beam" aria-hidden="true" />
 
-            <div className="boot-intro-brand">
-                <div className="boot-intro-mark">
-                    <LearnChainLogo size={88} />
+            <div className="boot-intro-stage">
+                <div className="boot-intro-copy">
+                    <p className="boot-intro-kicker">{t('intro.kicker')}</p>
+                    <div className="boot-intro-brand-row">
+                        <div className="boot-intro-mark">
+                            <LearnChainLogo size={72} />
+                        </div>
+                        <h1 className="boot-intro-title">LearnChain</h1>
+                    </div>
+                    <p className="boot-intro-headline">{t('dash.heroHeadline')}</p>
+                    <p className="boot-intro-tag">{t('dash.tagline')}</p>
+
+                    <div className="boot-intro-actions">
+                        <button type="button" className="boot-intro-enter" onClick={finish}>
+                            {t('intro.enter')}
+                        </button>
+                        <button type="button" className="boot-intro-skip" onClick={finish}>
+                            {t('intro.skip')}
+                        </button>
+                    </div>
                 </div>
-                <h1 className="boot-intro-title">LearnChain</h1>
-                <p className="boot-intro-tag">{t('dash.tagline')}</p>
-            </div>
 
-            <button
-                type="button"
-                className="boot-intro-skip"
-                onClick={e => {
-                    e.stopPropagation()
-                    finish()
-                }}
-            >
-                {t('intro.skip')}
-            </button>
+                <div className="boot-intro-visual" aria-hidden="true">
+                    <div className="boot-intro-orbit" />
+                    <div className="boot-intro-orbit boot-intro-orbit-inner" />
+                    <div className="boot-intro-chain">
+                        <span className="boot-link boot-link-a" />
+                        <span className="boot-link boot-link-b" />
+                        <span className="boot-link boot-link-c" />
+                        <span className="boot-link-node" />
+                    </div>
+                    <div className="boot-intro-mark-xl">
+                        <LearnChainLogo size={200} />
+                    </div>
+                </div>
+            </div>
         </div>
     )
 }
@@ -76,6 +101,11 @@ export default function BootIntro({ onFinished }: BootIntroProps) {
 export function shouldShowBootIntro(): boolean {
     if (typeof window === 'undefined') return false
     try {
+        const params = new URLSearchParams(window.location.search)
+        if (params.get('cover') === '1' || params.get('cover') === 'true') {
+            sessionStorage.removeItem(SESSION_KEY)
+            return true
+        }
         return sessionStorage.getItem(SESSION_KEY) !== '1'
     } catch {
         return true
