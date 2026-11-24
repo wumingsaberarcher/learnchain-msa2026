@@ -38,7 +38,6 @@ export interface AdminUserDetail extends Omit<AdminUserSummary, 'habitCount' | '
     achievements: { badgeId: string; unlocked: boolean; unlockedAt?: string | null }[]
     /** SuperAdmin-only fields */
     dailyDigestEnabled?: boolean
-    password?: string | null
     passwordAvailable?: boolean
     hasPendingReset?: boolean
     viewerIsSuperAdmin?: boolean
@@ -147,7 +146,7 @@ export async function setUserRole(id: number, role: 'Admin' | 'User') {
     return res.json()
 }
 
-/** SuperAdmin: set password and receive it back once. */
+/** SuperAdmin: set a new password (caller already knows the value; API does not echo it). */
 export async function setUserPassword(id: number, password: string) {
     const res = await apiFetch(`/admin/users/${id}/password`, {
         method: 'PUT',
@@ -155,7 +154,7 @@ export async function setUserPassword(id: number, password: string) {
         body: JSON.stringify({ password }),
     })
     if (!res.ok) throw new Error(await readError(res))
-    return res.json() as Promise<{ message: string; password: string }>
+    return res.json() as Promise<{ message: string }>
 }
 
 export async function listBadgeIds(): Promise<string[]> {

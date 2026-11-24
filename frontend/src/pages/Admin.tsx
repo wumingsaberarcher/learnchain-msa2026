@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { Shield, Search, Ban, BadgeCheck, Sparkles, Trash2, KeyRound, Crown, Eye, EyeOff } from 'lucide-react'
+import { Shield, Search, Ban, BadgeCheck, Sparkles, Trash2, KeyRound, Crown } from 'lucide-react'
 import { useHabitStore } from '../stores/habitStore'
 import { useTranslation } from '../stores/settingsStore'
 import { BADGE_DEFINITIONS, BADGE_MAP } from '../badges/badgeDefinitions'
@@ -48,7 +48,7 @@ export default function AdminPage() {
     const [banHours, setBanHours] = useState<number>(24)
     const [grantBadgeId, setGrantBadgeId] = useState('')
     const [passwordInput, setPasswordInput] = useState('')
-    const [showPassword, setShowPassword] = useState(false)
+    const [tempPasswordOnce, setTempPasswordOnce] = useState<string | null>(null)
     const [msg, setMsg] = useState('')
     const [err, setErr] = useState('')
     const [loading, setLoading] = useState(false)
@@ -79,7 +79,7 @@ export default function AdminPage() {
 
     const loadDetail = useCallback(async (id: number) => {
         setErr('')
-        setShowPassword(false)
+        setTempPasswordOnce(null)
         setPasswordInput('')
         try {
             const d = await getAdminUser(id)
@@ -247,18 +247,43 @@ export default function AdminPage() {
         }
     }
 
+    const makeTempPassword = () => {
+        const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+        let out = 'Lc'
+        for (let i = 0; i < 8; i++) {
+            out += alphabet[Math.floor(Math.random() * alphabet.length)]
+        }
+        out += String(Math.floor(Math.random() * 90) + 10)
+        return out
+    }
+
     const onSetPassword = async () => {
         if (!detail || !isSuper) return
         if (!passwordInput.trim()) {
             setErr(t('admin.invalidPassword'))
             return
         }
+        const next = passwordInput.trim()
         try {
-            const res = await setUserPassword(detail.id, passwordInput.trim())
+            await setUserPassword(detail.id, next)
+            setPasswordInput('')
             flash(t('admin.passwordUpdated'))
-            setPasswordInput(res.password)
-            setShowPassword(true)
             await loadDetail(detail.id)
+            setTempPasswordOnce(next)
+        } catch (e) {
+            setErr(e instanceof Error ? e.message : t('admin.actionFailed'))
+        }
+    }
+
+    const onIssueTempPassword = async () => {
+        if (!detail || !isSuper) return
+        const next = makeTempPassword()
+        try {
+            await setUserPassword(detail.id, next)
+            setPasswordInput('')
+            flash(t('admin.tempPasswordIssued'))
+            await loadDetail(detail.id)
+            setTempPasswordOnce(next)
         } catch (e) {
             setErr(e instanceof Error ? e.message : t('admin.actionFailed'))
         }
@@ -376,23 +401,13 @@ export default function AdminPage() {
                                             <p><strong>{t('admin.secretDigest')}:</strong> {detail.dailyDigestEnabled ? t('admin.yes') : t('admin.no')}</p>
                                             <p className="admin-password-row">
                                                 <strong>{t('admin.secretPassword')}:</strong>{' '}
-                                                {detail.passwordAvailable && detail.password ? (
-                                                    <>
-                                                        <code>{showPassword ? detail.password : '••••••••'}</code>
-                                                        <button
-                                                            type="button"
-                                                            className="admin-revoke-btn"
-                                                            onClick={() => setShowPassword(v => !v)}
-                                                        >
-                                                            {showPassword
-                                                                ? <><EyeOff className="w-3.5 h-3.5 inline" /> {t('admin.hidePassword')}</>
-                                                                : <><Eye className="w-3.5 h-3.5 inline" /> {t('admin.showPassword')}</>}
-                                                        </button>
-                                                    </>
-                                                ) : (
-                                                    <span className="admin-hint">{t('admin.passwordUnavailable')}</span>
-                                                )}
+                                                <span className="admin-hint">{t('admin.passwordResetHint')}</span>
                                             </p>
+                                            {tempPasswordOnce && (
+                                                <p className="admin-msg success" role="status">
+                                                    {t('admin.tempPasswordOnce', { password: tempPasswordOnce })}
+                                                </p>
+                                            )}
                                         </div>
                                         {!targetIsSuper && (
                                             <div className="admin-inline" style={{ marginTop: '0.75rem' }}>
@@ -406,6 +421,10 @@ export default function AdminPage() {
                                                 <button type="button" className="btn btn-secondary" onClick={() => void onSetPassword()}>
                                                     <KeyRound className="w-4 h-4 inline mr-1" />
                                                     {t('admin.setPassword')}
+                                                </button>
+                                                <button type="button" className="btn btn-secondary" onClick={() => void onIssueTempPassword()}>
+                                                    <KeyRound className="w-4 h-4 inline mr-1" />
+                                                    {t('admin.issueTempPassword')}
                                                 </button>
                                             </div>
                                         )}

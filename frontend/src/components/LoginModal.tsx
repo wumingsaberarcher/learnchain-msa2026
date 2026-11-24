@@ -147,7 +147,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                     body: JSON.stringify({ email: email.trim(), language }),
                 })
                 const bodyText = await res.text()
-                let parsed: { message?: string; username?: string; devCode?: string } = {}
+                let parsed: { message?: string; emailed?: boolean } = {}
                 try {
                     parsed = JSON.parse(bodyText)
                 } catch {
@@ -159,15 +159,12 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
                 if (!res.ok) {
                     setError(message)
                 } else {
-                    if (parsed.devCode) {
-                        setResetCode(parsed.devCode)
-                        setInfo(t('auth.forgotDevCode', {
-                            username: parsed.username || '—',
-                            code: parsed.devCode,
-                        }))
-                    } else {
-                        setInfo(message || t('auth.forgotSent'))
-                    }
+                    // Never surface reset codes in the UI — email or server logs only.
+                    setInfo(
+                        parsed.emailed === false
+                            ? t('auth.forgotDevHint')
+                            : (message || t('auth.forgotSent')),
+                    )
                     setMode('reset')
                 }
             } catch {
