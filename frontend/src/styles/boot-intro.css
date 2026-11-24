@@ -1,0 +1,191 @@
+.boot-intro {
+	position: fixed;
+	inset: 0;
+	z-index: 9999;
+	display: grid;
+	place-items: center;
+	background:
+		radial-gradient(ellipse 80% 60% at 50% 40%, rgba(0, 232, 255, 0.14), transparent 55%),
+		radial-gradient(ellipse 50% 40% at 70% 70%, rgba(255, 79, 216, 0.1), transparent 50%),
+		#05050a;
+	color: #eef6ff;
+	cursor: pointer;
+	overflow: hidden;
+	animation: bootIntroFadeIn 0.35s ease;
+}
+
+.boot-intro.theme-day {
+	background:
+		radial-gradient(ellipse 80% 60% at 50% 38%, rgba(46, 125, 50, 0.18), transparent 55%),
+		radial-gradient(ellipse 50% 40% at 72% 72%, rgba(249, 168, 37, 0.16), transparent 50%),
+		#f2f7ef;
+	color: #1a2e1a;
+}
+
+.boot-intro.phase-exit {
+	animation: bootIntroFadeOut 0.75s ease forwards;
+	pointer-events: none;
+}
+
+@keyframes bootIntroFadeIn {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+@keyframes bootIntroFadeOut {
+	to {
+		opacity: 0;
+		transform: scale(1.04);
+		filter: blur(8px);
+	}
+}
+
+.boot-intro-glow {
+	position: absolute;
+	width: min(70vw, 420px);
+	height: min(70vw, 420px);
+	border-radius: 50%;
+	background: radial-gradient(circle, rgba(0, 232, 255, 0.22), transparent 68%);
+	filter: blur(12px);
+	animation: bootPulse 2.4s ease-in-out infinite;
+}
+
+.boot-intro.theme-day .boot-intro-glow {
+	background: radial-gradient(circle, rgba(46, 125, 50, 0.22), transparent 68%);
+}
+
+@keyframes bootPulse {
+	0%, 100% { transform: scale(0.92); opacity: 0.7; }
+	50% { transform: scale(1.08); opacity: 1; }
+}
+
+.boot-intro-ring {
+	position: absolute;
+	width: min(55vw, 280px);
+	height: min(55vw, 280px);
+	border-radius: 50%;
+	border: 1px dashed rgba(0, 232, 255, 0.28);
+	animation: bootSpin 18s linear infinite;
+}
+
+.boot-intro.theme-day .boot-intro-ring {
+	border-color: rgba(46, 125, 50, 0.28);
+}
+
+@keyframes bootSpin {
+	to { transform: rotate(360deg); }
+}
+
+.boot-intro-brand {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 1rem;
+	text-align: center;
+	padding: 2rem;
+}
+
+.boot-intro-mark {
+	opacity: 0;
+	transform: scale(0.6) translateY(18px);
+	filter: drop-shadow(0 12px 40px rgba(0, 232, 255, 0.35));
+}
+
+.boot-intro.phase-enter .boot-intro-mark,
+.boot-intro.phase-hold .boot-intro-mark,
+.boot-intro.phase-exit .boot-intro-mark {
+	animation: bootMarkIn 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes bootMarkIn {
+	to {
+		opacity: 1;
+		transform: scale(1) translateY(0);
+	}
+}
+
+.boot-intro-title {
+	margin: 0;
+	font-family: 'Sora', 'Outfit', system-ui, sans-serif;
+	font-weight: 800;
+	font-size: clamp(2.4rem, 8vw, 3.6rem);
+	letter-spacing: -0.03em;
+	background: linear-gradient(100deg, #00e8ff, #7aa2ff 45%, #ff4fd8);
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	opacity: 0;
+	transform: translateY(16px);
+}
+
+.boot-intro.theme-day .boot-intro-title {
+	background: linear-gradient(100deg, #1b5e20, #2e7d32 40%, #f9a825);
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+}
+
+.boot-intro.phase-enter .boot-intro-title,
+.boot-intro.phase-hold .boot-intro-title,
+.boot-intro.phase-exit .boot-intro-title {
+	animation: bootTitleIn 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.35s forwards;
+}
+
+@keyframes bootTitleIn {
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.boot-intro-tag {
+	margin: 0;
+	font-family: 'Outfit', system-ui, sans-serif;
+	font-size: clamp(0.95rem, 2.8vw, 1.15rem);
+	opacity: 0;
+	letter-spacing: 0.04em;
+	color: rgba(220, 235, 255, 0.72);
+}
+
+.boot-intro.theme-day .boot-intro-tag {
+	color: rgba(40, 70, 40, 0.75);
+}
+
+.boot-intro.phase-enter .boot-intro-tag,
+.boot-intro.phase-hold .boot-intro-tag,
+.boot-intro.phase-exit .boot-intro-tag {
+	animation: bootTitleIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.65s forwards;
+}
+
+.boot-intro-skip {
+	position: absolute;
+	bottom: max(1.5rem, env(safe-area-inset-bottom));
+	left: 50%;
+	transform: translateX(-50%);
+	border: none;
+	background: transparent;
+	color: inherit;
+	opacity: 0.45;
+	font-family: 'Outfit', system-ui, sans-serif;
+	font-size: 0.85rem;
+	cursor: pointer;
+	padding: 0.5rem 1rem;
+}
+
+.boot-intro-skip:hover {
+	opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.boot-intro-glow,
+	.boot-intro-ring,
+	.boot-intro-mark,
+	.boot-intro-title,
+	.boot-intro-tag {
+		animation: none !important;
+		opacity: 1 !important;
+		transform: none !important;
+	}
+}

@@ -153,6 +153,11 @@ const zh = {
 
     // Dashboard
     'dash.tagline': 'Where Persistence Meets Growth',
+    'dash.heroHeadline': '把每一次坚持，连成成长的链',
+    'dash.snapshotTitle': '今日进度',
+    'dash.snapshotDesc': '习惯、连击、经验与打卡一览',
+    'intro.aria': 'LearnChain 启动画面',
+    'intro.skip': '点击进入',
     'dash.myHabits': '我的习惯',
     'dash.streak': '当前连击',
     'dash.totalXp': '总经验值',
@@ -942,6 +947,11 @@ const en: Record<keyof typeof zh, string> = {
     'auth.resendCode': 'Resend code',
 
     'dash.tagline': 'Where Persistence Meets Growth',
+    'dash.heroHeadline': 'Link every check-in into a chain of growth',
+    'dash.snapshotTitle': "Today's snapshot",
+    'dash.snapshotDesc': 'Habits, streaks, XP, and check-ins at a glance',
+    'intro.aria': 'LearnChain splash screen',
+    'intro.skip': 'Tap to enter',
     'dash.myHabits': 'My Habits',
     'dash.streak': 'Current Streak',
     'dash.totalXp': 'Total XP',

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useHabitStore } from '../stores/habitStore'
 import { useTranslation } from '../stores/languageStore'
-import { CheckCircle2, Clock, Sparkles } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Clock, Sparkles } from 'lucide-react'
 import { difficultyKey, habitTypeKey } from '../utils/habitHelpers'
 import HabitCalendar from '../components/HabitCalendar'
+import LearnChainLogo from '../components/LearnChainLogo'
 import { getAllCheckIns } from '../api/checkInApi'
 import type { CalendarCheckIn } from '../utils/habitCalendarHelpers'
 
@@ -54,32 +55,47 @@ export default function ChainDashboard() {
     return (
         <div className="min-h-screen">
             <section id="home" className="hero">
-                <div className="hero-content">
-                    <h1>LearnChain</h1>
-                    <p>{t('dash.tagline')}</p>
-
-                    <div className="hero-stats">
-                        <div className="stat">
-                            <span className="stat-number">{totalHabits}</span>
-                            <span className="stat-label">{t('dash.myHabits')}</span>
-                        </div>
-                        <div className="stat">
-                            <span className="stat-number">{totalStreak}</span>
-                            <span className="stat-label">{t('dash.streak')}</span>
-                        </div>
-                        <div className="stat">
-                            <span className="stat-number">{currentUser?.totalXP || 0}</span>
-                            <span className="stat-label">{t('dash.totalXp')}</span>
-                        </div>
-                        <div className="stat">
-                            <span className="stat-number">{todayCheckedCount}</span>
-                            <span className="stat-label">{t('dash.todayCheckin')}</span>
-                        </div>
+                <div className="hero-atmosphere" aria-hidden="true">
+                    <div className="hero-orbit" />
+                    <div className="hero-mark-glow">
+                        <LearnChainLogo size={220} className="hero-watermark" />
                     </div>
-
+                </div>
+                <div className="hero-content">
+                    <div className="hero-brand">
+                        <LearnChainLogo size={56} />
+                        <h1>LearnChain</h1>
+                    </div>
+                    <p className="hero-headline">{t('dash.heroHeadline')}</p>
+                    <p className="hero-support">{t('dash.tagline')}</p>
                     <div className="cta-buttons">
-                        <a href="/habits" className="btn btn-primary">{t('dash.goCheckin')}</a>
+                        <a href="/habits" className="btn btn-primary">
+                            {t('dash.goCheckin')} <ArrowRight className="inline w-5 h-5 ml-1" />
+                        </a>
                         <a href="#habits" className="btn btn-secondary">{t('dash.viewHabits')}</a>
+                    </div>
+                </div>
+            </section>
+
+            <section id="snapshot" className="section hero-snapshot">
+                <h2>{t('dash.snapshotTitle')}</h2>
+                <p className="hero-snapshot-desc">{t('dash.snapshotDesc')}</p>
+                <div className="hero-stats">
+                    <div className="stat">
+                        <span className="stat-number">{totalHabits}</span>
+                        <span className="stat-label">{t('dash.myHabits')}</span>
+                    </div>
+                    <div className="stat">
+                        <span className="stat-number">{totalStreak}</span>
+                        <span className="stat-label">{t('dash.streak')}</span>
+                    </div>
+                    <div className="stat">
+                        <span className="stat-number">{currentUser?.totalXP || 0}</span>
+                        <span className="stat-label">{t('dash.totalXp')}</span>
+                    </div>
+                    <div className="stat">
+                        <span className="stat-number">{todayCheckedCount}</span>
+                        <span className="stat-label">{t('dash.todayCheckin')}</span>
                     </div>
                 </div>
             </section>
