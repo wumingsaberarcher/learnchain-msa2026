@@ -44,8 +44,7 @@ export interface UserMemoryItem {
 }
 
 export interface AiProviderSettings {
-    apiKey: string
-    baseUrl: string
+    /** Preferred model name only — API keys stay on the server. */
     model: string
 }
 
@@ -95,8 +94,6 @@ export async function sendChat(
         body: JSON.stringify({
             messages: messages.map(m => ({ role: m.role, content: m.content })),
             language,
-            apiKey: provider.apiKey,
-            baseUrl: provider.baseUrl || undefined,
             model: provider.model || undefined,
             zoneType: zone,
             habitId: zone === 'habit' ? scope?.habitId : undefined,

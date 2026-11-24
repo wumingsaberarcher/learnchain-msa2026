@@ -16,15 +16,18 @@ public class HabitGroupDescriptionService
 
     private readonly AppDbContext _db;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly AiCredentialResolver _aiCredentials;
     private readonly ILogger<HabitGroupDescriptionService> _logger;
 
     public HabitGroupDescriptionService(
         AppDbContext db,
         IHttpClientFactory httpClientFactory,
+        AiCredentialResolver aiCredentials,
         ILogger<HabitGroupDescriptionService> logger)
     {
         _db = db;
         _httpClientFactory = httpClientFactory;
+        _aiCredentials = aiCredentials;
         _logger = logger;
     }
 
@@ -34,9 +37,8 @@ public class HabitGroupDescriptionService
         GenerateGroupDescriptionRequest request,
         CancellationToken ct = default)
     {
-        var apiKey = (request.ApiKey ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(apiKey))
-            throw new InvalidOperationException("missing_api_key");
+        var creds = _aiCredentials.Resolve(request.Model);
+        var apiKey = creds.ApiKey;
 
         var group = await _db.HabitGroups
             .FirstOrDefaultAsync(g => g.Id == groupId && g.UserId == userId && g.IsActive, ct)
@@ -144,7 +146,7 @@ public class HabitGroupDescriptionService
             userPrompt.AppendLine(Truncate(chatSb.ToString(), MaxChatChars));
         }
 
-        var raw = await CallLlmAsync(request.BaseUrl, apiKey, request.Model, system, userPrompt.ToString(), ct);
+        var raw = await CallLlmAsync(creds.BaseUrl, apiKey, creds.Model, system, userPrompt.ToString(), ct);
         var description = CleanDescription(raw);
         if (string.IsNullOrWhiteSpace(description))
             throw new InvalidOperationException("empty_llm");

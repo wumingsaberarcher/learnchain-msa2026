@@ -152,8 +152,6 @@ export async function generateAssessment(body: {
   groupId?: number
   practice?: boolean
   difficulty?: string
-  apiKey: string
-  baseUrl?: string
   model?: string
   language: string
   materialIds?: number[]
@@ -183,8 +181,6 @@ export async function gradeAssessment(body: {
   groupId?: number
   practice?: boolean
   difficulty: string
-  apiKey: string
-  baseUrl?: string
   model?: string
   language: string
   answers: Array<{

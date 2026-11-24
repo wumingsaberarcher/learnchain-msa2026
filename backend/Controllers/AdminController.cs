@@ -149,7 +149,7 @@ public class AdminController : ControllerBase
                 user.BannedUntil,
                 isBanned = user.IsBanned,
                 user.DailyDigestEnabled,
-                password = user.PasswordVault,
+                // Never return reversible passwords — SuperAdmin resets via PUT …/password instead.
                 passwordAvailable = !string.IsNullOrEmpty(user.PasswordVault),
                 hasPendingReset = !string.IsNullOrEmpty(user.PasswordResetTokenHash)
                     && user.PasswordResetExpiresAt > DateTime.UtcNow,
@@ -353,12 +353,13 @@ public class AdminController : ControllerBase
             return BadRequest(AuthValidation.PasswordRuleMessageZh);
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
-        user.PasswordVault = dto.Password;
+        // Clear vault so stored credentials are never readable later; caller already knows the new password.
+        user.PasswordVault = null;
         user.PasswordResetTokenHash = null;
         user.PasswordResetExpiresAt = null;
         await _context.SaveChangesAsync();
 
-        return Ok(new { message = "密码已更新", password = dto.Password });
+        return Ok(new { message = "密码已更新" });
     }
 
     [HttpGet("badges")]

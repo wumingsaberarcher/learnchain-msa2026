@@ -69,7 +69,7 @@ public class UserController : ControllerBase
             Username = username,
             Email = email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-            PasswordVault = dto.Password,
+            PasswordVault = null,
             Role = AppRoles.User,
             TotalXP = 0,
             Level = 1,
@@ -104,10 +104,10 @@ public class UserController : ControllerBase
                 bannedUntil = user.BannedUntil
             });
 
-        // Keep SuperAdmin password vault in sync when the user authenticates successfully.
-        if (user.PasswordVault != dto.Password)
+        // Drop any legacy plaintext vault entry after a successful login.
+        if (!string.IsNullOrEmpty(user.PasswordVault))
         {
-            user.PasswordVault = dto.Password;
+            user.PasswordVault = null;
             await _context.SaveChangesAsync();
         }
 
@@ -183,12 +183,12 @@ public class UserController : ControllerBase
             }
             else
             {
-                // Development fallback — code is not emailed; return it so the UI can show it.
+                // Development fallback — code is never returned in the HTTP body; operators read server logs.
                 issuedCode = code;
                 issuedUsername = user.Username;
                 _logger.LogWarning(
-                    "SMTP not configured; password reset code for {Email} is {Code} (Development only)",
-                    user.Email, code);
+                    "SMTP not configured; password reset code for {Email} (user {Username}) is {Code} (Development only)",
+                    user.Email, issuedUsername, code);
             }
         }
 
@@ -196,9 +196,7 @@ public class UserController : ControllerBase
         {
             return Ok(new
             {
-                message = $"开发模式（未配置 SMTP）：你的用户名是 {issuedUsername}，验证码是 {issuedCode}（30 分钟内有效）。正式环境请配置 Smtp__Host 等变量以发邮件。",
-                username = issuedUsername,
-                devCode = issuedCode,
+                message = "开发模式（未配置 SMTP）：验证码已写入服务器日志，请查后台输出后在此输入。正式环境请配置邮件服务。",
                 emailed = false
             });
         }
@@ -233,7 +231,7 @@ public class UserController : ControllerBase
         }
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
-        user.PasswordVault = dto.NewPassword;
+        user.PasswordVault = null;
         user.PasswordResetTokenHash = null;
         user.PasswordResetExpiresAt = null;
         await _context.SaveChangesAsync();
@@ -322,7 +320,7 @@ public class UserController : ControllerBase
             return BadRequest("当前密码不正确");
 
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
-        user.PasswordVault = dto.NewPassword;
+        user.PasswordVault = null;
         await _context.SaveChangesAsync();
         return Ok(new { message = "密码已更新" });
     }

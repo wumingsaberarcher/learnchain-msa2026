@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom'
-import { Target } from 'lucide-react'
 import Dashboard from './pages/ChainDashboard'
+import LearnChainLogo from './components/LearnChainLogo'
+import BootIntro, { shouldShowBootIntro } from './components/BootIntro'
 import About from './pages/About'
 import Music from './pages/Music'
 import Habits from './pages/Habits'
@@ -34,6 +35,7 @@ import { isStaffRole } from './api/adminApi'
 
 function App() {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
+    const [showIntro, setShowIntro] = useState(() => shouldShowBootIntro())
     const { isLoggedIn, currentUser, fetchHabits, fetchTodayCheckedHabits, fetchCurrentUser, markHabitCheckedToday } = useHabitStore()
     const { fetchProfile, syncAchievements, handleNewUnlocks } = useAchievementStore()
     const hydrateAiSettings = useAiSettingsStore(s => s.hydrateForUser)
@@ -68,7 +70,8 @@ function App() {
 
     return (
         <BrowserRouter>
-            <div className={`app-shell min-h-screen theme-${theme}`}>
+            <div className={`app-shell min-h-screen theme-${theme}${showIntro ? ' intro-locked' : ''}`}>
+                {showIntro && <BootIntro onFinished={() => setShowIntro(false)} />}
                 <BackgroundAnimation />
                 <BgmPlayer />
                 <AppSidebar />
@@ -83,7 +86,7 @@ function App() {
                                 aria-label={t('sidebar.open')}
                                 title={t('sidebar.open')}
                             >
-                                <Target className="w-6 h-6" />
+                                <LearnChainLogo size={28} />
                             </button>
                             <NavLink to="/" className="logo-home-link">
                                 <span className="logo-text">LearnChain</span>
@@ -151,14 +154,14 @@ function App() {
                 </main>
 
                 <BadgeUnlockModal />
-                {!isResting && !isFocusing && (
+                {!showIntro && !isResting && !isFocusing && (
                     <div className="theme-locale-fab">
                         <ThemeLocaleToggle />
                     </div>
                 )}
-                {!isResting && !isFocusing && <AiAssistant />}
-                {!isResting && !isFocusing && <CompanionTeaseOverlay />}
-                <IdleRestOverlay pauseIdle={isLoginModalOpen || isFocusing} />
+                {!showIntro && !isResting && !isFocusing && <AiAssistant />}
+                {!showIntro && !isResting && !isFocusing && <CompanionTeaseOverlay />}
+                <IdleRestOverlay pauseIdle={isLoginModalOpen || isFocusing || showIntro} />
                 <FocusModeOverlay
                     onCompleted={async (result) => {
                         const bonus = result.focusBonusXp ?? 0

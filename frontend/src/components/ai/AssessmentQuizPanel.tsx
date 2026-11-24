@@ -126,8 +126,6 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
     close,
   } = useAssessmentStore()
 
-  const apiKey = useAiSettingsStore((s) => s.apiKey)
-  const baseUrl = useAiSettingsStore((s) => s.baseUrl)
   const model = useAiSettingsStore((s) => s.model)
   const sendMessage = useChatStore((s) => s.sendMessage)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -187,10 +185,6 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
     const prompt = buildWrongReviewPrompt(result, qs, ans, zh)
     if (!prompt) {
       onCanalSpeak?.(t('assess.explainNone'))
-      return
-    }
-    if (!apiKey.trim()) {
-      setError(t('chat.missingApiKey'))
       return
     }
     setExplaining(true)
@@ -296,10 +290,6 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
   }
 
   const startGenerate = async () => {
-    if (!apiKey.trim()) {
-      setError(t('chat.missingApiKey'))
-      return
-    }
     if (selectedUsable.length === 0 && !curriculumSyllabus) {
       setError(t('assess.needSelectMaterial'))
       return
@@ -317,8 +307,6 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
         groupId: groupId ?? undefined,
         practice,
         difficulty,
-        apiKey,
-        baseUrl,
         model,
         language,
         materialIds: syllabusOnly ? [] : materialIds.length ? materialIds : undefined,
@@ -355,10 +343,6 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
   const finishGrade = async (
     answerOverride?: Record<string, { selectedOptionId?: string; textAnswer?: string }>,
   ) => {
-    if (!apiKey.trim()) {
-      setError(t('chat.missingApiKey'))
-      return
-    }
     setBusy(true)
     setPhase('grading')
     try {
@@ -382,8 +366,6 @@ export default function AssessmentQuizPanel({ onCanalSpeak }: { onCanalSpeak?: (
         groupId: groupId ?? undefined,
         practice,
         difficulty,
-        apiKey,
-        baseUrl,
         model,
         language,
         answers: payloadAnswers,

@@ -90,6 +90,7 @@ try
     builder.Services.AddScoped<AchievementService>();
     builder.Services.AddScoped<HabitContextBuilder>();
     builder.Services.AddScoped<CompanionMemoryService>();
+    builder.Services.AddSingleton<AiCredentialResolver>();
     builder.Services.AddScoped<AiAssistantService>();
     builder.Services.AddScoped<CompanionAffectionService>();
     builder.Services.AddScoped<CanalTrustService>();

@@ -49,8 +49,6 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
   const { t, language } = useTranslation()
   const patchHabitLocal = useHabitStore((s) => s.patchHabitLocal)
   const patchHabitsLocal = useHabitStore((s) => s.patchHabitsLocal)
-  const apiKey = useAiSettingsStore((s) => s.apiKey)
-  const baseUrl = useAiSettingsStore((s) => s.baseUrl)
   const model = useAiSettingsStore((s) => s.model)
   const [groups, setGroups] = useState<HabitGroup[]>([])
   const [loading, setLoading] = useState(true)
@@ -189,17 +187,11 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
       setError(t('groups.genDescNeedMats'))
       return
     }
-    if (!apiKey.trim()) {
-      setError(t('groups.genDescNeedKey'))
-      return
-    }
     setGenDescId(g.id)
     setError(null)
     try {
       const localExcerpts = await localCollectTextExcerpts(g.id)
       const { description } = await generateGroupDescription(g.id, {
-        apiKey: apiKey.trim(),
-        baseUrl: baseUrl.trim() || undefined,
         model: model.trim() || undefined,
         language,
         overwrite: false,
@@ -208,7 +200,7 @@ export default function HabitGroupsBoard({ habits, renderHabit }: Props) {
       setGroups((gs) => gs.map((x) => (x.id === g.id ? { ...x, description } : x)))
     } catch (e) {
       const msg = e instanceof Error ? e.message : ''
-      if (msg === 'missing_api_key') setError(t('groups.genDescNeedKey'))
+      if (msg === 'missing_api_key' || msg === 'ai_not_configured') setError(t('groups.genDescNeedKey'))
       else if (msg === 'no_materials') setError(t('groups.genDescNeedMats'))
       else setError(msg || t('groups.genDescFail'))
     } finally {
