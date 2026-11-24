@@ -8,9 +8,21 @@ interface BootIntroProps {
     onFinished: () => void
 }
 
+function wantsCoverPreview(): boolean {
+    try {
+        const params = new URLSearchParams(window.location.search)
+        return params.get('cover') === '1' || params.get('cover') === 'true'
+    } catch {
+        return false
+    }
+}
+
 export default function BootIntro({ onFinished }: BootIntroProps) {
     const { t, theme } = useTranslation()
-    const [phase, setPhase] = useState<'enter' | 'hold' | 'exit'>('enter')
+    // Cover/preview mode starts fully opaque so publish screenshots stay sharp
+    const [phase, setPhase] = useState<'enter' | 'hold' | 'exit'>(() =>
+        wantsCoverPreview() ? 'hold' : 'enter',
+    )
     const doneRef = useRef(false)
 
     const finish = () => {
@@ -31,12 +43,8 @@ export default function BootIntro({ onFinished }: BootIntroProps) {
 
     useEffect(() => {
         const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        if (reduce) {
-            setPhase('hold')
-            return
-        }
-
-        const toHold = window.setTimeout(() => setPhase('hold'), 900)
+        // Reach a sharp, fully-opaque hold quickly so preview screenshots stay crisp
+        const toHold = window.setTimeout(() => setPhase('hold'), reduce ? 0 : 450)
         // Stay on the cover until the user enters — soft fallback for kiosks only
         const softEnter = window.setTimeout(() => finish(), 22000)
         return () => {
