@@ -145,8 +145,6 @@ export type LocalMaterialExcerpt = { fileName: string; text: string }
 export async function generateGroupDescription(
   groupId: number,
   body: {
-    apiKey: string
-    baseUrl?: string
     model?: string
     language?: string
     overwrite?: boolean
@@ -157,8 +155,6 @@ export async function generateGroupDescription(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      apiKey: body.apiKey,
-      baseUrl: body.baseUrl,
       model: body.model,
       language: body.language,
       overwrite: body.overwrite ?? false,
@@ -175,7 +171,9 @@ export async function generateGroupDescription(
     } catch (e) {
       if (e instanceof Error && e.message && !e.message.startsWith('{')) throw e
     }
-    if (code === 'missing_api_key') throw new Error('missing_api_key')
+    if (code === 'missing_api_key' || /Ai__ApiKey|not configured/i.test(raw)) {
+      throw new Error('ai_not_configured')
+    }
     if (code === 'no_materials') throw new Error('no_materials')
     if (code === 'description_exists') throw new Error('description_exists')
     throw new Error(parseErrorBody(raw) || `Generate failed (HTTP ${res.status})`)

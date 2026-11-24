@@ -14,6 +14,7 @@ public class AssessmentService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly CompanionAffectionService _affection;
     private readonly CanalTrustService _trust;
+    private readonly AiCredentialResolver _aiCredentials;
     private readonly ILogger<AssessmentService> _logger;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -26,12 +27,14 @@ public class AssessmentService
         IHttpClientFactory httpClientFactory,
         CompanionAffectionService affection,
         CanalTrustService trust,
+        AiCredentialResolver aiCredentials,
         ILogger<AssessmentService> logger)
     {
         _db = db;
         _httpClientFactory = httpClientFactory;
         _affection = affection;
         _trust = trust;
+        _aiCredentials = aiCredentials;
         _logger = logger;
     }
 
@@ -159,9 +162,8 @@ public class AssessmentService
         AssessmentGenerateRequest request,
         CancellationToken ct)
     {
-        var apiKey = request.ApiKey?.Trim();
-        if (string.IsNullOrWhiteSpace(apiKey))
-            throw new InvalidOperationException("missing_api_key");
+        var creds = _aiCredentials.Resolve(request.Model);
+        var apiKey = creds.ApiKey;
 
         var (title, difficulty, materialText) = await LoadQuizContextAsync(user.Id, request, ct);
         if (!string.IsNullOrWhiteSpace(request.Difficulty))
@@ -196,7 +198,7 @@ public class AssessmentService
             ? $"主题：{title}\n模式：{modeLabel}\n难度：{difficulty}\n需要约 {count} 题。{(allowShort ? "可含问答题（short）。" : "以选择题（mcq）为主，至少 4 道 mcq。")}\n\n学习资料：\n{materialText}"
             : $"Topic: {title}\nMode: {modeLabel}\nDifficulty: {difficulty}\nAbout {count} questions. {(allowShort ? "May include short answers." : "Mostly mcq (at least 4).")}\n\nMaterials:\n{materialText}";
 
-        var raw = await CallJsonAsync(request.BaseUrl, apiKey, request.Model, system, userPrompt, ct);
+        var raw = await CallJsonAsync(creds.BaseUrl, apiKey, creds.Model, system, userPrompt, ct);
         var questions = ParseQuestions(raw, count, allowShort);
         if (questions.Count == 0)
             throw new InvalidOperationException("Failed to generate questions from the model.");
@@ -206,9 +208,8 @@ public class AssessmentService
 
     public async Task<object> GradeAsync(User user, AssessmentGradeRequest request, CancellationToken ct)
     {
-        var apiKey = request.ApiKey?.Trim();
-        if (string.IsNullOrWhiteSpace(apiKey))
-            throw new InvalidOperationException("missing_api_key");
+        var creds = _aiCredentials.Resolve(request.Model);
+        var apiKey = creds.ApiKey;
 
         Habit? habit = null;
         if (request.HabitId > 0)
@@ -248,7 +249,7 @@ public class AssessmentService
             var type = (q.Type ?? answer.Type ?? "mcq").Trim().ToLowerInvariant();
             if (type == "short")
             {
-                results.Add(await GradeShortAsync(apiKey, request.BaseUrl, request.Model, q, answer.TextAnswer ?? "", zh, ct));
+                results.Add(await GradeShortAsync(apiKey, creds.BaseUrl, creds.Model, q, answer.TextAnswer ?? "", zh, ct));
             }
             else
             {

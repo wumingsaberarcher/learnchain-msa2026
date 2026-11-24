@@ -284,10 +284,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (!trimmed && !imageDataUrl) return []
 
         const provider = useAiSettingsStore.getState()
-        if (!provider.apiKey.trim()) {
-            set({ error: 'missing_api_key' })
-            return []
-        }
 
         const { userId, scope } = get()
         const kind = messageKindForScope(scope)
@@ -313,8 +309,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         try {
             const res = await sendChat(payload, language, {
-                apiKey: provider.apiKey,
-                baseUrl: provider.baseUrl,
                 model: provider.model,
             }, scope, imageDataUrl)
 

@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { ImagePlus, Mail, Mic, Paperclip, Send, Trash2, X } from 'lucide-react'
 import { sendTodayReminder } from '../../api/chatApi'
 import { useChatStore } from '../../stores/chatStore'
-import { useAiSettingsStore } from '../../stores/aiSettingsStore'
 import { useCompanionStore } from '../../stores/companionStore'
 import { useHabitStore } from '../../stores/habitStore'
 import { useTranslation } from '../../stores/settingsStore'
@@ -21,7 +19,6 @@ export default function AiAssistant() {
         isOpen, messages, isSending, isListening, error, lastActions,
         toggle, close, setListening, clearHistory, hydrateForUser, sendMessage, clearError,
     } = useChatStore()
-    const apiKey = useAiSettingsStore(s => s.apiKey)
     const {
         emotion, isTalking, userAvatarUrl, galModeOpen,
         setUserAvatarFromFile, clearUserAvatar, tryHoverSurprise, enterGalMode,
@@ -109,7 +106,9 @@ export default function AiAssistant() {
         if (avatarInputRef.current) avatarInputRef.current.value = ''
     }
 
-    const errorText = error === 'missing_api_key' ? t('chat.missingApiKey') : error
+    const errorText = error === 'missing_api_key' || (error && /Ai__ApiKey|not configured/i.test(error))
+        ? t('chat.missingApiKey')
+        : error
     const userInitial = (currentUser?.username?.[0] ?? 'U').toUpperCase()
 
     return (
@@ -200,13 +199,6 @@ export default function AiAssistant() {
                             </div>
                         </div>
                         {avatarErr && <div className="ai-chat-error">{avatarErr}</div>}
-
-                        {!apiKey.trim() && (
-                            <div className="ai-chat-banner">
-                                {t('chat.needApiKey')}{' '}
-                                <Link to="/profile" onClick={close}>{t('chat.goProfile')}</Link>
-                            </div>
-                        )}
 
                         <div className="ai-chat-messages" ref={listRef}>
                             {messages.length === 0 && (

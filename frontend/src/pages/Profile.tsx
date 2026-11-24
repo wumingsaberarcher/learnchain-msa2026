@@ -29,8 +29,6 @@ export default function ProfilePage() {
     const [newPwd, setNewPwd] = useState('')
     const [msg, setMsg] = useState('')
     const [err, setErr] = useState('')
-    const [aiKey, setAiKey] = useState(aiSettings.apiKey)
-    const [aiBase, setAiBase] = useState(aiSettings.baseUrl)
     const [aiModel, setAiModel] = useState(aiSettings.model)
     const [digestEnabled, setDigestEnabled] = useState(false)
     const [memories, setMemories] = useState<UserMemoryItem[]>([])
@@ -46,10 +44,8 @@ export default function ProfilePage() {
     useEffect(() => { void affection.hydrate() }, [affection.hydrate])
     useEffect(() => { void trust.hydrate() }, [trust.hydrate])
     useEffect(() => {
-        setAiKey(aiSettings.apiKey)
-        setAiBase(aiSettings.baseUrl)
         setAiModel(aiSettings.model)
-    }, [aiSettings.userId, aiSettings.apiKey, aiSettings.baseUrl, aiSettings.model])
+    }, [aiSettings.userId, aiSettings.model])
     useEffect(() => {
         getChatPreferences()
             .then(p => setDigestEnabled(p.dailyDigestEnabled))
@@ -79,13 +75,9 @@ export default function ProfilePage() {
     }
 
     const handleSaveAi = () => {
-        aiSettings.save({
-            apiKey: aiKey.trim(),
-            baseUrl: aiBase.trim() || 'https://api.openai.com/v1',
-            model: aiModel.trim() || 'gpt-4o-mini',
-        })
-        setAiBase(aiBase.trim() || 'https://api.openai.com/v1')
-        setAiModel(aiModel.trim() || 'gpt-4o-mini')
+        const model = aiModel.trim() || 'gpt-4o-mini'
+        aiSettings.save({ model })
+        setAiModel(model)
         setMsg(t('profile.aiSaved'))
         setTimeout(() => setMsg(''), 2500)
     }
@@ -239,29 +231,6 @@ export default function ProfilePage() {
                     <label>{t('profile.aiTitle')}</label>
                     <p className="profile-hint">{t('profile.aiHint')}</p>
                     <div className="profile-ai-grid">
-                        <div className="profile-info-item">
-                            <label htmlFor="ai-key">{t('profile.aiApiKey')}</label>
-                            <input
-                                id="ai-key"
-                                type="password"
-                                className="profile-input"
-                                value={aiKey}
-                                onChange={e => setAiKey(e.target.value)}
-                                placeholder="sk-..."
-                                autoComplete="off"
-                            />
-                        </div>
-                        <div className="profile-info-item">
-                            <label htmlFor="ai-base">{t('profile.aiBaseUrl')}</label>
-                            <input
-                                id="ai-base"
-                                type="url"
-                                className="profile-input"
-                                value={aiBase}
-                                onChange={e => setAiBase(e.target.value)}
-                                placeholder="https://api.openai.com/v1"
-                            />
-                        </div>
                         <div className="profile-info-item">
                             <label htmlFor="ai-model">{t('profile.aiModel')}</label>
                             <input

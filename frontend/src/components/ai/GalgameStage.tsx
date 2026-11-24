@@ -302,7 +302,7 @@ export default function GalgameStage() {
     } else {
       const err = useChatStore.getState().error
       playLine(
-        err === 'missing_api_key'
+        err === 'missing_api_key' || (err != null && /Ai__ApiKey|not configured/i.test(err))
           ? t('chat.missingApiKey')
           : err || t('chat.galFallback'),
       )
@@ -369,7 +369,10 @@ export default function GalgameStage() {
   }
 
   const hoverMsg = historyMessages.find((m) => m.id === hoverTickId)
-  const errorText = error === 'missing_api_key' ? t('chat.missingApiKey') : error
+  const errorText =
+    error === 'missing_api_key' || (error != null && /Ai__ApiKey|not configured/i.test(error))
+      ? t('chat.missingApiKey')
+      : error
 
   return (
     <div className={`gal-stage${assessmentActive ? ' has-assess' : ''}${viewMode === 'history' ? ' is-history' : ''}`} role="dialog" aria-label={t('chat.galTitle')}>

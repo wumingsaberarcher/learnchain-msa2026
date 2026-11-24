@@ -10,8 +10,6 @@ namespace backend.Services;
 
 public class AiAssistantService
 {
-    private const string DefaultBaseUrl = "https://api.openai.com/v1";
-    private const string DefaultModel = "gpt-4o-mini";
     private const int MaxToolRounds = 4;
 
     private readonly AppDbContext _context;
@@ -22,6 +20,7 @@ public class AiAssistantService
     private readonly CanalTrustService _trust;
     private readonly CanalKnowledgeService _canalKnowledge;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly AiCredentialResolver _aiCredentials;
     private readonly ILogger<AiAssistantService> _logger;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -39,6 +38,7 @@ public class AiAssistantService
         CanalTrustService trust,
         CanalKnowledgeService canalKnowledge,
         IHttpClientFactory httpClientFactory,
+        AiCredentialResolver aiCredentials,
         ILogger<AiAssistantService> logger)
     {
         _context = context;
@@ -49,18 +49,17 @@ public class AiAssistantService
         _trust = trust;
         _canalKnowledge = canalKnowledge;
         _httpClientFactory = httpClientFactory;
+        _aiCredentials = aiCredentials;
         _logger = logger;
     }
 
     public async Task<ChatResponse> ChatAsync(User user, ChatRequest request, CancellationToken ct = default)
     {
-        var apiKey = request.ApiKey?.Trim();
-        if (string.IsNullOrWhiteSpace(apiKey))
-            throw new InvalidOperationException(
-                "API key is required. Add your OpenAI-compatible API key in Profile → AI Assistant settings.");
-
-        var baseUrl = (request.BaseUrl?.Trim().TrimEnd('/') is { Length: > 0 } b ? b : DefaultBaseUrl);
-        var model = string.IsNullOrWhiteSpace(request.Model) ? DefaultModel : request.Model.Trim();
+        // Server-owned credentials only — never accept client-supplied API keys.
+        var creds = _aiCredentials.Resolve(request.Model);
+        var apiKey = creds.ApiKey;
+        var baseUrl = creds.BaseUrl;
+        var model = creds.Model;
         var zh = request.Language.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
 
         var latestUser = request.Messages
