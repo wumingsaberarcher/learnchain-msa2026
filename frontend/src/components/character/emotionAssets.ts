@@ -44,6 +44,13 @@ import mouthSorrow from '../../../Canal/mouth/mouth_sorrow.png'
 import mouthSurprise from '../../../Canal/mouth/mouth_surprise.png'
 import mouthFear from '../../../Canal/mouth/mouth_fear.png'
 
+import plateNormal from '../../../Canal/expression-plates/normal.png'
+import plateSmile from '../../../Canal/expression-plates/smile.png'
+import plateAngry from '../../../Canal/expression-plates/angry.png'
+import plateSorrow from '../../../Canal/expression-plates/sorrow.png'
+import plateSurprise from '../../../Canal/expression-plates/surprise.png'
+import plateFear from '../../../Canal/expression-plates/fear.png'
+
 export type Emotion = 'normal' | 'angry' | 'smile' | 'sorrow' | 'surprise' | 'fear'
 
 
@@ -154,9 +161,21 @@ export const baseAssets = {
   frontHair,
 } as const
 
+/** Full expression plates (4× + white keyed). Used by Character when usePlate. */
+export const expressionPlates: Record<Emotion, string> = {
+  normal: plateNormal,
+  smile: plateSmile,
+  angry: plateAngry,
+  sorrow: plateSorrow,
+  surprise: plateSurprise,
+  fear: plateFear,
+}
+
 export interface CharacterProps {
   emotion?: Emotion
   isTalking?: boolean
   className?: string
   style?: CSSProperties
+  /** Single full expression plate instead of layered PNGs. Default true. */
+  usePlate?: boolean
 }
