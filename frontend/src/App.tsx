@@ -154,14 +154,14 @@ function App() {
                 </main>
 
                 <BadgeUnlockModal />
-                {!isResting && !isFocusing && (
+                {!showIntro && !isResting && !isFocusing && (
                     <div className="theme-locale-fab">
                         <ThemeLocaleToggle />
                     </div>
                 )}
-                {!isResting && !isFocusing && <AiAssistant />}
-                {!isResting && !isFocusing && <CompanionTeaseOverlay />}
-                <IdleRestOverlay pauseIdle={isLoginModalOpen || isFocusing} />
+                {!showIntro && !isResting && !isFocusing && <AiAssistant />}
+                {!showIntro && !isResting && !isFocusing && <CompanionTeaseOverlay />}
+                <IdleRestOverlay pauseIdle={isLoginModalOpen || isFocusing || showIntro} />
                 <FocusModeOverlay
                     onCompleted={async (result) => {
                         const bonus = result.focusBonusXp ?? 0

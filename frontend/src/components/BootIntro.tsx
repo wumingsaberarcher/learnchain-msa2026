@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import LearnChainLogo from './LearnChainLogo'
 import { useTranslation } from '../stores/settingsStore'
 
@@ -11,6 +11,16 @@ interface BootIntroProps {
 export default function BootIntro({ onFinished }: BootIntroProps) {
     const { t, theme } = useTranslation()
     const [phase, setPhase] = useState<'enter' | 'hold' | 'exit'>('enter')
+    const doneRef = useRef(false)
+
+    const finish = () => {
+        if (doneRef.current) return
+        doneRef.current = true
+        try {
+            sessionStorage.setItem(SESSION_KEY, '1')
+        } catch { /* ignore */ }
+        onFinished()
+    }
 
     useEffect(() => {
         const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -27,15 +37,9 @@ export default function BootIntro({ onFinished }: BootIntroProps) {
             clearTimeout(toExit)
             clearTimeout(toDone)
         }
+        // finish is stable for this mount; avoid re-arming timers
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
-
-    const finish = () => {
-        try {
-            sessionStorage.setItem(SESSION_KEY, '1')
-        } catch { /* ignore */ }
-        onFinished()
-    }
 
     return (
         <div
@@ -55,7 +59,14 @@ export default function BootIntro({ onFinished }: BootIntroProps) {
                 <p className="boot-intro-tag">{t('dash.tagline')}</p>
             </div>
 
-            <button type="button" className="boot-intro-skip" onClick={finish}>
+            <button
+                type="button"
+                className="boot-intro-skip"
+                onClick={e => {
+                    e.stopPropagation()
+                    finish()
+                }}
+            >
                 {t('intro.skip')}
             </button>
         </div>
